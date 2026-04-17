@@ -33,56 +33,230 @@ def inject_css() -> None:
         """
         <style>
             :root {
-                --bg: #07111f;
-                --bg-soft: #0f1b2d;
-                --card: rgba(15, 27, 45, 0.88);
-                --line: rgba(148, 163, 184, 0.22);
-                --text: #ebf2ff;
-                --muted: #97a6ba;
-                --green: #3ddc97;
-                --red: #ff6b6b;
-                --gold: #ffca6d;
-                --blue: #5ab2ff;
+                --bg: #06111a;
+                --bg-soft: #0f1d29;
+                --card: rgba(11, 24, 36, 0.82);
+                --line: rgba(133, 255, 210, 0.18);
+                --text: #f4fbff;
+                --muted: #90a8b7;
+                --green: #7dffcf;
+                --red: #ff7a90;
+                --gold: #ffd36e;
+                --blue: #61d9ff;
+                --cyan: #5afff2;
             }
 
             .stApp {
                 background:
-                    radial-gradient(circle at top left, rgba(90, 178, 255, 0.18), transparent 30%),
-                    radial-gradient(circle at top right, rgba(61, 220, 151, 0.12), transparent 24%),
-                    linear-gradient(180deg, #040b14 0%, #07111f 45%, #08131d 100%);
+                    radial-gradient(circle at 10% 10%, rgba(97, 217, 255, 0.22), transparent 20%),
+                    radial-gradient(circle at 88% 12%, rgba(125, 255, 207, 0.18), transparent 18%),
+                    radial-gradient(circle at 50% 90%, rgba(255, 211, 110, 0.10), transparent 24%),
+                    linear-gradient(180deg, #02070d 0%, #06111a 42%, #041019 100%);
                 color: var(--text);
             }
 
             .block-container {
-                padding-top: 1.1rem;
-                padding-bottom: 2rem;
+                padding-top: 1rem;
+                padding-bottom: 2.5rem;
+                max-width: 1380px;
             }
 
             .hero, .panel {
                 border: 1px solid var(--line);
                 background: var(--card);
-                border-radius: 20px;
-                box-shadow: 0 20px 60px rgba(0, 0, 0, 0.22);
+                border-radius: 24px;
+                box-shadow: 0 24px 80px rgba(0, 0, 0, 0.28);
+                backdrop-filter: blur(18px);
             }
 
             .hero {
-                padding: 1.5rem 1.7rem;
-                margin-bottom: 1rem;
+                padding: 1.8rem 1.9rem;
+                margin-bottom: 1.2rem;
+                overflow: hidden;
+                position: relative;
+                background:
+                    linear-gradient(135deg, rgba(11, 24, 36, 0.92), rgba(5, 18, 30, 0.82)),
+                    linear-gradient(135deg, rgba(97, 217, 255, 0.08), rgba(125, 255, 207, 0.05));
             }
 
             .hero h1 {
                 margin: 0;
-                font-size: 2.2rem;
+                font-size: 2.9rem;
                 letter-spacing: -0.04em;
+                line-height: 0.95;
             }
 
             .hero p {
                 color: var(--muted);
-                margin: 0.45rem 0 0 0;
+                margin: 0.55rem 0 0 0;
+                font-size: 1.05rem;
+                max-width: 760px;
             }
 
             .panel {
-                padding: 1rem 1rem 0.5rem 1rem;
+                padding: 1.05rem 1.05rem 0.6rem 1.05rem;
+                background:
+                    linear-gradient(180deg, rgba(12, 25, 37, 0.88), rgba(7, 18, 28, 0.9));
+            }
+
+            .hero::before {
+                content: "";
+                position: absolute;
+                width: 300px;
+                height: 300px;
+                right: -90px;
+                top: -120px;
+                background: radial-gradient(circle, rgba(97, 217, 255, 0.24), transparent 62%);
+                pointer-events: none;
+            }
+
+            .hero::after {
+                content: "";
+                position: absolute;
+                width: 260px;
+                height: 260px;
+                right: 80px;
+                bottom: -160px;
+                background: radial-gradient(circle, rgba(125, 255, 207, 0.18), transparent 60%);
+                pointer-events: none;
+            }
+
+            .hero-badges {
+                display: flex;
+                gap: 0.65rem;
+                flex-wrap: wrap;
+                margin-bottom: 1rem;
+            }
+
+            .hero-badge {
+                padding: 0.38rem 0.8rem;
+                border-radius: 999px;
+                border: 1px solid rgba(97, 217, 255, 0.22);
+                background: rgba(255, 255, 255, 0.04);
+                color: var(--text);
+                font-size: 0.82rem;
+                letter-spacing: 0.04em;
+                text-transform: uppercase;
+            }
+
+            .kpi-card {
+                padding: 1rem 1rem 1.05rem 1rem;
+                border-radius: 22px;
+                border: 1px solid rgba(97, 217, 255, 0.16);
+                background: linear-gradient(180deg, rgba(10, 24, 35, 0.94), rgba(7, 17, 28, 0.92));
+                box-shadow: inset 0 1px 0 rgba(255,255,255,0.03), 0 14px 40px rgba(0,0,0,0.18);
+                min-height: 132px;
+            }
+
+            .kpi-label {
+                color: var(--muted);
+                font-size: 0.82rem;
+                text-transform: uppercase;
+                letter-spacing: 0.08em;
+            }
+
+            .kpi-value {
+                color: var(--text);
+                font-size: 2rem;
+                font-weight: 700;
+                margin-top: 0.55rem;
+                letter-spacing: -0.04em;
+            }
+
+            .kpi-delta {
+                margin-top: 0.4rem;
+                color: var(--cyan);
+                font-size: 0.95rem;
+            }
+
+            .steps-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+                gap: 0.9rem;
+                margin-top: 0.35rem;
+                margin-bottom: 0.6rem;
+            }
+
+            .step-card {
+                border-radius: 20px;
+                padding: 1rem;
+                border: 1px solid rgba(125, 255, 207, 0.15);
+                background: linear-gradient(180deg, rgba(13, 28, 42, 0.86), rgba(8, 18, 29, 0.9));
+                min-height: 138px;
+            }
+
+            .step-number {
+                color: var(--cyan);
+                font-size: 0.8rem;
+                letter-spacing: 0.12em;
+                text-transform: uppercase;
+            }
+
+            .step-title {
+                color: var(--text);
+                font-size: 1.08rem;
+                font-weight: 700;
+                margin-top: 0.55rem;
+                margin-bottom: 0.4rem;
+            }
+
+            .step-copy {
+                color: var(--muted);
+                font-size: 0.92rem;
+                line-height: 1.45;
+            }
+
+            .highlight-box {
+                border-radius: 18px;
+                padding: 0.95rem 1rem;
+                border: 1px solid rgba(255, 211, 110, 0.16);
+                background: linear-gradient(90deg, rgba(255, 211, 110, 0.08), rgba(97, 217, 255, 0.06));
+                color: var(--text);
+                margin-bottom: 0.8rem;
+            }
+
+            .stButton > button {
+                border-radius: 14px;
+                border: 1px solid rgba(97, 217, 255, 0.16);
+                background: linear-gradient(135deg, rgba(13, 31, 44, 0.98), rgba(8, 20, 30, 0.96));
+                color: var(--text);
+                font-weight: 600;
+                min-height: 3rem;
+                box-shadow: 0 10px 30px rgba(0,0,0,0.18);
+                transition: all 0.18s ease;
+            }
+
+            .stButton > button:hover {
+                border-color: rgba(97, 217, 255, 0.36);
+                transform: translateY(-1px);
+                box-shadow: 0 14px 32px rgba(0,0,0,0.22);
+            }
+
+            .stButton > button[kind="primary"] {
+                background: linear-gradient(135deg, rgba(91, 255, 242, 0.22), rgba(97, 217, 255, 0.18));
+                border: 1px solid rgba(91, 255, 242, 0.34);
+                box-shadow: 0 0 0 1px rgba(91, 255, 242, 0.08), 0 0 28px rgba(91, 255, 242, 0.16);
+            }
+
+            [data-testid="stSidebar"] {
+                background: linear-gradient(180deg, rgba(5, 14, 22, 0.96), rgba(7, 18, 28, 0.98));
+                border-right: 1px solid rgba(97, 217, 255, 0.10);
+            }
+
+            [data-testid="stDataFrame"] {
+                border-radius: 18px;
+                overflow: hidden;
+                border: 1px solid rgba(97, 217, 255, 0.12);
+            }
+
+            h3 {
+                letter-spacing: -0.03em;
+            }
+
+            @media (max-width: 900px) {
+                .hero h1 {
+                    font-size: 2.2rem;
+                }
             }
         </style>
         """,
@@ -102,8 +276,13 @@ def render_header() -> None:
     st.markdown(
         """
         <div class="hero">
+            <div class="hero-badges">
+                <span class="hero-badge">Painel Pessoal</span>
+                <span class="hero-badge">Visual Futurista</span>
+                <span class="hero-badge">Robo em Simulacao</span>
+            </div>
             <h1>Invest Pro Bot</h1>
-            <p>Painel pessoal para acompanhar, configurar e operar seu robo em modo automatico com trilha de auditoria.</p>
+            <p>Um painel simples para testar a estrategia, acompanhar o saldo e ligar ou pausar o robo.</p>
         </div>
         """,
         unsafe_allow_html=True,
@@ -111,63 +290,102 @@ def render_header() -> None:
 
 
 def sidebar_form(runtime: dict) -> tuple[list[str], StrategyConfig, date]:
-    st.sidebar.title("Controle do robo")
-    tickers_text = st.sidebar.text_area("Ativos monitorados", value=", ".join(runtime["tickers"]))
+    st.sidebar.title("Configuracao rapida")
+    st.sidebar.caption("Preencha apenas o basico. O restante ja vem ajustado para voce.")
+
+    tickers_text = st.sidebar.text_area(
+        "Acoes para acompanhar",
+        value=", ".join(runtime["tickers"]),
+        help="Digite os codigos separados por virgula. Ex.: VALE3.SA, PETR4.SA, ITUB4.SA",
+    )
     tickers = [item.strip().upper() for item in tickers_text.split(",") if item.strip()]
 
-    start_date = st.sidebar.date_input("Data inicial do backtest", value=date.fromisoformat(runtime["backtest_start"]))
+    start_date = st.sidebar.date_input("Analisar dados desde", value=date.fromisoformat(runtime["backtest_start"]))
     capital_total = st.sidebar.number_input(
-        "Capital inicial da conta",
+        "Quanto dinheiro voce quer simular",
         min_value=100.0,
         value=float(runtime["capital_total"]),
         step=100.0,
     )
     capital_operacao = st.sidebar.number_input(
-        "Capital maximo por operacao",
+        "Valor maximo por compra",
         min_value=50.0,
         value=float(runtime["capital_por_operacao"]),
         step=50.0,
     )
     intervalo = st.sidebar.slider(
-        "Intervalo de verificacao (min)",
+        "A cada quantos minutos verificar",
         min_value=1,
         max_value=60,
         value=int(runtime["interval_minutes"]),
     )
-    media_curta = st.sidebar.slider("Media curta", 5, 30, int(runtime["strategy"]["media_curta"]))
-    media_longa = st.sidebar.slider("Media longa", 10, 60, int(runtime["strategy"]["media_longa"]))
-    media_tendencia = st.sidebar.slider("Media tendencia", 20, 200, int(runtime["strategy"]["media_tendencia"]))
-    periodo_rsi = st.sidebar.slider("Periodo RSI", 7, 30, int(runtime["strategy"]["periodo_rsi"]))
-    rsi_compra = st.sidebar.slider("RSI max compra", 40, 80, int(runtime["strategy"]["rsi_compra_max"]))
-    rsi_venda = st.sidebar.slider("RSI min venda", 50, 90, int(runtime["strategy"]["rsi_venda_min"]))
-    stop_loss = st.sidebar.slider("Stop loss (%)", 1.0, 15.0, float(runtime["strategy"]["stop_loss_pct"]), 0.5)
-    taxa = st.sidebar.slider("Taxa operacao (%)", 0.0, 2.0, float(runtime["strategy"]["taxa_operacao_pct"]), 0.05)
 
-    strategy = StrategyConfig(
-        capital_inicial=float(capital_total),
-        capital_por_operacao=float(capital_operacao),
-        media_curta=media_curta,
-        media_longa=media_longa,
-        media_tendencia=media_tendencia,
-        periodo_rsi=periodo_rsi,
-        rsi_compra_max=float(rsi_compra),
-        rsi_venda_min=float(rsi_venda),
-        stop_loss_pct=float(stop_loss),
-        taxa_operacao_pct=float(taxa),
+    perfil = st.sidebar.selectbox(
+        "Perfil da estrategia",
+        ["Equilibrado", "Conservador", "Agressivo"],
+        index=0,
+        help="Escolha um perfil pronto em vez de mexer em varios numeros tecnicos.",
     )
+
+    if perfil == "Conservador":
+        strategy = StrategyConfig(
+            capital_inicial=float(capital_total),
+            capital_por_operacao=float(capital_operacao),
+            media_curta=9,
+            media_longa=26,
+            media_tendencia=72,
+            periodo_rsi=14,
+            rsi_compra_max=62,
+            rsi_venda_min=70,
+            stop_loss_pct=2.0,
+            taxa_operacao_pct=0.1,
+        )
+    elif perfil == "Agressivo":
+        strategy = StrategyConfig(
+            capital_inicial=float(capital_total),
+            capital_por_operacao=float(capital_operacao),
+            media_curta=7,
+            media_longa=18,
+            media_tendencia=40,
+            periodo_rsi=10,
+            rsi_compra_max=72,
+            rsi_venda_min=78,
+            stop_loss_pct=4.5,
+            taxa_operacao_pct=0.1,
+        )
+    else:
+        strategy = StrategyConfig(
+            capital_inicial=float(capital_total),
+            capital_por_operacao=float(capital_operacao),
+            media_curta=9,
+            media_longa=21,
+            media_tendencia=50,
+            periodo_rsi=14,
+            rsi_compra_max=68,
+            rsi_venda_min=75,
+            stop_loss_pct=3.0,
+            taxa_operacao_pct=0.1,
+        )
+
+    with st.sidebar.expander("Ver detalhes da estrategia"):
+        st.write(f"Perfil escolhido: `{perfil}`")
+        st.write(f"Media curta: `{strategy.media_curta}`")
+        st.write(f"Media longa: `{strategy.media_longa}`")
+        st.write(f"Stop loss: `{strategy.stop_loss_pct}%`")
 
     runtime["tickers"] = tickers
     runtime["backtest_start"] = start_date.isoformat()
     runtime["capital_total"] = float(capital_total)
     runtime["capital_por_operacao"] = float(capital_operacao)
     runtime["interval_minutes"] = int(intervalo)
+    runtime["profile"] = perfil
     runtime["strategy"] = strategy.to_dict()
     return tickers, strategy, start_date
 
 
 def render_controls(runtime: dict) -> None:
     st.markdown('<div class="panel">', unsafe_allow_html=True)
-    st.subheader("Centro de operacao")
+    st.subheader("O que voce quer fazer agora?")
     col1, col2, col3, col4, col5 = st.columns(5)
     if col1.button("Salvar configuracao", use_container_width=True):
         save_runtime_config(runtime)
@@ -193,11 +411,11 @@ def render_controls(runtime: dict) -> None:
 
     modo = runtime.get("mode", "paper")
     status = "ATIVO" if runtime.get("enabled") else "PAUSADO"
-    st.caption(f"Modo atual: `{modo}` | Status: `{status}` | Runner: [bot_runner.py]({Path(APP_DIR, 'bot_runner.py')})")
+    st.caption(f"Modo: `{modo}` | Status do robo: `{status}` | Arquivo do runner: [bot_runner.py]({Path(APP_DIR, 'bot_runner.py')})")
     if modo == "real":
         st.error("Modo real exige integracao da corretora. Atualmente o projeto executa ordens apenas em simulacao.")
     else:
-        st.info("Modo paper ativo. O robo atualiza saldo, posicoes e historico sem enviar ordens reais.")
+        st.info("Voce esta em simulacao. O robo treina e registra tudo sem mexer em dinheiro real.")
     st.markdown("</div>", unsafe_allow_html=True)
 
 
@@ -208,10 +426,56 @@ def render_status_cards(runtime: dict, state: dict) -> None:
     pnl = portfolio_value - float(runtime["capital_total"])
 
     cols = st.columns(4)
-    cols[0].metric("Caixa", format_currency(float(state["cash"])))
-    cols[1].metric("Patrimonio", format_currency(portfolio_value), format_currency(pnl))
-    cols[2].metric("Posicoes abertas", str(len(state["positions"])))
-    cols[3].metric("Ciclos executados", str(int(state.get("run_count", 0))))
+    cards = [
+        ("Dinheiro parado", format_currency(float(state["cash"])), "Saldo livre para novas entradas"),
+        ("Valor total", format_currency(portfolio_value), format_currency(pnl)),
+        ("Compras abertas", str(len(state["positions"])), "Posicoes em acompanhamento"),
+        ("Verificacoes feitas", str(int(state.get("run_count", 0))), "Ciclos executados pelo robo"),
+    ]
+    for col, (label, value, delta) in zip(cols, cards):
+        col.markdown(
+            f"""
+            <div class="kpi-card">
+                <div class="kpi-label">{label}</div>
+                <div class="kpi-value">{value}</div>
+                <div class="kpi-delta">{delta}</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+
+def render_steps() -> None:
+    st.markdown('<div class="panel">', unsafe_allow_html=True)
+    st.subheader("Como usar")
+    st.markdown(
+        """
+        <div class="steps-grid">
+            <div class="step-card">
+                <div class="step-number">Passo 1</div>
+                <div class="step-title">Escolha as acoes</div>
+                <div class="step-copy">Digite os codigos na barra lateral e informe o valor que deseja simular.</div>
+            </div>
+            <div class="step-card">
+                <div class="step-number">Passo 2</div>
+                <div class="step-title">Selecione o perfil</div>
+                <div class="step-copy">Use um perfil pronto para nao precisar mexer em configuracoes tecnicas.</div>
+            </div>
+            <div class="step-card">
+                <div class="step-number">Passo 3</div>
+                <div class="step-title">Teste a estrategia</div>
+                <div class="step-copy">Clique em atualizar backtest e veja se o resultado visual faz sentido para voce.</div>
+            </div>
+            <div class="step-card">
+                <div class="step-number">Passo 4</div>
+                <div class="step-title">Ligue o robo</div>
+                <div class="step-copy">Ative o robo e deixe o runner funcionando para que ele acompanhe tudo sozinho.</div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    st.markdown("</div>", unsafe_allow_html=True)
 
 
 def build_price_figure(df: pd.DataFrame, ticker: str) -> go.Figure:
@@ -247,10 +511,10 @@ def build_price_figure(df: pd.DataFrame, ticker: str) -> go.Figure:
 
 def render_backtest(runtime: dict, tickers: list[str], strategy: StrategyConfig, start_date: date) -> None:
     st.markdown('<div class="panel">', unsafe_allow_html=True)
-    st.subheader("Painel de validacao da estrategia")
+    st.subheader("Resultado da estrategia")
 
     if not tickers:
-        st.info("Adicione pelo menos um ativo para gerar o backtest.")
+        st.info("Adicione pelo menos uma acao para gerar a simulacao.")
         st.markdown("</div>", unsafe_allow_html=True)
         return
 
@@ -275,7 +539,7 @@ def render_backtest(runtime: dict, tickers: list[str], strategy: StrategyConfig,
     data_map = st.session_state.get("backtest_data_map", {})
 
     if not reports:
-        st.warning("Nao foi possivel montar o backtest com os filtros atuais.")
+        st.warning("Nao foi possivel montar a simulacao com os dados atuais.")
         st.markdown("</div>", unsafe_allow_html=True)
         return
 
@@ -285,9 +549,19 @@ def render_backtest(runtime: dict, tickers: list[str], strategy: StrategyConfig,
     ranking_view["Valor final"] = ranking_view["Valor final"].map(format_currency)
     ranking_view["Retorno %"] = ranking_view["Retorno %"].map(format_pct)
     ranking_view["Drawdown %"] = ranking_view["Drawdown %"].map(format_pct)
+
+    melhor = ranking_df.iloc[0]
+    st.markdown(
+        f"""
+        <div class="highlight-box">
+            Melhor ativo da simulacao: <strong>{melhor['Ativo']}</strong> com retorno de <strong>{format_pct(float(melhor['Retorno %']))}</strong>.
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
     st.dataframe(ranking_view, use_container_width=True, hide_index=True)
 
-    ticker = st.selectbox("Ativo para detalhe tecnico", ranking_df["Ativo"].tolist())
+    ticker = st.selectbox("Escolha uma acao para ver o grafico", ranking_df["Ativo"].tolist())
     df = data_map[ticker]
     st.plotly_chart(build_price_figure(df, ticker), use_container_width=True)
     st.markdown("</div>", unsafe_allow_html=True)
@@ -298,7 +572,7 @@ def render_positions_and_logs(state: dict) -> None:
 
     with col_left:
         st.markdown('<div class="panel">', unsafe_allow_html=True)
-        st.subheader("Posicoes abertas")
+        st.subheader("Compras em andamento")
         if state["positions"]:
             positions_df = pd.DataFrame(
                 [
@@ -316,12 +590,12 @@ def render_positions_and_logs(state: dict) -> None:
             )
             st.dataframe(positions_df, use_container_width=True, hide_index=True)
         else:
-            st.info("Nenhuma posicao aberta no momento.")
+            st.info("Nenhuma compra aberta no momento.")
         st.markdown("</div>", unsafe_allow_html=True)
 
     with col_right:
         st.markdown('<div class="panel">', unsafe_allow_html=True)
-        st.subheader("Ultimos eventos")
+        st.subheader("Ultimas movimentacoes")
         logs = read_logs(limit=12)
         if logs:
             log_df = pd.DataFrame(logs)
@@ -333,7 +607,7 @@ def render_positions_and_logs(state: dict) -> None:
 
 def render_files() -> None:
     st.markdown('<div class="panel">', unsafe_allow_html=True)
-    st.subheader("Arquivos do robo")
+    st.subheader("Arquivos importantes")
     files = [
         ("Configuracao", Path(APP_DIR, "runtime_config.json")),
         ("Estado", Path(APP_DIR, "bot_state.json")),
@@ -342,7 +616,7 @@ def render_files() -> None:
     ]
     for label, path in files:
         st.write(f"{label}: [{path.name}]({path})")
-    st.caption("O `bot_runner.py` e o processo que voce deixa rodando para executar o robo continuamente.")
+    st.caption("O `bot_runner.py` e o arquivo que fica rodando para o robo continuar trabalhando sozinho.")
     st.markdown("</div>", unsafe_allow_html=True)
 
 
@@ -355,6 +629,8 @@ def main() -> None:
     tickers, strategy, start_date = sidebar_form(runtime)
     state = load_bot_state()
 
+    render_steps()
+    st.divider()
     render_controls(runtime)
     render_status_cards(runtime, state)
     st.divider()
