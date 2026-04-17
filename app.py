@@ -7,7 +7,11 @@ import streamlit as st
 
 from data_engine import load_data
 from ml_engine import MLEngineConfig, EnsembleProbabilityModel, build_feature_panel
-from strategy_engine import StrategyConfig, generate_target_weights, market_filter
+from strategy_engine import (
+    StrategyConfig,
+    combined_market_filter,
+    generate_target_weights,
+)
 from portfolio_optimizer import OptimizerConfig, build_rolling_optimized_weights
 from walk_forward import WalkForwardConfig, run_walk_forward_validation
 from metrics import compute_all_metrics
@@ -57,6 +61,9 @@ def run_pipeline(
     optimizer_method: str,
     execution_delay: int,
     fast_mode: bool,
+    use_regime_filter: bool,
+    use_volatility_filter: bool,
+    vol_threshold: float,
 ):
     progress = st.progress(0, text="Iniciando pipeline institucional...")
 
@@ -120,7 +127,16 @@ def run_pipeline(
             periods_per_year=252,
         )
 
-    regime = market_filter(prices)
+    filters_df = combined_market_filter(
+        prices=prices,
+        benchmark="SPY",
+        fast_ma_window=50,
+        slow_ma_window=200,
+        vol_window=20,
+        vol_threshold=vol_threshold,
+        use_regime_filter=use_regime_filter,
+        use_volatility_filter=use_volatility_filter,
+    )
 
     def model_factory():
         return EnsembleProbabilityModel(config=ml_config)
@@ -131,15 +147,15 @@ def run_pipeline(
         weighted["date"] = pd.to_datetime(weighted["date"])
 
         weighted = weighted.merge(
-            regime.rename("regime"),
-            left_on="date",
-            right_index=True,
+            filters_df.reset_index().rename(columns={"index": "date"}),
+            on="date",
             how="left",
         )
 
-        weighted["regime"] = weighted["regime"].fillna(False)
-        weighted.loc[weighted["regime"] == False, "weight"] = 0.0
-        weighted.loc[weighted["regime"] == False, "selected"] = False
+        weighted["trade_allowed"] = weighted["trade_allowed"].fillna(False)
+
+        weighted.loc[weighted["trade_allowed"] == False, "weight"] = 0.0
+        weighted.loc[weighted["trade_allowed"] == False, "selected"] = False
 
         optimized_matrix = build_rolling_optimized_weights(
             prices=prices,
@@ -203,6 +219,7 @@ def run_pipeline(
         "mc_result": mc_result,
         "report": report,
         "weights_df": weights_df,
+        "filters_df": filters_df,
     }
 
 
@@ -311,6 +328,27 @@ def plot_strategy_comparison(metrics: dict, mc_result: dict, wf_result: dict):
     return fig
 
 
+def plot_filter_states(filters_df: pd.DataFrame):
+    if filters_df.empty:
+        return go.Figure()
+
+    plot_df = filters_df.copy().astype(int)
+
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=plot_df.index, y=plot_df["regime"], mode="lines", name="Bull Regime"))
+    fig.add_trace(go.Scatter(x=plot_df.index, y=plot_df["vol_filter"], mode="lines", name="Volatilidade OK"))
+    fig.add_trace(go.Scatter(x=plot_df.index, y=plot_df["trade_allowed"], mode="lines", name="Operar Permitido"))
+
+    fig.update_layout(
+        title="Estados dos Filtros de Mercado",
+        template="plotly_dark",
+        height=320,
+        margin=dict(l=20, r=20, t=50, b=20),
+        yaxis=dict(tickmode="array", tickvals=[0, 1]),
+    )
+    return fig
+
+
 def main():
     inject_css()
 
@@ -336,6 +374,11 @@ def main():
     execution_delay = st.sidebar.slider("Atraso de execução (barras)", 1, 3, 1, 1)
     fast_mode = st.sidebar.toggle("Modo rápido para Streamlit", value=True)
 
+    st.sidebar.subheader("Filtros de mercado")
+    use_regime_filter = st.sidebar.toggle("Filtro bull/bear", value=True)
+    use_volatility_filter = st.sidebar.toggle("Filtro de volatilidade", value=True)
+    vol_threshold = st.sidebar.slider("Limite de volatilidade", 0.010, 0.050, 0.025, 0.001)
+
     run_button = st.sidebar.button("Executar pesquisa institucional", use_container_width=True)
 
     if not run_button:
@@ -351,6 +394,9 @@ def main():
             optimizer_method=optimizer_method,
             execution_delay=execution_delay,
             fast_mode=fast_mode,
+            use_regime_filter=use_regime_filter,
+            use_volatility_filter=use_volatility_filter,
+            vol_threshold=vol_threshold,
         )
     except Exception as e:
         st.error(f"Erro ao executar pipeline: {e}")
@@ -361,6 +407,7 @@ def main():
     mc_result = result["mc_result"]
     wf_result = result["wf_result"]
     weights_df = result["weights_df"]
+    filters_df = result["filters_df"]
 
     col1, col2, col3, col4 = st.columns(4)
     col1.metric("Sharpe", f"{metrics.get('sharpe', 0.0):.2f}")
@@ -391,6 +438,12 @@ def main():
             plot_allocation(weights_df),
             use_container_width=True,
         )
+
+    st.subheader("Filtros de mercado")
+    st.plotly_chart(
+        plot_filter_states(filters_df),
+        use_container_width=True,
+    )
 
     st.subheader("Resultados do Walk-Forward")
     st.dataframe(wf_result["fold_metrics"], use_container_width=True)
