@@ -43,7 +43,7 @@ def inject_css() -> None:
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def cached_load_data(start_date: str, fast_mode: bool) -> pd.DataFrame:
-    history_limit = 450 if fast_mode else 900
+    history_limit = 500 if fast_mode else 1200
     return load_data(start=start_date, history_limit=history_limit)
 
 
@@ -60,6 +60,55 @@ def _safe_reset_index_with_date(df: pd.DataFrame) -> pd.DataFrame:
         out = out.rename(columns={first_col: "date"})
     out["date"] = pd.to_datetime(out["date"])
     return out
+
+
+def _build_dynamic_wf_config(
+    feature_panel: pd.DataFrame,
+    initial_capital: float,
+    execution_delay: int,
+    fast_mode: bool,
+) -> WalkForwardConfig:
+    unique_dates = pd.Index(sorted(pd.to_datetime(feature_panel["date"]).unique()))
+    n_dates = len(unique_dates)
+
+    if n_dates < 80:
+        raise ValueError(
+            f"Poucas datas disponíveis após limpeza ({n_dates}). "
+            f"Tente uma data inicial mais antiga ou desligue o modo rápido."
+        )
+
+    if fast_mode:
+        train_window = min(160, max(60, int(n_dates * 0.55)))
+        test_window = min(20, max(10, int(n_dates * 0.12)))
+        step_size = max(10, min(test_window, 15))
+    else:
+        train_window = min(252, max(120, int(n_dates * 0.60)))
+        test_window = min(30, max(15, int(n_dates * 0.12)))
+        step_size = max(10, min(test_window, 21))
+
+    # garantir espaço suficiente para pelo menos 1 fold
+    while train_window + test_window + 1 >= n_dates and train_window > 40:
+        train_window -= 10
+
+    while train_window + test_window + 1 >= n_dates and test_window > 10:
+        test_window -= 5
+
+    if train_window + test_window + 1 >= n_dates:
+        raise ValueError(
+            f"Não foi possível montar walk-forward com {n_dates} datas úteis. "
+            f"Tente desligar o modo rápido ou usar mais histórico."
+        )
+
+    return WalkForwardConfig(
+        train_window=train_window,
+        test_window=test_window,
+        step_size=step_size,
+        min_assets=3,
+        initial_capital=initial_capital,
+        fee_rate=0.0005,
+        slippage_rate=0.0005,
+        execution_delay=execution_delay,
+    )
 
 
 def run_pipeline(
@@ -107,40 +156,19 @@ def run_pipeline(
         target_gross_exposure=1.0,
     )
 
-    if fast_mode:
-        wf_config = WalkForwardConfig(
-            train_window=252,
-            test_window=15,
-            step_size=15,
-            min_assets=3,
-            initial_capital=initial_capital,
-            fee_rate=0.0005,
-            slippage_rate=0.0005,
-            execution_delay=execution_delay,
-        )
-        mc_config = MonteCarloConfig(
-            n_simulations=200,
-            block_size=5,
-            random_state=42,
-            periods_per_year=252,
-        )
-    else:
-        wf_config = WalkForwardConfig(
-            train_window=252 * 2,
-            test_window=21,
-            step_size=21,
-            min_assets=3,
-            initial_capital=initial_capital,
-            fee_rate=0.0005,
-            slippage_rate=0.0005,
-            execution_delay=execution_delay,
-        )
-        mc_config = MonteCarloConfig(
-            n_simulations=500,
-            block_size=5,
-            random_state=42,
-            periods_per_year=252,
-        )
+    wf_config = _build_dynamic_wf_config(
+        feature_panel=feature_panel,
+        initial_capital=initial_capital,
+        execution_delay=execution_delay,
+        fast_mode=fast_mode,
+    )
+
+    mc_config = MonteCarloConfig(
+        n_simulations=200 if fast_mode else 500,
+        block_size=5,
+        random_state=42,
+        periods_per_year=252,
+    )
 
     filters_df = combined_market_filter(
         prices=prices,
@@ -236,6 +264,11 @@ def run_pipeline(
         "report": report,
         "weights_df": weights_df,
         "filters_df": filters_df,
+        "wf_config_used": {
+            "train_window": wf_config.train_window,
+            "test_window": wf_config.test_window,
+            "step_size": wf_config.step_size,
+        },
     }
 
 
@@ -384,6 +417,12 @@ def main():
     col2.metric("Sortino", f"{metrics.get('sortino', 0.0):.2f}")
     col3.metric("Calmar", f"{metrics.get('calmar', 0.0):.2f}")
     col4.metric("Max Drawdown", f"{metrics.get('max_drawdown', 0.0):.2%}")
+
+    st.caption(
+        f"Walk-forward usado: train={result['wf_config_used']['train_window']} | "
+        f"test={result['wf_config_used']['test_window']} | "
+        f"step={result['wf_config_used']['step_size']}"
+    )
 
     st.plotly_chart(plot_equity_curve(backtest_result["equity_curve"]), use_container_width=True)
     st.plotly_chart(plot_drawdown(backtest_result["drawdown"]), use_container_width=True)
