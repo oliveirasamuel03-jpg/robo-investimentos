@@ -48,7 +48,7 @@ def load_data(
 
     prices = prices.sort_index().ffill().dropna(how="all")
 
-    valid_cols = [c for c in prices.columns if prices[c].notna().sum() > 100]
+    valid_cols = [c for c in prices.columns if prices[c].notna().sum() > 120]
     prices = prices[valid_cols]
 
     if prices.empty:
