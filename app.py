@@ -86,7 +86,6 @@ def _build_dynamic_wf_config(
         test_window = min(30, max(15, int(n_dates * 0.12)))
         step_size = max(10, min(test_window, 21))
 
-    # garantir espaço suficiente para pelo menos 1 fold
     while train_window + test_window + 1 >= n_dates and train_window > 40:
         train_window -= 10
 
@@ -123,7 +122,6 @@ def run_pipeline(
     use_volatility_filter: bool,
     vol_threshold: float,
     cash_threshold: float,
-    cash_buffer: float,
     target_portfolio_vol: float,
 ):
     progress = st.progress(0, text="Iniciando pipeline institucional...")
@@ -140,11 +138,7 @@ def run_pipeline(
         probability_threshold=probability_threshold,
         top_n=top_n,
         max_weight_per_asset=0.40,
-        weight_method="score",
-        long_only=True,
-        min_assets=1,
         cash_threshold=cash_threshold,
-        cash_buffer=cash_buffer,
         target_portfolio_vol=target_portfolio_vol,
     )
 
@@ -376,7 +370,6 @@ def main():
 
     st.sidebar.subheader("Controles de convicção")
     cash_threshold = st.sidebar.slider("Threshold para ficar em caixa", 0.50, 0.85, 0.62, 0.01)
-    cash_buffer = st.sidebar.slider("Diferença mínima de convicção", 0.00, 0.10, 0.02, 0.005)
     target_portfolio_vol = st.sidebar.slider("Vol alvo do portfólio", 0.05, 0.30, 0.12, 0.01)
 
     run_button = st.sidebar.button("Executar pesquisa institucional", use_container_width=True)
@@ -398,7 +391,6 @@ def main():
             use_volatility_filter=use_volatility_filter,
             vol_threshold=vol_threshold,
             cash_threshold=cash_threshold,
-            cash_buffer=cash_buffer,
             target_portfolio_vol=target_portfolio_vol,
         )
     except Exception as e:
