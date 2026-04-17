@@ -53,6 +53,15 @@ def cached_build_feature_panel(prices: pd.DataFrame) -> pd.DataFrame:
     return build_feature_panel(prices, config=ml_config)
 
 
+def _safe_reset_index_with_date(df: pd.DataFrame) -> pd.DataFrame:
+    out = df.reset_index().copy()
+    if "date" not in out.columns:
+        first_col = out.columns[0]
+        out = out.rename(columns={first_col: "date"})
+    out["date"] = pd.to_datetime(out["date"])
+    return out
+
+
 def run_pipeline(
     start_date: str,
     initial_capital: float,
@@ -138,24 +147,25 @@ def run_pipeline(
         use_volatility_filter=use_volatility_filter,
     )
 
+    filters_long = _safe_reset_index_with_date(filters_df)
+
     def model_factory():
         return EnsembleProbabilityModel(config=ml_config)
 
     def signal_builder(pred_df: pd.DataFrame) -> pd.DataFrame:
-        weighted = generate_target_weights(pred_df, config=strategy_config)
+        weighted = generate_target_weights(pred_df, config=strategy_config).copy()
         weighted["selected"] = weighted["weight"] > 0
         weighted["date"] = pd.to_datetime(weighted["date"])
 
         weighted = weighted.merge(
-            filters_df.reset_index().rename(columns={"index": "date"}),
+            filters_long[["date", "regime", "vol_filter", "trade_allowed"]],
             on="date",
             how="left",
         )
 
         weighted["trade_allowed"] = weighted["trade_allowed"].fillna(False)
-
-        weighted.loc[weighted["trade_allowed"] == False, "weight"] = 0.0
-        weighted.loc[weighted["trade_allowed"] == False, "selected"] = False
+        weighted.loc[~weighted["trade_allowed"], "weight"] = 0.0
+        weighted.loc[~weighted["trade_allowed"], "selected"] = False
 
         optimized_matrix = build_rolling_optimized_weights(
             prices=prices,
@@ -163,11 +173,13 @@ def run_pipeline(
             config=optimizer_config,
         )
 
-        optimized_long = (
-            optimized_matrix.reset_index()
-            .melt(id_vars="date", var_name="asset", value_name="weight")
-            .sort_values(["date", "asset"])
-        )
+        optimized_long = _safe_reset_index_with_date(optimized_matrix)
+        optimized_long = optimized_long.melt(
+            id_vars="date",
+            var_name="asset",
+            value_name="weight",
+        ).sort_values(["date", "asset"])
+
         return optimized_long
 
     progress.progress(50, text="Executando walk-forward validation...")
@@ -415,44 +427,23 @@ def main():
     col3.metric("Calmar", f"{metrics.get('calmar', 0.0):.2f}")
     col4.metric("Max Drawdown", f"{metrics.get('max_drawdown', 0.0):.2%}")
 
-    st.plotly_chart(
-        plot_equity_curve(backtest_result["equity_curve"]),
-        use_container_width=True,
-    )
-
-    st.plotly_chart(
-        plot_drawdown(backtest_result["drawdown"]),
-        use_container_width=True,
-    )
+    st.plotly_chart(plot_equity_curve(backtest_result["equity_curve"]), use_container_width=True)
+    st.plotly_chart(plot_drawdown(backtest_result["drawdown"]), use_container_width=True)
 
     left, right = st.columns(2)
-
     with left:
-        st.plotly_chart(
-            plot_monte_carlo_histogram(mc_result["simulations"]),
-            use_container_width=True,
-        )
-
+        st.plotly_chart(plot_monte_carlo_histogram(mc_result["simulations"]), use_container_width=True)
     with right:
-        st.plotly_chart(
-            plot_allocation(weights_df),
-            use_container_width=True,
-        )
+        st.plotly_chart(plot_allocation(weights_df), use_container_width=True)
 
     st.subheader("Filtros de mercado")
-    st.plotly_chart(
-        plot_filter_states(filters_df),
-        use_container_width=True,
-    )
+    st.plotly_chart(plot_filter_states(filters_df), use_container_width=True)
 
     st.subheader("Resultados do Walk-Forward")
     st.dataframe(wf_result["fold_metrics"], use_container_width=True)
 
     st.subheader("Painel de Comparação da Estratégia")
-    st.plotly_chart(
-        plot_strategy_comparison(metrics, mc_result, wf_result),
-        use_container_width=True,
-    )
+    st.plotly_chart(plot_strategy_comparison(metrics, mc_result, wf_result), use_container_width=True)
 
     with st.expander("Relatório institucional"):
         st.json(result["report"])
