@@ -75,7 +75,22 @@ def _build_target_matrix(
     if predictions.empty:
         return pd.DataFrame(0.0, index=price_index, columns=price_columns)
 
-    pivot = predictions.pivot(index="date", columns="asset", values="weight")
+    tmp = predictions.copy()
+    tmp["date"] = pd.to_datetime(tmp["date"])
+    tmp["asset"] = tmp["asset"].astype(str)
+    tmp["weight"] = pd.to_numeric(tmp["weight"], errors="coerce").fillna(0.0)
+
+    # evita duplicatas antes do pivot
+    tmp = tmp.groupby(["date", "asset"], as_index=False)["weight"].sum()
+
+    pivot = tmp.pivot_table(
+        index="date",
+        columns="asset",
+        values="weight",
+        aggfunc="sum",
+        fill_value=0.0,
+    )
+
     pivot = pivot.reindex(index=price_index, columns=price_columns).fillna(0.0)
     return pivot
 
@@ -87,39 +102,6 @@ def run_walk_forward_validation(
     signal_builder: Callable[[pd.DataFrame], pd.DataFrame],
     config: Optional[WalkForwardConfig] = None,
 ) -> Dict[str, object]:
-    """
-    Walk-forward validation without look-ahead bias.
-
-    Parameters
-    ----------
-    prices : pd.DataFrame
-        Wide price matrix. Index=date, columns=assets.
-    feature_data : pd.DataFrame
-        Long dataset with columns at least:
-        ['date', 'asset', ..., 'target']
-    model_factory : callable
-        Returns a fresh ML model instance for each fold.
-        The model must implement:
-            fit(X, y)
-            predict_proba(X) -> probabilities for class 1 or shape (n,2)
-    signal_builder : callable
-        Function receiving predictions DataFrame with columns:
-            ['date', 'asset', 'probability']
-        and returning:
-            ['date', 'asset', 'weight']
-    config : WalkForwardConfig
-        Walk-forward parameters.
-
-    Returns
-    -------
-    dict with:
-        fold_metrics
-        aggregate_metrics
-        predictions
-        target_weights
-        backtest_result
-        degradation_analysis
-    """
     if config is None:
         config = WalkForwardConfig()
 
@@ -136,10 +118,21 @@ def run_walk_forward_validation(
 
     data = feature_data.copy()
     data["date"] = pd.to_datetime(data["date"])
-    data = data.sort_values(["date", "asset"]).reset_index(drop=True)
+    data["asset"] = data["asset"].astype(str)
+
+    # remove duplicatas do painel de features
+    non_key_cols = [c for c in data.columns if c not in {"date", "asset"}]
+    agg_map = {c: "mean" for c in non_key_cols}
+    data = (
+        data.groupby(["date", "asset"], as_index=False)
+        .agg(agg_map)
+        .sort_values(["date", "asset"])
+        .reset_index(drop=True)
+    )
 
     prices = prices.copy()
     prices.index = pd.to_datetime(prices.index)
+    prices.columns = prices.columns.astype(str)
     prices = prices.sort_index()
 
     feature_cols = [c for c in data.columns if c not in {"date", "asset", "target"}]
@@ -205,9 +198,26 @@ def run_walk_forward_validation(
         pred_df["target"] = y_test.values
         pred_df["fold"] = fold_number
 
+        # blindagem contra duplicatas antes do signal_builder
+        pred_df = (
+            pred_df.groupby(["date", "asset"], as_index=False)
+            .agg(
+                probability=("probability", "mean"),
+                target=("target", "max"),
+                fold=("fold", "min"),
+            )
+        )
+
         weights_df = signal_builder(pred_df[["date", "asset", "probability"]].copy())
         if not {"date", "asset", "weight"}.issubset(weights_df.columns):
             raise ValueError("signal_builder must return columns ['date', 'asset', 'weight']")
+
+        weights_df = weights_df.copy()
+        weights_df["date"] = pd.to_datetime(weights_df["date"])
+        weights_df["asset"] = weights_df["asset"].astype(str)
+        weights_df["weight"] = pd.to_numeric(weights_df["weight"], errors="coerce").fillna(0.0)
+
+        weights_df = weights_df.groupby(["date", "asset"], as_index=False)["weight"].sum()
 
         merged = pred_df.merge(
             weights_df[["date", "asset", "weight"]],
@@ -275,6 +285,16 @@ def run_walk_forward_validation(
         raise ValueError("No valid walk-forward folds were generated")
 
     predictions_all = pd.concat(prediction_frames, ignore_index=True)
+    predictions_all = (
+        predictions_all.groupby(["date", "asset"], as_index=False)
+        .agg(
+            probability=("probability", "mean"),
+            target=("target", "max"),
+            fold=("fold", "min"),
+            weight=("weight", "sum"),
+        )
+    )
+
     fold_metrics = pd.DataFrame(fold_summaries)
 
     full_target_weights = _build_target_matrix(
