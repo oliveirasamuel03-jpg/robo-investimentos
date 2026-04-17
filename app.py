@@ -3,31 +3,66 @@ import yfinance as yf
 import pandas as pd
 import matplotlib.pyplot as plt
 
+# =====================
+# CONFIGURAÇÃO VISUAL
+# =====================
 st.set_page_config(page_title="Robô Investidor", layout="wide")
 
-st.title("🤖 Robô de Investimentos com Gráficos")
+st.markdown("""
+    <style>
+        .main {
+            background-color: #0e1117;
+            color: white;
+        }
+        .stButton>button {
+            background-color: #00c46c;
+            color: white;
+            border-radius: 10px;
+            height: 45px;
+            width: 100%;
+            font-weight: bold;
+        }
+        .card {
+            background-color: #1c1f26;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 10px;
+        }
+    </style>
+""", unsafe_allow_html=True)
 
-# ===== RSI =====
-def calcular_rsi(dados, periodo=14):
-    delta = dados.diff()
-    ganho = (delta.where(delta > 0, 0)).rolling(periodo).mean()
-    perda = (-delta.where(delta < 0, 0)).rolling(periodo).mean()
-    rs = ganho / perda
+st.title("📊 Robô Investidor Pro")
+
+# =====================
+# RSI
+# =====================
+def rsi(series, period=14):
+    delta = series.diff()
+    gain = (delta.where(delta > 0, 0)).rolling(period).mean()
+    loss = (-delta.where(delta < 0, 0)).rolling(period).mean()
+    rs = gain / loss
     return 100 - (100 / (1 + rs))
 
-# ===== AÇÕES =====
+# =====================
+# ATIVOS
+# =====================
 ativos = [
     "VALE3.SA","PETR4.SA","ITUB4.SA","BBDC4.SA",
     "BBAS3.SA","WEGE3.SA","MGLU3.SA","RENT3.SA",
     "PRIO3.SA","EQTL3.SA"
 ]
 
+# =====================
+# BOTÃO PRINCIPAL
+# =====================
 if st.button("🚀 Rodar Análise"):
 
     resultados = []
     dados_ativos = {}
 
-    # ===== TESTE DOS ATIVOS =====
+    # =====================
+    # ANÁLISE
+    # =====================
     for ativo in ativos:
         dados = yf.download(ativo, start="2018-01-01")
 
@@ -37,168 +72,89 @@ if st.button("🚀 Rodar Análise"):
         if isinstance(dados.columns, pd.MultiIndex):
             dados.columns = dados.columns.droplevel(1)
 
-        close = dados['Close']
+        close = dados["Close"]
 
-        dados['media9'] = close.rolling(9).mean()
-        dados['media21'] = close.rolling(21).mean()
-        dados['media50'] = close.rolling(50).mean()
-        dados['RSI'] = calcular_rsi(close)
+        dados["media9"] = close.rolling(9).mean()
+        dados["media21"] = close.rolling(21).mean()
+        dados["media50"] = close.rolling(50).mean()
+        dados["RSI"] = rsi(close)
 
-        dados['sinal'] = 0
-        dados.loc[dados['media9'] > dados['media21'], 'sinal'] = 1
-        dados.loc[dados['media9'] < dados['media21'], 'sinal'] = -1
+        dados["sinal"] = 0
+        dados.loc[dados["media9"] > dados["media21"], "sinal"] = 1
+        dados.loc[dados["media9"] < dados["media21"], "sinal"] = -1
 
         dinheiro = 1000
         acoes = 0
-        preco_compra = 0
 
         historico = []
 
         for i in range(len(dados)):
             preco = close.iloc[i]
-            sinal = dados['sinal'].iloc[i]
-            rsi = dados['RSI'].iloc[i]
-            media50 = dados['media50'].iloc[i]
+            sinal = dados["sinal"].iloc[i]
+            rsi_val = dados["RSI"].iloc[i]
+            media50 = dados["media50"].iloc[i]
 
-            if sinal == 1 and dinheiro > 0 and rsi < 70 and preco > media50:
+            if sinal == 1 and dinheiro > 0 and rsi_val < 70 and preco > media50:
                 acoes = dinheiro / preco
                 dinheiro = 0
-                preco_compra = preco
 
             elif acoes > 0:
-                if preco < preco_compra * 0.97:
-                    dinheiro = acoes * preco
-                    acoes = 0
-                elif sinal == -1 or rsi > 70:
+                if sinal == -1 or rsi_val > 70:
                     dinheiro = acoes * preco
                     acoes = 0
 
-            valor_total = dinheiro + (acoes * preco)
-            historico.append(valor_total)
+            historico.append(dinheiro + acoes * preco)
 
-        valor_final = historico[-1]
-        lucro = valor_final - 1000
+        lucro = historico[-1] - 1000
 
-        # drawdown
-        pico = historico[0]
-        max_dd = 0
-
-        for v in historico:
-            if v > pico:
-                pico = v
-            dd = (pico - v) / pico
-            if dd > max_dd:
-                max_dd = dd
-
-        resultados.append((ativo, lucro, max_dd))
+        resultados.append((ativo, lucro))
         dados_ativos[ativo] = dados
 
-    # ===== RANKING =====
-    resultados = sorted(resultados, key=lambda x: x[1], reverse=True)
+    # =====================
+    # RANKING
+    # =====================
+    resultados.sort(key=lambda x: x[1], reverse=True)
 
-    st.subheader("📊 Ranking")
-    for ativo, lucro, dd in resultados:
-        cor = "🟢" if lucro >= 0 else "🔴"
-        st.write(f"{cor} {ativo} → Lucro: R$ {lucro:.2f} | DD: {dd*100:.2f}%")
+    st.subheader("🏆 Ranking de Ativos")
 
-    # ===== FILTRO =====
-    selecionados = [x for x in resultados if x[1] > 0 and x[2] < 0.30]
+    cols = st.columns(3)
 
-    carteira = []
-    empresas = set()
+    for i, (ativo, lucro) in enumerate(resultados[:3]):
+        with cols[i]:
+            st.markdown(f"""
+            <div class="card">
+                <h3>{ativo}</h3>
+                <h2 style="color: {'#00ff88' if lucro > 0 else '#ff4d4d'}">
+                    R$ {lucro:.2f}
+                </h2>
+            </div>
+            """, unsafe_allow_html=True)
 
-    for ativo, lucro, dd in selecionados:
-        emp = ativo[:4]
-        if emp not in empresas:
-            carteira.append((ativo, lucro, dd))
-            empresas.add(emp)
-        if len(carteira) == 3:
-            break
+    # =====================
+    # LISTA COMPLETA
+    # =====================
+    st.subheader("📋 Todos os Ativos")
 
-    st.subheader("🤖 Portfólio Selecionado")
-    for ativo, lucro, dd in carteira:
-        st.write(f"{ativo} → Lucro: R$ {lucro:.2f}")
+    for ativo, lucro in resultados:
+        cor = "🟢" if lucro > 0 else "🔴"
+        st.write(f"{cor} {ativo} → R$ {lucro:.2f}")
 
-    # ===== SIMULAÇÃO =====
-    capital = 1000
-    por_ativo = capital / len(carteira)
-    total = 0
+    # =====================
+    # GRÁFICO MELHORADO
+    # =====================
+    st.subheader("📈 Análise do Ativo")
 
-    historico_portfolio = []
+    escolhido = st.selectbox("Escolha um ativo", list(dados_ativos.keys()))
+    dados = dados_ativos[escolhido]
 
-    for ativo, _, _ in carteira:
-        dados = dados_ativos[ativo]
-        close = dados['Close']
+    fig, ax = plt.subplots(figsize=(12,5))
 
-        dinheiro = por_ativo
-        acoes = 0
+    ax.plot(dados["Close"], label="Preço", linewidth=2)
+    ax.plot(dados["media9"], label="Média 9")
+    ax.plot(dados["media21"], label="Média 21")
 
-        historico = []
-
-        for i in range(len(dados)):
-            preco = close.iloc[i]
-            sinal = dados['sinal'].iloc[i]
-            rsi = dados['RSI'].iloc[i]
-            media50 = dados['media50'].iloc[i]
-
-            if sinal == 1 and dinheiro > 0 and rsi < 70 and preco > media50:
-                acoes = dinheiro / preco
-                dinheiro = 0
-
-            elif acoes > 0:
-                if sinal == -1 or rsi > 70:
-                    dinheiro = acoes * preco
-                    acoes = 0
-
-            valor = dinheiro + (acoes * preco)
-            historico.append(valor)
-
-        valor_final = historico[-1]
-        total += valor_final
-
-        # soma para gráfico geral
-        if not historico_portfolio:
-            historico_portfolio = historico
-        else:
-            historico_portfolio = [x + y for x, y in zip(historico_portfolio, historico)]
-
-        st.write(f"{ativo} → Final: R$ {valor_final:.2f}")
-
-    # ===== RESULTADO =====
-    st.subheader("💰 Resultado Final")
-
-    lucro_total = total - capital
-
-    st.write(f"Valor final: R$ {total:.2f}")
-
-    if lucro_total >= 0:
-        st.success(f"Lucro: R$ {lucro_total:.2f}")
-    else:
-        st.error(f"Prejuízo: R$ {lucro_total:.2f}")
-
-    # ===== GRÁFICO PORTFÓLIO =====
-    st.subheader("📈 Evolução do Portfólio")
-
-    fig, ax = plt.subplots()
-    ax.plot(historico_portfolio)
-    ax.set_title("Crescimento do capital")
-    ax.set_xlabel("Tempo")
-    ax.set_ylabel("Valor (R$)")
+    ax.set_title(f"{escolhido} - Análise Técnica")
+    ax.legend()
+    ax.grid()
 
     st.pyplot(fig)
-
-    # ===== GRÁFICO INTERATIVO =====
-    st.subheader("📊 Analisar Ação")
-
-    acao = st.selectbox("Escolha uma ação", list(dados_ativos.keys()))
-    dados = dados_ativos[acao]
-
-    fig2, ax2 = plt.subplots()
-    ax2.plot(dados['Close'], label="Preço")
-    ax2.plot(dados['media9'], label="Média 9")
-    ax2.plot(dados['media21'], label="Média 21")
-    ax2.legend()
-
-    ax2.set_title(f"{acao} - Gráfico")
-
-    st.pyplot(fig2)
