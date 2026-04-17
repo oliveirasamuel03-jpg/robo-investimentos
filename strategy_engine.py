@@ -12,18 +12,30 @@ WeightMethod = Literal["equal", "score", "rank"]
 
 @dataclass
 class StrategyConfig:
-    probability_threshold: float = 0.55
-    top_n: int = 3
+    probability_threshold: float = 0.65
+    top_n: int = 5
     max_weight_per_asset: float = 0.40
     long_only: bool = True
     weight_method: WeightMethod = "score"
     min_assets: int = 1
 
 
+def market_filter(prices: pd.DataFrame, benchmark: str = "SPY", window: int = 200) -> pd.Series:
+    if benchmark not in prices.columns:
+        return pd.Series(True, index=prices.index)
+
+    benchmark_px = prices[benchmark].copy()
+    ma = benchmark_px.rolling(window).mean()
+    regime = benchmark_px > ma
+    regime = regime.fillna(False)
+    regime.name = "regime"
+    return regime
+
+
 def _clip_and_normalize(weights: pd.Series, max_weight_per_asset: float) -> pd.Series:
     weights = weights.clip(lower=0.0, upper=max_weight_per_asset)
-
     total = float(weights.sum())
+
     if total <= 0:
         return pd.Series(0.0, index=weights.index)
 
@@ -34,8 +46,7 @@ def _build_equal_weights(selected_assets: pd.Index) -> pd.Series:
     if len(selected_assets) == 0:
         return pd.Series(dtype=float)
 
-    w = pd.Series(1.0 / len(selected_assets), index=selected_assets, dtype=float)
-    return w
+    return pd.Series(1.0 / len(selected_assets), index=selected_assets, dtype=float)
 
 
 def _build_score_weights(selected_probs: pd.Series) -> pd.Series:
@@ -56,9 +67,10 @@ def _build_rank_weights(selected_probs: pd.Series) -> pd.Series:
     if selected_probs.empty:
         return pd.Series(dtype=float)
 
+    sorted_assets = selected_probs.sort_values(ascending=False).index
     ranks = pd.Series(
-        np.arange(len(selected_probs), 0, -1, dtype=float),
-        index=selected_probs.sort_values(ascending=False).index,
+        np.arange(len(sorted_assets), 0, -1, dtype=float),
+        index=sorted_assets,
     )
     return ranks / ranks.sum()
 
@@ -67,29 +79,6 @@ def generate_target_weights(
     predictions: pd.DataFrame,
     config: StrategyConfig | None = None,
 ) -> pd.DataFrame:
-    """
-    Convert model probabilities into daily cross-sectional portfolio weights.
-
-    Parameters
-    ----------
-    predictions : pd.DataFrame
-        Must contain:
-            - date
-            - asset
-            - probability
-    config : StrategyConfig
-        Portfolio construction rules.
-
-    Returns
-    -------
-    pd.DataFrame with columns:
-        - date
-        - asset
-        - probability
-        - rank
-        - selected
-        - weight
-    """
     if config is None:
         config = StrategyConfig()
 
@@ -152,9 +141,6 @@ def build_weight_matrix(
     index: pd.Index | None = None,
     columns: pd.Index | None = None,
 ) -> pd.DataFrame:
-    """
-    Convert long-form weighted predictions into wide date x asset weight matrix.
-    """
     required_cols = {"date", "asset", "weight"}
     missing = required_cols - set(weighted_predictions.columns)
     if missing:
@@ -182,12 +168,8 @@ def build_weight_matrix(
 
 def generate_signals_from_probabilities(
     predictions: pd.DataFrame,
-    probability_threshold: float = 0.55,
+    probability_threshold: float = 0.65,
 ) -> pd.DataFrame:
-    """
-    Simple binary signal helper.
-    Returns 1 when probability >= threshold, else 0.
-    """
     required_cols = {"date", "asset", "probability"}
     missing = required_cols - set(predictions.columns)
     if missing:
