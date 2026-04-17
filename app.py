@@ -73,6 +73,9 @@ def run_pipeline(
     use_regime_filter: bool,
     use_volatility_filter: bool,
     vol_threshold: float,
+    cash_threshold: float,
+    cash_buffer: float,
+    target_portfolio_vol: float,
 ):
     progress = st.progress(0, text="Iniciando pipeline institucional...")
 
@@ -91,6 +94,9 @@ def run_pipeline(
         weight_method="score",
         long_only=True,
         min_assets=1,
+        cash_threshold=cash_threshold,
+        cash_buffer=cash_buffer,
+        target_portfolio_vol=target_portfolio_vol,
     )
 
     optimizer_config = OptimizerConfig(
@@ -146,15 +152,13 @@ def run_pipeline(
         use_regime_filter=use_regime_filter,
         use_volatility_filter=use_volatility_filter,
     )
-
     filters_long = _safe_reset_index_with_date(filters_df)
 
     def model_factory():
         return EnsembleProbabilityModel(config=ml_config)
 
     def signal_builder(pred_df: pd.DataFrame) -> pd.DataFrame:
-        weighted = generate_target_weights(pred_df, config=strategy_config).copy()
-        weighted["selected"] = weighted["weight"] > 0
+        weighted = generate_target_weights(pred_df, prices=prices, config=strategy_config).copy()
         weighted["date"] = pd.to_datetime(weighted["date"])
 
         weighted = weighted.merge(
@@ -237,55 +241,21 @@ def run_pipeline(
 
 def plot_equity_curve(equity_curve: pd.DataFrame):
     fig = go.Figure()
-    fig.add_trace(
-        go.Scatter(
-            x=equity_curve.index,
-            y=equity_curve["equity"],
-            mode="lines",
-            name="Equity",
-        )
-    )
-    fig.update_layout(
-        title="Equity Curve",
-        template="plotly_dark",
-        height=420,
-        margin=dict(l=20, r=20, t=50, b=20),
-    )
+    fig.add_trace(go.Scatter(x=equity_curve.index, y=equity_curve["equity"], mode="lines", name="Equity"))
+    fig.update_layout(title="Equity Curve", template="plotly_dark", height=420, margin=dict(l=20, r=20, t=50, b=20))
     return fig
 
 
 def plot_drawdown(drawdown: pd.Series):
     fig = go.Figure()
-    fig.add_trace(
-        go.Scatter(
-            x=drawdown.index,
-            y=drawdown.values,
-            mode="lines",
-            fill="tozeroy",
-            name="Drawdown",
-        )
-    )
-    fig.update_layout(
-        title="Drawdown",
-        template="plotly_dark",
-        height=320,
-        margin=dict(l=20, r=20, t=50, b=20),
-    )
+    fig.add_trace(go.Scatter(x=drawdown.index, y=drawdown.values, mode="lines", fill="tozeroy", name="Drawdown"))
+    fig.update_layout(title="Drawdown", template="plotly_dark", height=320, margin=dict(l=20, r=20, t=50, b=20))
     return fig
 
 
 def plot_monte_carlo_histogram(mc_df: pd.DataFrame):
-    fig = px.histogram(
-        mc_df,
-        x="sharpe",
-        nbins=30,
-        title="Distribuição de Sharpe - Monte Carlo",
-    )
-    fig.update_layout(
-        template="plotly_dark",
-        height=360,
-        margin=dict(l=20, r=20, t=50, b=20),
-    )
+    fig = px.histogram(mc_df, x="sharpe", nbins=30, title="Distribuição de Sharpe - Monte Carlo")
+    fig.update_layout(template="plotly_dark", height=360, margin=dict(l=20, r=20, t=50, b=20))
     return fig
 
 
@@ -299,16 +269,8 @@ def plot_allocation(weights_df: pd.DataFrame):
     if latest.empty:
         return go.Figure()
 
-    fig = px.pie(
-        names=latest.index,
-        values=latest.values,
-        title="Alocação Final do Portfólio",
-    )
-    fig.update_layout(
-        template="plotly_dark",
-        height=360,
-        margin=dict(l=20, r=20, t=50, b=20),
-    )
+    fig = px.pie(names=latest.index, values=latest.values, title="Alocação Final do Portfólio")
+    fig.update_layout(template="plotly_dark", height=360, margin=dict(l=20, r=20, t=50, b=20))
     return fig
 
 
@@ -325,18 +287,8 @@ def plot_strategy_comparison(metrics: dict, mc_result: dict, wf_result: dict):
             ],
         }
     )
-
-    fig = px.bar(
-        comparison,
-        x="Métrica",
-        y="Valor",
-        title="Comparação de Qualidade da Estratégia",
-    )
-    fig.update_layout(
-        template="plotly_dark",
-        height=360,
-        margin=dict(l=20, r=20, t=50, b=20),
-    )
+    fig = px.bar(comparison, x="Métrica", y="Valor", title="Comparação de Qualidade da Estratégia")
+    fig.update_layout(template="plotly_dark", height=360, margin=dict(l=20, r=20, t=50, b=20))
     return fig
 
 
@@ -345,12 +297,10 @@ def plot_filter_states(filters_df: pd.DataFrame):
         return go.Figure()
 
     plot_df = filters_df.copy().astype(int)
-
     fig = go.Figure()
     fig.add_trace(go.Scatter(x=plot_df.index, y=plot_df["regime"], mode="lines", name="Bull Regime"))
     fig.add_trace(go.Scatter(x=plot_df.index, y=plot_df["vol_filter"], mode="lines", name="Volatilidade OK"))
     fig.add_trace(go.Scatter(x=plot_df.index, y=plot_df["trade_allowed"], mode="lines", name="Operar Permitido"))
-
     fig.update_layout(
         title="Estados dos Filtros de Mercado",
         template="plotly_dark",
@@ -371,8 +321,8 @@ def main():
 
     start_date = st.sidebar.text_input("Data de início", value="2019-01-01")
     initial_capital = st.sidebar.number_input("Capital inicial", min_value=1000.0, value=10000.0, step=1000.0)
-    probability_threshold = st.sidebar.slider("Limiar de probabilidade", 0.50, 0.85, 0.65, 0.01)
-    top_n = st.sidebar.slider("Principais ativos N", 1, 6, 5, 1)
+    probability_threshold = st.sidebar.slider("Limiar de probabilidade", 0.50, 0.85, 0.60, 0.01)
+    top_n = st.sidebar.slider("Principais ativos N", 1, 6, 2, 1)
     optimizer_method = st.sidebar.selectbox(
         "Método de otimização",
         ["equal_weight", "risk_parity", "markowitz"],
@@ -388,8 +338,13 @@ def main():
 
     st.sidebar.subheader("Filtros de mercado")
     use_regime_filter = st.sidebar.toggle("Filtro bull/bear", value=True)
-    use_volatility_filter = st.sidebar.toggle("Filtro de volatilidade", value=True)
+    use_volatility_filter = st.sidebar.toggle("Filtro de volatilidade", value=False)
     vol_threshold = st.sidebar.slider("Limite de volatilidade", 0.010, 0.050, 0.025, 0.001)
+
+    st.sidebar.subheader("Controles de convicção")
+    cash_threshold = st.sidebar.slider("Threshold para ficar em caixa", 0.50, 0.85, 0.62, 0.01)
+    cash_buffer = st.sidebar.slider("Diferença mínima de convicção", 0.00, 0.10, 0.02, 0.005)
+    target_portfolio_vol = st.sidebar.slider("Vol alvo do portfólio", 0.05, 0.30, 0.12, 0.01)
 
     run_button = st.sidebar.button("Executar pesquisa institucional", use_container_width=True)
 
@@ -409,6 +364,9 @@ def main():
             use_regime_filter=use_regime_filter,
             use_volatility_filter=use_volatility_filter,
             vol_threshold=vol_threshold,
+            cash_threshold=cash_threshold,
+            cash_buffer=cash_buffer,
+            target_portfolio_vol=target_portfolio_vol,
         )
     except Exception as e:
         st.error(f"Erro ao executar pipeline: {e}")
