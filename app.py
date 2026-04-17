@@ -21,7 +21,40 @@ st.set_page_config(
 )
 
 
-@st.cache_data(show_spinner=False)
+def inject_css() -> None:
+    st.markdown(
+        """
+        <style>
+            .stApp {
+                background: linear-gradient(180deg, #02070d 0%, #06111a 45%, #041019 100%);
+            }
+            [data-testid="stSidebar"] {
+                background: linear-gradient(180deg, rgba(8, 14, 24, 0.98), rgba(10, 20, 32, 0.98));
+            }
+            .metric-card {
+                border: 1px solid rgba(120, 180, 255, 0.12);
+                border-radius: 18px;
+                padding: 0.8rem 1rem;
+                background: rgba(255,255,255,0.02);
+            }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def cached_load_data(start_date: str, fast_mode: bool) -> pd.DataFrame:
+    history_limit = 450 if fast_mode else 900
+    return load_data(start=start_date, history_limit=history_limit)
+
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def cached_build_feature_panel(prices: pd.DataFrame) -> pd.DataFrame:
+    ml_config = MLEngineConfig()
+    return build_feature_panel(prices, config=ml_config)
+
+
 def run_pipeline(
     start_date: str,
     initial_capital: float,
@@ -29,11 +62,17 @@ def run_pipeline(
     top_n: int,
     optimizer_method: str,
     execution_delay: int,
+    fast_mode: bool,
 ):
-    prices = load_data(start=start_date)
+    progress = st.progress(0, text="Iniciando pipeline institucional...")
+
+    progress.progress(10, text="Carregando dados de mercado...")
+    prices = cached_load_data(start_date=start_date, fast_mode=fast_mode)
+
+    progress.progress(25, text="Construindo features quantitativas...")
+    feature_panel = cached_build_feature_panel(prices)
 
     ml_config = MLEngineConfig()
-    feature_panel = build_feature_panel(prices, config=ml_config)
 
     strategy_config = StrategyConfig(
         probability_threshold=probability_threshold,
@@ -46,22 +85,46 @@ def run_pipeline(
 
     optimizer_config = OptimizerConfig(
         method=optimizer_method,
-        lookback_window=60,
+        lookback_window=40 if fast_mode else 60,
         max_weight=0.40,
         min_weight=0.0,
         target_gross_exposure=1.0,
     )
 
-    wf_config = WalkForwardConfig(
-        train_window=252 * 2,
-        test_window=21,
-        step_size=21,
-        min_assets=3,
-        initial_capital=initial_capital,
-        fee_rate=0.0005,
-        slippage_rate=0.0005,
-        execution_delay=execution_delay,
-    )
+    if fast_mode:
+        wf_config = WalkForwardConfig(
+            train_window=252,
+            test_window=15,
+            step_size=15,
+            min_assets=3,
+            initial_capital=initial_capital,
+            fee_rate=0.0005,
+            slippage_rate=0.0005,
+            execution_delay=execution_delay,
+        )
+        mc_config = MonteCarloConfig(
+            n_simulations=200,
+            block_size=5,
+            random_state=42,
+            periods_per_year=252,
+        )
+    else:
+        wf_config = WalkForwardConfig(
+            train_window=252 * 2,
+            test_window=21,
+            step_size=21,
+            min_assets=3,
+            initial_capital=initial_capital,
+            fee_rate=0.0005,
+            slippage_rate=0.0005,
+            execution_delay=execution_delay,
+        )
+        mc_config = MonteCarloConfig(
+            n_simulations=500,
+            block_size=5,
+            random_state=42,
+            periods_per_year=252,
+        )
 
     def model_factory():
         return EnsembleProbabilityModel(config=ml_config)
@@ -83,6 +146,7 @@ def run_pipeline(
         )
         return optimized_long
 
+    progress.progress(50, text="Executando walk-forward validation...")
     wf_result = run_walk_forward_validation(
         prices=prices,
         feature_data=feature_panel,
@@ -91,6 +155,7 @@ def run_pipeline(
         config=wf_config,
     )
 
+    progress.progress(72, text="Calculando métricas institucionais...")
     backtest_result = wf_result["backtest_result"]
 
     weight_cols = [c for c in backtest_result["portfolio_history"].columns if str(c).startswith("w_")]
@@ -104,22 +169,22 @@ def run_pipeline(
         initial_capital=initial_capital,
     )
 
+    progress.progress(85, text="Rodando Monte Carlo...")
     mc_result = run_monte_carlo(
         returns=backtest_result["returns"]["return"],
-        config=MonteCarloConfig(
-            n_simulations=1000,
-            block_size=5,
-            random_state=42,
-            periods_per_year=252,
-        ),
+        config=mc_config,
     )
 
+    progress.progress(95, text="Gerando relatório institucional...")
     report = build_institutional_report(
         metrics=metrics,
         monte_carlo=mc_result,
         walk_forward=wf_result,
     )
     save_report(report)
+
+    progress.progress(100, text="Pesquisa concluída.")
+    progress.empty()
 
     return {
         "prices": prices,
@@ -176,8 +241,8 @@ def plot_monte_carlo_histogram(mc_df: pd.DataFrame):
     fig = px.histogram(
         mc_df,
         x="sharpe",
-        nbins=40,
-        title="Monte Carlo Sharpe Distribution",
+        nbins=30,
+        title="Distribuição de Sharpe - Monte Carlo",
     )
     fig.update_layout(
         template="plotly_dark",
@@ -200,7 +265,7 @@ def plot_allocation(weights_df: pd.DataFrame):
     fig = px.pie(
         names=latest.index,
         values=latest.values,
-        title="Latest Portfolio Allocation",
+        title="Alocação Final do Portfólio",
     )
     fig.update_layout(
         template="plotly_dark",
@@ -213,8 +278,8 @@ def plot_allocation(weights_df: pd.DataFrame):
 def plot_strategy_comparison(metrics: dict, mc_result: dict, wf_result: dict):
     comparison = pd.DataFrame(
         {
-            "Metric": ["Sharpe", "Sortino", "Calmar", "MC Robustness", "WFE"],
-            "Value": [
+            "Métrica": ["Sharpe", "Sortino", "Calmar", "Robustez MC", "WFE"],
+            "Valor": [
                 metrics.get("sharpe", 0.0),
                 metrics.get("sortino", 0.0),
                 metrics.get("calmar", 0.0),
@@ -226,9 +291,9 @@ def plot_strategy_comparison(metrics: dict, mc_result: dict, wf_result: dict):
 
     fig = px.bar(
         comparison,
-        x="Metric",
-        y="Value",
-        title="Strategy Quality Comparison",
+        x="Métrica",
+        y="Valor",
+        title="Comparação de Qualidade da Estratégia",
     )
     fig.update_layout(
         template="plotly_dark",
@@ -239,29 +304,37 @@ def plot_strategy_comparison(metrics: dict, mc_result: dict, wf_result: dict):
 
 
 def main():
-    st.title("Invest Pro Bot - Institutional Quant Research & Trading System")
-    st.caption("Robustness > profitability | statistics > intuition | validation > assumptions")
+    inject_css()
 
-    st.sidebar.header("Research Configuration")
+    st.title("Invest Pro Bot - Sistema de Pesquisa e Negociação Quantitativa Institucional")
+    st.caption("Robustez > rentabilidade | estatística > intuição | validação > pressupostos")
 
-    start_date = st.sidebar.text_input("Start Date", value="2018-01-01")
-    initial_capital = st.sidebar.number_input("Initial Capital", min_value=1000.0, value=100000.0, step=1000.0)
-    probability_threshold = st.sidebar.slider("Probability Threshold", 0.50, 0.80, 0.55, 0.01)
-    top_n = st.sidebar.slider("Top N Assets", 1, 6, 3, 1)
+    st.sidebar.header("Configuração de pesquisa")
+
+    start_date = st.sidebar.text_input("Data de início", value="2019-01-01")
+    initial_capital = st.sidebar.number_input("Capital inicial", min_value=1000.0, value=10000.0, step=1000.0)
+    probability_threshold = st.sidebar.slider("Limiar de probabilidade", 0.50, 0.80, 0.55, 0.01)
+    top_n = st.sidebar.slider("Principais ativos N", 1, 6, 3, 1)
     optimizer_method = st.sidebar.selectbox(
-        "Optimizer Method",
+        "Método de otimização",
         ["equal_weight", "risk_parity", "markowitz"],
         index=1,
+        format_func=lambda x: {
+            "equal_weight": "peso igual",
+            "risk_parity": "paridade de risco",
+            "markowitz": "markowitz",
+        }[x],
     )
-    execution_delay = st.sidebar.slider("Execution Delay (bars)", 1, 3, 1, 1)
+    execution_delay = st.sidebar.slider("Atraso de execução (barras)", 1, 3, 1, 1)
+    fast_mode = st.sidebar.toggle("Modo rápido para Streamlit", value=True)
 
-    run_button = st.sidebar.button("Run Institutional Research")
+    run_button = st.sidebar.button("Executar pesquisa institucional", use_container_width=True)
 
     if not run_button:
-        st.info("Configure the parameters and click 'Run Institutional Research'.")
+        st.info("Configure os parâmetros e clique em 'Executar pesquisa institucional'.")
         return
 
-    with st.spinner("Running institutional pipeline..."):
+    try:
         result = run_pipeline(
             start_date=start_date,
             initial_capital=initial_capital,
@@ -269,7 +342,11 @@ def main():
             top_n=top_n,
             optimizer_method=optimizer_method,
             execution_delay=execution_delay,
+            fast_mode=fast_mode,
         )
+    except Exception as e:
+        st.error(f"Erro ao executar pipeline: {e}")
+        return
 
     backtest_result = result["backtest_result"]
     metrics = result["metrics"]
@@ -307,17 +384,17 @@ def main():
             use_container_width=True,
         )
 
-    st.subheader("Walk-Forward Results")
+    st.subheader("Resultados do Walk-Forward")
     st.dataframe(wf_result["fold_metrics"], use_container_width=True)
 
-    st.subheader("Strategy Comparison Panel")
+    st.subheader("Painel de Comparação da Estratégia")
     st.plotly_chart(
         plot_strategy_comparison(metrics, mc_result, wf_result),
         use_container_width=True,
     )
 
-    st.subheader("Institutional Report")
-    st.json(result["report"])
+    with st.expander("Relatório institucional"):
+        st.json(result["report"])
 
 
 if __name__ == "__main__":
