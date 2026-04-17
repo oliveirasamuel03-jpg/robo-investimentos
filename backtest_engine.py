@@ -9,81 +9,56 @@ def backtest_portfolio(
     fee_rate: float = 0.0005,
     slippage_rate: float = 0.0005,
     execution_delay: int = 1,
+    max_gross_exposure: float = 1.0,
 ) -> dict:
-    """
-    Realistic portfolio backtest with:
-    - multi-asset weights
-    - 1-bar execution delay
-    - transaction costs
-    - slippage
-    - portfolio history
-    - trade log
+    if prices.empty:
+        raise ValueError("prices is empty")
 
-    Parameters
-    ----------
-    prices : pd.DataFrame
-        Adjusted close prices indexed by date, columns = assets.
-    target_weights : pd.DataFrame
-        Desired target weights by date, same index/columns as prices.
-        Example: 0.25, 0.10, 0.0, etc.
-    initial_capital : float
-        Starting NAV.
-    fee_rate : float
-        Transaction fee as fraction of traded notional.
-    slippage_rate : float
-        Slippage as fraction of traded notional.
-    execution_delay : int
-        Number of bars of delay before signal execution.
+    if target_weights.empty:
+        raise ValueError("target_weights is empty")
 
-    Returns
-    -------
-    dict with:
-        equity_curve
-        returns
-        drawdown
-        trade_log
-        portfolio_history
-    """
+    if execution_delay < 0:
+        raise ValueError("execution_delay must be >= 0")
+
     prices = prices.sort_index().copy()
     target_weights = target_weights.sort_index().copy()
 
     common_index = prices.index.intersection(target_weights.index)
     common_cols = prices.columns.intersection(target_weights.columns)
 
+    if len(common_index) == 0 or len(common_cols) == 0:
+        raise ValueError("prices and target_weights have no overlapping index/columns")
+
     prices = prices.loc[common_index, common_cols].ffill().dropna(how="all")
-    target_weights = target_weights.loc[common_index, common_cols].fillna(0.0)
+    target_weights = target_weights.loc[common_index, common_cols].replace([np.inf, -np.inf], np.nan).fillna(0.0)
 
     asset_returns = prices.pct_change().fillna(0.0)
-
     executed_weights = target_weights.shift(execution_delay).fillna(0.0)
 
-    dates = prices.index
-    current_weights = pd.Series(0.0, index=common_cols)
-    nav = initial_capital
+    current_weights = pd.Series(0.0, index=common_cols, dtype=float)
+    nav = float(initial_capital)
+    running_peak = float(initial_capital)
 
     equity_records = []
     return_records = []
     portfolio_records = []
     trade_records = []
 
-    running_peak = initial_capital
-
-    for dt in dates:
-        desired_weights = executed_weights.loc[dt].copy()
+    for dt in prices.index:
+        desired_weights = executed_weights.loc[dt].astype(float).copy()
 
         gross_exposure = desired_weights.abs().sum()
-        if gross_exposure > 1.0 and gross_exposure > 0:
-            desired_weights = desired_weights / gross_exposure
+        if gross_exposure > max_gross_exposure and gross_exposure > 0:
+            desired_weights = desired_weights / gross_exposure * max_gross_exposure
 
-        turnover = (desired_weights - current_weights).abs().sum()
-
+        turnover = float((desired_weights - current_weights).abs().sum())
         trading_cost = turnover * (fee_rate + slippage_rate)
 
-        day_asset_returns = asset_returns.loc[dt]
+        day_asset_returns = asset_returns.loc[dt].astype(float)
         gross_portfolio_return = float((current_weights * day_asset_returns).sum())
         net_portfolio_return = gross_portfolio_return - trading_cost
 
-        nav = nav * (1.0 + net_portfolio_return)
+        nav *= (1.0 + net_portfolio_return)
         running_peak = max(running_peak, nav)
         drawdown = (nav / running_peak) - 1.0
 
@@ -94,14 +69,18 @@ def backtest_portfolio(
             delta_w = new_w - old_w
 
             if abs(delta_w) > 1e-12:
+                side = "BUY" if delta_w > 0 else "SELL"
                 trade_records.append(
                     {
                         "date": dt,
                         "asset": asset,
+                        "side": side,
+                        "price": float(prices.loc[dt, asset]),
                         "old_weight": old_w,
                         "new_weight": new_w,
                         "delta_weight": delta_w,
                         "estimated_cost": abs(delta_w) * (fee_rate + slippage_rate),
+                        "turnover_total": turnover,
                     }
                 )
 
