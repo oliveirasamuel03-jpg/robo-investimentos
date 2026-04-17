@@ -1,4 +1,31 @@
 import streamlit as st
+
+# =====================
+# LOGIN BÁSICO
+# =====================
+USUARIO = "lsoliveira"
+SENHA = "25166903Aa."
+
+if "logado" not in st.session_state:
+    st.session_state.logado = False
+
+if not st.session_state.logado:
+
+    st.title("🔐 Acesso ao Robô Investidor")
+
+    usuario_input = st.text_input("Usuário")
+    senha_input = st.text_input("Senha", type="password")
+
+    if st.button("Entrar"):
+
+        if usuario_input == USUARIO and senha_input == SENHA:
+            st.session_state.logado = True
+            st.success("Login realizado com sucesso!")
+            st.rerun()
+        else:
+            st.error("Usuário ou senha incorretos")
+
+    st.stop()import streamlit as st
 import yfinance as yf
 import pandas as pd
 import plotly.graph_objects as go
