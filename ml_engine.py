@@ -10,50 +10,36 @@ from sklearn.impute import SimpleImputer
 from sklearn.preprocessing import StandardScaler
 
 
-# =========================================================
-# Config
-# =========================================================
-
 @dataclass
 class MLEngineConfig:
-    lookahead: int = 5                # horizonte do alvo (dias)
-    quantile_top: float = 0.3         # top X% considerados "bons"
+    lookahead: int = 5
+    quantile_top: float = 0.3
     use_scaler: bool = True
     random_state: int = 42
 
 
-# =========================================================
-# Feature Engineering (cross-sectional)
-# =========================================================
-
-def _zscore(x: pd.Series) -> pd.Series:
-    std = x.std(ddof=0)
-    if std == 0 or np.isnan(std):
-        return pd.Series(0.0, index=x.index)
-    return (x - x.mean()) / std
-
-
 def _cs_rank(df: pd.DataFrame) -> pd.DataFrame:
-    # rank por linha (data), normalizado [0,1]
     return df.rank(axis=1, pct=True)
 
 
-def build_feature_panel(prices: pd.DataFrame, config: MLEngineConfig) -> pd.DataFrame:
+def build_feature_panel(prices: pd.DataFrame, config: MLEngineConfig | None = None) -> pd.DataFrame:
+    if config is None:
+        config = MLEngineConfig()
+
     px = prices.sort_index().copy()
     rets = px.pct_change()
 
-    # -------- momentum (time-series) --------
     mom_20 = px.pct_change(20)
     mom_60 = px.pct_change(60)
     mom_120 = px.pct_change(120)
 
-    # -------- volatilidade --------
     vol_20 = rets.rolling(20).std()
 
-    # -------- z-score (time-series) --------
-    z_20 = rets.rolling(20).apply(lambda x: (x[-1] - np.mean(x)) / (np.std(x) + 1e-8), raw=False)
+    # z-score do retorno atual contra janela de 20 dias
+    mean_20 = rets.rolling(20).mean()
+    std_20 = rets.rolling(20).std()
+    z_20 = (rets - mean_20) / (std_20 + 1e-8)
 
-    # -------- força vs SPY (se existir) --------
     if "SPY" in px.columns:
         spy = px["SPY"]
         rel = px.divide(spy, axis=0)
@@ -61,11 +47,10 @@ def build_feature_panel(prices: pd.DataFrame, config: MLEngineConfig) -> pd.Data
     else:
         rel_mom_60 = mom_60 * 0.0
 
-    # -------- cross-sectional features --------
     cs_mom_20 = _cs_rank(mom_20)
     cs_mom_60 = _cs_rank(mom_60)
     cs_mom_120 = _cs_rank(mom_120)
-    cs_vol_20 = _cs_rank(-vol_20)  # menor vol = melhor
+    cs_vol_20 = _cs_rank(-vol_20)
     cs_z_20 = _cs_rank(z_20)
     cs_rel = _cs_rank(rel_mom_60)
 
@@ -84,7 +69,6 @@ def build_feature_panel(prices: pd.DataFrame, config: MLEngineConfig) -> pd.Data
         "cs_rel": cs_rel,
     }
 
-    # -------- futuro (para target) --------
     fwd_ret = px.pct_change(config.lookahead).shift(-config.lookahead)
 
     rows = []
@@ -102,8 +86,6 @@ def build_feature_panel(prices: pd.DataFrame, config: MLEngineConfig) -> pd.Data
     df = pd.DataFrame(rows)
     df = df.replace([np.inf, -np.inf], np.nan).dropna()
 
-    # -------- target cross-sectional --------
-    # 1 = ativo está no top X% naquele dia
     df["target"] = (
         df.groupby("date")["target_ret"]
         .transform(lambda x: x >= x.quantile(1 - config.quantile_top))
@@ -113,12 +95,11 @@ def build_feature_panel(prices: pd.DataFrame, config: MLEngineConfig) -> pd.Data
     return df
 
 
-# =========================================================
-# Modelo Ensemble (probabilidade)
-# =========================================================
-
 class EnsembleProbabilityModel:
-    def __init__(self, config: MLEngineConfig):
+    def __init__(self, config: MLEngineConfig | None = None):
+        if config is None:
+            config = MLEngineConfig()
+
         self.config = config
 
         steps = [("imputer", SimpleImputer(strategy="median"))]
@@ -157,4 +138,5 @@ class EnsembleProbabilityModel:
         p1 = self.rf.predict_proba(Xp)[:, 1]
         p2 = self.gb.predict_proba(Xp)[:, 1]
 
-        return (p1 + p2) / 2.0
+        p = (p1 + p2) / 2.0
+        return np.column_stack([1.0 - p, p])
