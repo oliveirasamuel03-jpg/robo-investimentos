@@ -2,4 +2,3 @@ streamlit>=1.44
 yfinance>=0.2.54
 pandas>=2.2
 plotly>=5.24
-  
