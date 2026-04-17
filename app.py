@@ -7,7 +7,7 @@ import streamlit as st
 
 from data_engine import load_data
 from ml_engine import MLEngineConfig, EnsembleProbabilityModel, build_feature_panel
-from strategy_engine import StrategyConfig, generate_target_weights
+from strategy_engine import StrategyConfig, generate_target_weights, market_filter
 from portfolio_optimizer import OptimizerConfig, build_rolling_optimized_weights
 from walk_forward import WalkForwardConfig, run_walk_forward_validation
 from metrics import compute_all_metrics
@@ -30,12 +30,6 @@ def inject_css() -> None:
             }
             [data-testid="stSidebar"] {
                 background: linear-gradient(180deg, rgba(8, 14, 24, 0.98), rgba(10, 20, 32, 0.98));
-            }
-            .metric-card {
-                border: 1px solid rgba(120, 180, 255, 0.12);
-                border-radius: 18px;
-                padding: 0.8rem 1rem;
-                background: rgba(255,255,255,0.02);
             }
         </style>
         """,
@@ -126,12 +120,26 @@ def run_pipeline(
             periods_per_year=252,
         )
 
+    regime = market_filter(prices)
+
     def model_factory():
         return EnsembleProbabilityModel(config=ml_config)
 
     def signal_builder(pred_df: pd.DataFrame) -> pd.DataFrame:
         weighted = generate_target_weights(pred_df, config=strategy_config)
         weighted["selected"] = weighted["weight"] > 0
+        weighted["date"] = pd.to_datetime(weighted["date"])
+
+        weighted = weighted.merge(
+            regime.rename("regime"),
+            left_on="date",
+            right_index=True,
+            how="left",
+        )
+
+        weighted["regime"] = weighted["regime"].fillna(False)
+        weighted.loc[weighted["regime"] == False, "weight"] = 0.0
+        weighted.loc[weighted["regime"] == False, "selected"] = False
 
         optimized_matrix = build_rolling_optimized_weights(
             prices=prices,
@@ -313,8 +321,8 @@ def main():
 
     start_date = st.sidebar.text_input("Data de início", value="2019-01-01")
     initial_capital = st.sidebar.number_input("Capital inicial", min_value=1000.0, value=10000.0, step=1000.0)
-    probability_threshold = st.sidebar.slider("Limiar de probabilidade", 0.50, 0.80, 0.55, 0.01)
-    top_n = st.sidebar.slider("Principais ativos N", 1, 6, 3, 1)
+    probability_threshold = st.sidebar.slider("Limiar de probabilidade", 0.50, 0.85, 0.65, 0.01)
+    top_n = st.sidebar.slider("Principais ativos N", 1, 6, 5, 1)
     optimizer_method = st.sidebar.selectbox(
         "Método de otimização",
         ["equal_weight", "risk_parity", "markowitz"],
