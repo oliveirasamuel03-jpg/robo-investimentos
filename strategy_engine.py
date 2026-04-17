@@ -166,9 +166,17 @@ def generate_target_weights(
 
     df = predictions.copy()
     df["date"] = pd.to_datetime(df["date"])
+    df["asset"] = df["asset"].astype(str)
     df["probability"] = pd.to_numeric(df["probability"], errors="coerce")
     df = df.replace([np.inf, -np.inf], np.nan).dropna(subset=["date", "asset", "probability"])
-    df = df.sort_values(["date", "probability"], ascending=[True, False]).reset_index(drop=True)
+
+    # remove duplicatas na entrada
+    df = (
+        df.groupby(["date", "asset"], as_index=False)["probability"]
+        .mean()
+        .sort_values(["date", "probability"], ascending=[True, False])
+        .reset_index(drop=True)
+    )
 
     output_rows = []
 
@@ -179,7 +187,6 @@ def generate_target_weights(
         eligible = g[g["probability"] >= config.probability_threshold].copy()
         eligible = eligible.sort_values("probability", ascending=False).head(config.top_n)
 
-        # cash filter inteligente
         if eligible.empty:
             g["selected"] = False
             g["weight"] = 0.0
@@ -215,7 +222,6 @@ def generate_target_weights(
 
         weights = _clip_and_normalize(weights, config.max_weight_per_asset)
 
-        # volatility sizing
         if prices is not None:
             scale = _portfolio_volatility_scale(
                 prices=prices,
@@ -239,4 +245,54 @@ def generate_target_weights(
         output_rows.append(g)
 
     result = pd.concat(output_rows, ignore_index=True)
+
+    # blindagem final contra duplicatas
+    result = (
+        result.groupby(["date", "asset"], as_index=False)
+        .agg(
+            probability=("probability", "mean"),
+            rank=("rank", "min"),
+            selected=("selected", "max"),
+            weight=("weight", "sum"),
+            cash_mode=("cash_mode", "max"),
+        )
+        .sort_values(["date", "asset"])
+        .reset_index(drop=True)
+    )
+
     return result[["date", "asset", "probability", "rank", "selected", "weight", "cash_mode"]]
+
+
+def build_weight_matrix(
+    weighted_predictions: pd.DataFrame,
+    index: pd.Index | None = None,
+    columns: pd.Index | None = None,
+) -> pd.DataFrame:
+    required_cols = {"date", "asset", "weight"}
+    missing = required_cols - set(weighted_predictions.columns)
+    if missing:
+        raise ValueError(f"weighted_predictions missing required columns: {sorted(missing)}")
+
+    df = weighted_predictions.copy()
+    df["date"] = pd.to_datetime(df["date"])
+    df["asset"] = df["asset"].astype(str)
+    df["weight"] = pd.to_numeric(df["weight"], errors="coerce").fillna(0.0)
+
+    # evita erro de reshape
+    df = df.groupby(["date", "asset"], as_index=False)["weight"].sum()
+
+    matrix = df.pivot_table(
+        index="date",
+        columns="asset",
+        values="weight",
+        aggfunc="sum",
+        fill_value=0.0,
+    )
+
+    if index is not None:
+        matrix = matrix.reindex(index=index).fillna(0.0)
+
+    if columns is not None:
+        matrix = matrix.reindex(columns=columns).fillna(0.0)
+
+    return matrix.sort_index()
