@@ -20,16 +20,86 @@ class StrategyConfig:
     min_assets: int = 1
 
 
-def market_filter(prices: pd.DataFrame, benchmark: str = "SPY", window: int = 200) -> pd.Series:
+def market_filter(
+    prices: pd.DataFrame,
+    benchmark: str = "SPY",
+    fast_ma_window: int = 50,
+    slow_ma_window: int = 200,
+) -> pd.Series:
+    """
+    Regime bull/bear filter:
+    Bull regime only when:
+    - benchmark price > slow moving average
+    - fast moving average > slow moving average
+    """
     if benchmark not in prices.columns:
-        return pd.Series(True, index=prices.index)
+        return pd.Series(True, index=prices.index, name="regime")
 
-    benchmark_px = prices[benchmark].copy()
-    ma = benchmark_px.rolling(window).mean()
-    regime = benchmark_px > ma
+    benchmark_px = prices[benchmark].astype(float).copy()
+    fast_ma = benchmark_px.rolling(fast_ma_window).mean()
+    slow_ma = benchmark_px.rolling(slow_ma_window).mean()
+
+    regime = (benchmark_px > slow_ma) & (fast_ma > slow_ma)
     regime = regime.fillna(False)
     regime.name = "regime"
     return regime
+
+
+def volatility_filter(
+    prices: pd.DataFrame,
+    benchmark: str = "SPY",
+    vol_window: int = 20,
+    vol_threshold: float = 0.025,
+) -> pd.Series:
+    """
+    Volatility filter based on benchmark realized volatility.
+    Allows trading only when benchmark rolling volatility is below threshold.
+    """
+    if benchmark not in prices.columns:
+        return pd.Series(True, index=prices.index, name="vol_filter")
+
+    benchmark_px = prices[benchmark].astype(float).copy()
+    returns = benchmark_px.pct_change()
+    realized_vol = returns.rolling(vol_window).std()
+
+    vol_ok = realized_vol < vol_threshold
+    vol_ok = vol_ok.fillna(False)
+    vol_ok.name = "vol_filter"
+    return vol_ok
+
+
+def combined_market_filter(
+    prices: pd.DataFrame,
+    benchmark: str = "SPY",
+    fast_ma_window: int = 50,
+    slow_ma_window: int = 200,
+    vol_window: int = 20,
+    vol_threshold: float = 0.025,
+    use_regime_filter: bool = True,
+    use_volatility_filter: bool = True,
+) -> pd.DataFrame:
+    """
+    Combined market filter with regime + volatility.
+    """
+    regime = market_filter(
+        prices=prices,
+        benchmark=benchmark,
+        fast_ma_window=fast_ma_window,
+        slow_ma_window=slow_ma_window,
+    )
+
+    vol_ok = volatility_filter(
+        prices=prices,
+        benchmark=benchmark,
+        vol_window=vol_window,
+        vol_threshold=vol_threshold,
+    )
+
+    df = pd.DataFrame(index=prices.index)
+    df["regime"] = regime if use_regime_filter else True
+    df["vol_filter"] = vol_ok if use_volatility_filter else True
+    df["trade_allowed"] = df["regime"] & df["vol_filter"]
+    return df
 
 
 def _clip_and_normalize(weights: pd.Series, max_weight_per_asset: float) -> pd.Series:
@@ -95,7 +165,7 @@ def generate_target_weights(
 
     output_rows = []
 
-    for dt, group in df.groupby("date", sort=True):
+    for _, group in df.groupby("date", sort=True):
         g = group.copy()
         g["rank"] = g["probability"].rank(method="first", ascending=False).astype(int)
 
