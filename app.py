@@ -1,10 +1,18 @@
 import streamlit as st
+import yfinance as yf
+import pandas as pd
+import plotly.graph_objects as go
+
+# =====================
+# CONFIG
+# =====================
+st.set_page_config(page_title="Invest Pro", layout="wide")
 
 # =====================
 # LOGIN BÁSICO
 # =====================
-USUARIO = "lsoliveira"
-SENHA = "25166903Aa."
+USUARIO = "admin"
+SENHA = "1234"
 
 if "logado" not in st.session_state:
     st.session_state.logado = False
@@ -25,14 +33,7 @@ if not st.session_state.logado:
         else:
             st.error("Usuário ou senha incorretos")
 
-    st.stop()import streamlit as st
-import yfinance as yf
-import pandas as pd
-import plotly.graph_objects as go
-
-st.set_page_config(page_title="Invest Pro", layout="wide")
-
-st.title("📊 Invest Pro - Dashboard Inteligente")
+    st.stop()
 
 # =====================
 # RSI
@@ -52,13 +53,18 @@ ativos = [
     "BBAS3.SA","WEGE3.SA","MGLU3.SA","RENT3.SA"
 ]
 
-if st.button("🚀 Rodar Análise Profissional"):
+# =====================
+# APP PRINCIPAL
+# =====================
+st.title("📊 Invest Pro - Dashboard")
+
+if st.button("🚀 Rodar Análise"):
 
     resultados = []
     dados_map = {}
 
     # =====================
-    # BACKTEST
+    # ANÁLISE
     # =====================
     for ativo in ativos:
 
@@ -101,11 +107,11 @@ if st.button("🚀 Rodar Análise Profissional"):
         dados_map[ativo] = dados
 
     # =====================
-    # RANKING PROFISSIONAL
+    # RANKING
     # =====================
     resultados.sort(key=lambda x: x[1], reverse=True)
 
-    st.subheader("🏆 Ranking Inteligente")
+    st.subheader("🏆 Ranking")
 
     col1, col2, col3 = st.columns(3)
 
@@ -127,7 +133,7 @@ if st.button("🚀 Rodar Análise Profissional"):
     df = dados_map[ativo]
 
     # =====================
-    # GRÁFICO CANDLESTICK PROFISSIONAL
+    # GRÁFICO PROFISSIONAL (CANDLESTICK)
     # =====================
     fig = go.Figure()
 
@@ -155,19 +161,17 @@ if st.button("🚀 Rodar Análise Profissional"):
     ))
 
     fig.update_layout(
-        title=f"{ativo} - Gráfico Profissional",
-        xaxis_title="Tempo",
-        yaxis_title="Preço",
         template="plotly_dark",
-        height=600
+        height=600,
+        title=f"{ativo} - Análise Profissional"
     )
 
     st.plotly_chart(fig, use_container_width=True)
 
     # =====================
-    # RESUMO
+    # RESULTADO
     # =====================
-    st.subheader("📊 Resultado")
+    st.subheader("📊 Resultado Final")
 
     for ativo, lucro in resultados:
         cor = "🟢" if lucro > 0 else "🔴"
