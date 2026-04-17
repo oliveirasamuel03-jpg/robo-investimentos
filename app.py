@@ -1,45 +1,19 @@
 import streamlit as st
 import yfinance as yf
 import pandas as pd
-import matplotlib.pyplot as plt
+import plotly.graph_objects as go
 
-# =====================
-# CONFIGURAÇÃO VISUAL
-# =====================
-st.set_page_config(page_title="Robô Investidor", layout="wide")
+st.set_page_config(page_title="Invest Pro", layout="wide")
 
-st.markdown("""
-    <style>
-        .main {
-            background-color: #0e1117;
-            color: white;
-        }
-        .stButton>button {
-            background-color: #00c46c;
-            color: white;
-            border-radius: 10px;
-            height: 45px;
-            width: 100%;
-            font-weight: bold;
-        }
-        .card {
-            background-color: #1c1f26;
-            padding: 20px;
-            border-radius: 12px;
-            margin-bottom: 10px;
-        }
-    </style>
-""", unsafe_allow_html=True)
-
-st.title("📊 Robô Investidor Pro")
+st.title("📊 Invest Pro - Dashboard Inteligente")
 
 # =====================
 # RSI
 # =====================
 def rsi(series, period=14):
     delta = series.diff()
-    gain = (delta.where(delta > 0, 0)).rolling(period).mean()
-    loss = (-delta.where(delta < 0, 0)).rolling(period).mean()
+    gain = delta.clip(lower=0).rolling(period).mean()
+    loss = (-delta.clip(upper=0)).rolling(period).mean()
     rs = gain / loss
     return 100 - (100 / (1 + rs))
 
@@ -48,23 +22,20 @@ def rsi(series, period=14):
 # =====================
 ativos = [
     "VALE3.SA","PETR4.SA","ITUB4.SA","BBDC4.SA",
-    "BBAS3.SA","WEGE3.SA","MGLU3.SA","RENT3.SA",
-    "PRIO3.SA","EQTL3.SA"
+    "BBAS3.SA","WEGE3.SA","MGLU3.SA","RENT3.SA"
 ]
 
-# =====================
-# BOTÃO PRINCIPAL
-# =====================
-if st.button("🚀 Rodar Análise"):
+if st.button("🚀 Rodar Análise Profissional"):
 
     resultados = []
-    dados_ativos = {}
+    dados_map = {}
 
     # =====================
-    # ANÁLISE
+    # BACKTEST
     # =====================
     for ativo in ativos:
-        dados = yf.download(ativo, start="2018-01-01")
+
+        dados = yf.download(ativo, start="2020-01-01")
 
         if dados.empty:
             continue
@@ -72,89 +43,105 @@ if st.button("🚀 Rodar Análise"):
         if isinstance(dados.columns, pd.MultiIndex):
             dados.columns = dados.columns.droplevel(1)
 
-        close = dados["Close"]
-
-        dados["media9"] = close.rolling(9).mean()
-        dados["media21"] = close.rolling(21).mean()
-        dados["media50"] = close.rolling(50).mean()
-        dados["RSI"] = rsi(close)
+        dados["media9"] = dados["Close"].rolling(9).mean()
+        dados["media21"] = dados["Close"].rolling(21).mean()
+        dados["rsi"] = rsi(dados["Close"])
 
         dados["sinal"] = 0
         dados.loc[dados["media9"] > dados["media21"], "sinal"] = 1
         dados.loc[dados["media9"] < dados["media21"], "sinal"] = -1
 
         dinheiro = 1000
-        acoes = 0
-
-        historico = []
+        posicao = 0
 
         for i in range(len(dados)):
-            preco = close.iloc[i]
+            preco = dados["Close"].iloc[i]
             sinal = dados["sinal"].iloc[i]
-            rsi_val = dados["RSI"].iloc[i]
-            media50 = dados["media50"].iloc[i]
+            r = dados["rsi"].iloc[i]
 
-            if sinal == 1 and dinheiro > 0 and rsi_val < 70 and preco > media50:
-                acoes = dinheiro / preco
+            if sinal == 1 and dinheiro > 0 and r < 70:
+                posicao = dinheiro / preco
                 dinheiro = 0
 
-            elif acoes > 0:
-                if sinal == -1 or rsi_val > 70:
-                    dinheiro = acoes * preco
-                    acoes = 0
+            elif posicao > 0 and (sinal == -1 or r > 75):
+                dinheiro = posicao * preco
+                posicao = 0
 
-            historico.append(dinheiro + acoes * preco)
-
-        lucro = historico[-1] - 1000
+        valor_final = dinheiro + posicao * dados["Close"].iloc[-1]
+        lucro = valor_final - 1000
 
         resultados.append((ativo, lucro))
-        dados_ativos[ativo] = dados
+        dados_map[ativo] = dados
 
     # =====================
-    # RANKING
+    # RANKING PROFISSIONAL
     # =====================
     resultados.sort(key=lambda x: x[1], reverse=True)
 
-    st.subheader("🏆 Ranking de Ativos")
+    st.subheader("🏆 Ranking Inteligente")
 
-    cols = st.columns(3)
+    col1, col2, col3 = st.columns(3)
 
     for i, (ativo, lucro) in enumerate(resultados[:3]):
-        with cols[i]:
-            st.markdown(f"""
-            <div class="card">
-                <h3>{ativo}</h3>
-                <h2 style="color: {'#00ff88' if lucro > 0 else '#ff4d4d'}">
-                    R$ {lucro:.2f}
-                </h2>
-            </div>
-            """, unsafe_allow_html=True)
+        col = [col1, col2, col3][i]
+
+        col.metric(
+            label=ativo,
+            value=f"R$ {lucro:.2f}",
+            delta=f"{lucro:.2f}"
+        )
+
+    st.divider()
 
     # =====================
-    # LISTA COMPLETA
+    # SELEÇÃO
     # =====================
-    st.subheader("📋 Todos os Ativos")
+    ativo = st.selectbox("📌 Escolha o ativo", list(dados_map.keys()))
+    df = dados_map[ativo]
+
+    # =====================
+    # GRÁFICO CANDLESTICK PROFISSIONAL
+    # =====================
+    fig = go.Figure()
+
+    fig.add_trace(go.Candlestick(
+        x=df.index,
+        open=df["Open"],
+        high=df["High"],
+        low=df["Low"],
+        close=df["Close"],
+        name="Preço"
+    ))
+
+    fig.add_trace(go.Scatter(
+        x=df.index,
+        y=df["media9"],
+        name="Média 9",
+        line=dict(color="blue")
+    ))
+
+    fig.add_trace(go.Scatter(
+        x=df.index,
+        y=df["media21"],
+        name="Média 21",
+        line=dict(color="orange")
+    ))
+
+    fig.update_layout(
+        title=f"{ativo} - Gráfico Profissional",
+        xaxis_title="Tempo",
+        yaxis_title="Preço",
+        template="plotly_dark",
+        height=600
+    )
+
+    st.plotly_chart(fig, use_container_width=True)
+
+    # =====================
+    # RESUMO
+    # =====================
+    st.subheader("📊 Resultado")
 
     for ativo, lucro in resultados:
         cor = "🟢" if lucro > 0 else "🔴"
         st.write(f"{cor} {ativo} → R$ {lucro:.2f}")
-
-    # =====================
-    # GRÁFICO MELHORADO
-    # =====================
-    st.subheader("📈 Análise do Ativo")
-
-    escolhido = st.selectbox("Escolha um ativo", list(dados_ativos.keys()))
-    dados = dados_ativos[escolhido]
-
-    fig, ax = plt.subplots(figsize=(12,5))
-
-    ax.plot(dados["Close"], label="Preço", linewidth=2)
-    ax.plot(dados["media9"], label="Média 9")
-    ax.plot(dados["media21"], label="Média 21")
-
-    ax.set_title(f"{escolhido} - Análise Técnica")
-    ax.legend()
-    ax.grid()
-
-    st.pyplot(fig)
