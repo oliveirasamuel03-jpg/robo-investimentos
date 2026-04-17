@@ -122,7 +122,6 @@ def run_monte_carlo(
     sharpe_std = float(df["sharpe"].std(ddof=0))
     ci_lower = float(df["total_return"].quantile(0.05))
     ci_upper = float(df["total_return"].quantile(0.95))
-
     robustness_score = float(prob_positive * max(sharpe_mean, 0.0))
 
     return {
