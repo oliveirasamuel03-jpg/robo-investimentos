@@ -12,12 +12,15 @@ WeightMethod = Literal["equal", "score", "rank"]
 
 @dataclass
 class StrategyConfig:
-    probability_threshold: float = 0.65
-    top_n: int = 5
+    probability_threshold: float = 0.60
+    top_n: int = 2
     max_weight_per_asset: float = 0.40
     long_only: bool = True
     weight_method: WeightMethod = "score"
     min_assets: int = 1
+    cash_threshold: float = 0.62
+    cash_buffer: float = 0.02
+    target_portfolio_vol: float = 0.12
 
 
 def market_filter(
@@ -26,16 +29,10 @@ def market_filter(
     fast_ma_window: int = 50,
     slow_ma_window: int = 200,
 ) -> pd.Series:
-    """
-    Regime bull/bear filter:
-    Bull regime only when:
-    - benchmark price > slow moving average
-    - fast moving average > slow moving average
-    """
     if benchmark not in prices.columns:
         return pd.Series(True, index=prices.index, name="regime")
 
-    benchmark_px = prices[benchmark].astype(float).copy()
+    benchmark_px = prices[benchmark].astype(float)
     fast_ma = benchmark_px.rolling(fast_ma_window).mean()
     slow_ma = benchmark_px.rolling(slow_ma_window).mean()
 
@@ -51,14 +48,10 @@ def volatility_filter(
     vol_window: int = 20,
     vol_threshold: float = 0.025,
 ) -> pd.Series:
-    """
-    Volatility filter based on benchmark realized volatility.
-    Allows trading only when benchmark rolling volatility is below threshold.
-    """
     if benchmark not in prices.columns:
         return pd.Series(True, index=prices.index, name="vol_filter")
 
-    benchmark_px = prices[benchmark].astype(float).copy()
+    benchmark_px = prices[benchmark].astype(float)
     returns = benchmark_px.pct_change()
     realized_vol = returns.rolling(vol_window).std()
 
@@ -78,16 +71,12 @@ def combined_market_filter(
     use_regime_filter: bool = True,
     use_volatility_filter: bool = True,
 ) -> pd.DataFrame:
-    """
-    Combined market filter with regime + volatility.
-    """
     regime = market_filter(
         prices=prices,
         benchmark=benchmark,
         fast_ma_window=fast_ma_window,
         slow_ma_window=slow_ma_window,
     )
-
     vol_ok = volatility_filter(
         prices=prices,
         benchmark=benchmark,
@@ -105,17 +94,14 @@ def combined_market_filter(
 def _clip_and_normalize(weights: pd.Series, max_weight_per_asset: float) -> pd.Series:
     weights = weights.clip(lower=0.0, upper=max_weight_per_asset)
     total = float(weights.sum())
-
     if total <= 0:
         return pd.Series(0.0, index=weights.index)
-
     return weights / total
 
 
 def _build_equal_weights(selected_assets: pd.Index) -> pd.Series:
     if len(selected_assets) == 0:
         return pd.Series(dtype=float)
-
     return pd.Series(1.0 / len(selected_assets), index=selected_assets, dtype=float)
 
 
@@ -125,8 +111,8 @@ def _build_score_weights(selected_probs: pd.Series) -> pd.Series:
 
     shifted = selected_probs - selected_probs.min()
     shifted = shifted + 1e-6
-
     total = float(shifted.sum())
+
     if total <= 0:
         return pd.Series(1.0 / len(selected_probs), index=selected_probs.index, dtype=float)
 
@@ -138,15 +124,36 @@ def _build_rank_weights(selected_probs: pd.Series) -> pd.Series:
         return pd.Series(dtype=float)
 
     sorted_assets = selected_probs.sort_values(ascending=False).index
-    ranks = pd.Series(
-        np.arange(len(sorted_assets), 0, -1, dtype=float),
-        index=sorted_assets,
-    )
+    ranks = pd.Series(np.arange(len(sorted_assets), 0, -1, dtype=float), index=sorted_assets)
     return ranks / ranks.sum()
+
+
+def _portfolio_volatility_scale(
+    prices: pd.DataFrame,
+    date: pd.Timestamp,
+    assets: list[str],
+    target_portfolio_vol: float,
+    lookback: int = 20,
+    annualization: int = 252,
+) -> float:
+    if len(assets) == 0:
+        return 0.0
+
+    hist = prices[assets].loc[:date].pct_change().dropna().tail(lookback)
+    if hist.empty or len(hist) < 5:
+        return 1.0
+
+    avg_vol = float(hist.std(ddof=0).mean() * np.sqrt(annualization))
+    if avg_vol <= 0:
+        return 1.0
+
+    scale = target_portfolio_vol / avg_vol
+    return float(np.clip(scale, 0.0, 1.0))
 
 
 def generate_target_weights(
     predictions: pd.DataFrame,
+    prices: pd.DataFrame | None = None,
     config: StrategyConfig | None = None,
 ) -> pd.DataFrame:
     if config is None:
@@ -165,16 +172,35 @@ def generate_target_weights(
 
     output_rows = []
 
-    for _, group in df.groupby("date", sort=True):
+    for dt, group in df.groupby("date", sort=True):
         g = group.copy()
         g["rank"] = g["probability"].rank(method="first", ascending=False).astype(int)
 
         eligible = g[g["probability"] >= config.probability_threshold].copy()
         eligible = eligible.sort_values("probability", ascending=False).head(config.top_n)
 
+        # cash filter inteligente
+        if eligible.empty:
+            g["selected"] = False
+            g["weight"] = 0.0
+            g["cash_mode"] = True
+            output_rows.append(g)
+            continue
+
+        top_prob = float(eligible["probability"].max())
+        avg_prob = float(eligible["probability"].mean())
+
+        if (top_prob < config.cash_threshold) or ((top_prob - avg_prob) < config.cash_buffer):
+            g["selected"] = False
+            g["weight"] = 0.0
+            g["cash_mode"] = True
+            output_rows.append(g)
+            continue
+
         if len(eligible) < config.min_assets:
             g["selected"] = False
             g["weight"] = 0.0
+            g["cash_mode"] = True
             output_rows.append(g)
             continue
 
@@ -189,63 +215,28 @@ def generate_target_weights(
 
         weights = _clip_and_normalize(weights, config.max_weight_per_asset)
 
+        # volatility sizing
+        if prices is not None:
+            scale = _portfolio_volatility_scale(
+                prices=prices,
+                date=dt,
+                assets=list(weights.index),
+                target_portfolio_vol=config.target_portfolio_vol,
+            )
+            weights = weights * scale
+
         g["selected"] = g["asset"].isin(weights.index)
         g["weight"] = g["asset"].map(weights).fillna(0.0)
+        g["cash_mode"] = False
 
         if config.long_only:
             g["weight"] = g["weight"].clip(lower=0.0)
 
         total_weight = float(g["weight"].sum())
         if total_weight > 0:
-            g["weight"] = g["weight"] / total_weight
+            g["weight"] = g["weight"] / max(total_weight, 1e-12) * min(total_weight, 1.0)
 
         output_rows.append(g)
 
     result = pd.concat(output_rows, ignore_index=True)
-    result = result[["date", "asset", "probability", "rank", "selected", "weight"]]
-    return result
-
-
-def build_weight_matrix(
-    weighted_predictions: pd.DataFrame,
-    index: pd.Index | None = None,
-    columns: pd.Index | None = None,
-) -> pd.DataFrame:
-    required_cols = {"date", "asset", "weight"}
-    missing = required_cols - set(weighted_predictions.columns)
-    if missing:
-        raise ValueError(f"weighted_predictions missing required columns: {sorted(missing)}")
-
-    df = weighted_predictions.copy()
-    df["date"] = pd.to_datetime(df["date"])
-
-    matrix = df.pivot_table(
-        index="date",
-        columns="asset",
-        values="weight",
-        aggfunc="sum",
-        fill_value=0.0,
-    )
-
-    if index is not None:
-        matrix = matrix.reindex(index=index).fillna(0.0)
-
-    if columns is not None:
-        matrix = matrix.reindex(columns=columns).fillna(0.0)
-
-    return matrix.sort_index()
-
-
-def generate_signals_from_probabilities(
-    predictions: pd.DataFrame,
-    probability_threshold: float = 0.65,
-) -> pd.DataFrame:
-    required_cols = {"date", "asset", "probability"}
-    missing = required_cols - set(predictions.columns)
-    if missing:
-        raise ValueError(f"predictions missing required columns: {sorted(missing)}")
-
-    df = predictions.copy()
-    df["date"] = pd.to_datetime(df["date"])
-    df["signal"] = (df["probability"] >= probability_threshold).astype(int)
-    return df[["date", "asset", "probability", "signal"]]
+    return result[["date", "asset", "probability", "rank", "selected", "weight", "cash_mode"]]
