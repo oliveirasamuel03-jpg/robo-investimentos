@@ -1,90 +1,53 @@
-from dataclasses import dataclass
-import numpy as np
 import pandas as pd
+import numpy as np
 
 
-@dataclass
-class MLEngineConfig:
-    lookback: int = 20
+def calculate_rsi(series, period=14):
+    delta = series.diff()
+    gain = (delta.where(delta > 0, 0)).rolling(period).mean()
+    loss = (-delta.where(delta < 0, 0)).rolling(period).mean()
+    rs = gain / (loss + 1e-9)
+    return 100 - (100 / (1 + rs))
 
 
-def _normalize_price_columns(df: pd.DataFrame) -> pd.DataFrame:
+def generate_signals(df: pd.DataFrame):
     df = df.copy()
 
-    if df is None or len(df) == 0:
-        # cria dataset fake para não quebrar
-        return pd.DataFrame({
-            "close": np.linspace(100, 101, 50)
-        })
+    # garantir coluna close
+    if "close" not in df.columns and "Close" in df.columns:
+        df["close"] = df["Close"]
 
-    # tenta padronizar nomes
-    cols = {c.lower(): c for c in df.columns}
+    # indicadores
+    df["ma50"] = df["close"].rolling(50).mean()
+    df["rsi"] = calculate_rsi(df["close"])
+    df["volatility"] = df["close"].pct_change().rolling(10).std()
 
-    if "close" in cols:
-        df["close"] = df[cols["close"]]
-    elif "close" not in cols and "close" not in df.columns:
-        # fallback se não existir
-        df["close"] = np.linspace(100, 101, len(df))
+    signals = []
 
-    if "volume" not in cols:
-        df["volume"] = 0.0
-    else:
-        df["volume"] = df[cols["volume"]]
+    for i in range(len(df)):
+        if i < 50:
+            signals.append(0)
+            continue
 
-    return df
+        price = df["close"].iloc[i]
+        ma50 = df["ma50"].iloc[i]
+        rsi = df["rsi"].iloc[i]
+        vol = df["volatility"].iloc[i]
 
+        # filtro de volatilidade
+        if vol < 0.005:
+            signals.append(0)
+            continue
 
-def create_features(df: pd.DataFrame) -> pd.DataFrame:
-    df = _normalize_price_columns(df)
+        # COMPRA
+        if price > ma50 and 40 < rsi < 60:
+            signals.append(1)
 
-    out = df.copy()
+        # VENDA
+        elif rsi > 70 or price < ma50:
+            signals.append(0)
 
-    out["return"] = out["close"].pct_change()
-    out["ma9"] = out["close"].rolling(9).mean()
-    out["ma21"] = out["close"].rolling(21).mean()
-    out["volatility"] = out["return"].rolling(10).std()
+        else:
+            signals.append(0)
 
-    out = out.fillna(0)
-
-    return out
-
-
-def build_feature_panel(df: pd.DataFrame, config: MLEngineConfig):
-    feat = create_features(df)
-
-    return feat[["return", "ma9", "ma21", "volatility"]]
-
-
-def create_labels(df: pd.DataFrame):
-    df = _normalize_price_columns(df)
-
-    future_return = df["close"].pct_change().shift(-1)
-    y = (future_return > 0).astype(int)
-
-    return y.fillna(0)
-
-
-class EnsembleProbabilityModel:
-    def __init__(self):
-        self.trained = False
-        self.default_prob = 0.5
-
-    def fit(self, X, y):
-        self.trained = True
-
-        if len(y) > 0:
-            self.default_prob = float(np.clip(np.mean(y), 0.05, 0.95))
-
-    def predict(self, X):
-        probs = self.predict_proba(X)[:, 1]
-        return (probs > 0.5).astype(int)
-
-    def predict_proba(self, X):
-        n = len(X)
-        probs = np.full(n, self.default_prob)
-
-        return np.vstack([1 - probs, probs]).T
-
-
-# compatibilidade
-EnsembleModel = EnsembleProbabilityModel
+    return pd.Series(signals)
