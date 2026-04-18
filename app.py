@@ -1,3 +1,4 @@
+from risk_engine import RiskConfig, apply_portfolio_risk_overlay
 from __future__ import annotations
 
 import pandas as pd
