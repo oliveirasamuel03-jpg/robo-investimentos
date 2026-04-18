@@ -141,3 +141,29 @@ def ensure_paper_files():
         if not os.path.exists(path):
             with open(path, "w") as f:
                 json.dump(default_content, f)
+# =========================
+# STATE (FALTAVA ISSO)
+# =========================
+import json
+import os
+
+
+def load_paper_state():
+    path = "data/paper_state.json"
+
+    if not os.path.exists(path):
+        return {
+            "balance": 10000,
+            "positions": [],
+            "history": []
+        }
+
+    with open(path, "r") as f:
+        return json.load(f)
+
+
+def save_paper_state(state: dict):
+    os.makedirs("data", exist_ok=True)
+
+    with open("data/paper_state.json", "w") as f:
+        json.dump(state, f, indent=2)
