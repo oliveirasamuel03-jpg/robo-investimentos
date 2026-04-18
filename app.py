@@ -32,16 +32,228 @@ def inject_css() -> None:
     st.markdown(
         """
         <style>
-            .stApp {
-                background: linear-gradient(180deg, #02070d 0%, #06111a 45%, #041019 100%);
+            :root {
+                --bg-main: #020611;
+                --bg-soft: #071120;
+                --card-bg: rgba(8, 16, 32, 0.88);
+                --card-bg-2: rgba(10, 20, 38, 0.92);
+                --line: rgba(0, 245, 255, 0.22);
+                --cyan: #00f5ff;
+                --blue: #3b82f6;
+                --purple: #8b5cf6;
+                --pink: #ff2bd6;
+                --green: #19f5c1;
+                --text: #eaf6ff;
+                --muted: #8aa0b8;
+                --warning: #ffb703;
             }
+
+            .stApp {
+                background:
+                    radial-gradient(circle at top left, rgba(0,245,255,0.12), transparent 28%),
+                    radial-gradient(circle at top right, rgba(139,92,246,0.12), transparent 26%),
+                    radial-gradient(circle at bottom center, rgba(255,43,214,0.08), transparent 22%),
+                    linear-gradient(180deg, #01040b 0%, #020611 45%, #04101d 100%);
+                color: var(--text);
+            }
+
             [data-testid="stSidebar"] {
-                background: linear-gradient(180deg, rgba(8, 14, 24, 0.98), rgba(10, 20, 32, 0.98));
+                background:
+                    linear-gradient(180deg, rgba(4,10,18,0.98), rgba(5,12,24,0.99));
+                border-right: 1px solid rgba(0,245,255,0.12);
+            }
+
+            .block-container {
+                max-width: 1450px;
+                padding-top: 1.0rem;
+                padding-bottom: 2rem;
+            }
+
+            h1, h2, h3, h4, h5 {
+                color: var(--text) !important;
+                letter-spacing: -0.02em;
+            }
+
+            p, div, span, label {
+                color: var(--text);
+            }
+
+            .hero-box {
+                position: relative;
+                overflow: hidden;
+                padding: 1.6rem 1.8rem;
+                border-radius: 22px;
+                background:
+                    linear-gradient(135deg, rgba(7,18,34,0.96), rgba(10,24,44,0.85));
+                border: 1px solid rgba(0,245,255,0.15);
+                box-shadow:
+                    0 0 0 1px rgba(0,245,255,0.04),
+                    0 0 30px rgba(0,245,255,0.08),
+                    0 0 60px rgba(139,92,246,0.06);
+                margin-bottom: 1rem;
+            }
+
+            .hero-box::before {
+                content: "";
+                position: absolute;
+                top: -80px;
+                right: -80px;
+                width: 220px;
+                height: 220px;
+                background: radial-gradient(circle, rgba(0,245,255,0.20), transparent 60%);
+                pointer-events: none;
+            }
+
+            .hero-box::after {
+                content: "";
+                position: absolute;
+                bottom: -90px;
+                left: -70px;
+                width: 240px;
+                height: 240px;
+                background: radial-gradient(circle, rgba(255,43,214,0.12), transparent 60%);
+                pointer-events: none;
+            }
+
+            .hero-title {
+                font-size: 2.3rem;
+                font-weight: 800;
+                line-height: 1.05;
+                margin-bottom: 0.45rem;
+                color: #f7fbff;
+            }
+
+            .hero-sub {
+                color: var(--muted);
+                font-size: 0.98rem;
+            }
+
+            .section-card {
+                background: linear-gradient(180deg, rgba(8,16,30,0.95), rgba(7,14,24,0.95));
+                border: 1px solid rgba(0,245,255,0.10);
+                border-radius: 18px;
+                padding: 1rem 1rem 0.7rem 1rem;
+                box-shadow:
+                    0 0 0 1px rgba(0,245,255,0.03),
+                    0 0 18px rgba(0,245,255,0.04);
+                margin-bottom: 1rem;
+            }
+
+            .kpi-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+                gap: 0.8rem;
+                margin-bottom: 1rem;
+            }
+
+            .kpi-card {
+                background:
+                    linear-gradient(180deg, rgba(10,18,34,0.96), rgba(7,14,26,0.96));
+                border: 1px solid rgba(0,245,255,0.12);
+                border-radius: 18px;
+                padding: 0.95rem 1rem;
+                box-shadow:
+                    inset 0 0 0 1px rgba(255,255,255,0.01),
+                    0 0 16px rgba(0,245,255,0.05);
+            }
+
+            .kpi-label {
+                color: var(--muted);
+                font-size: 0.82rem;
+                text-transform: uppercase;
+                letter-spacing: 0.08em;
+                margin-bottom: 0.35rem;
+            }
+
+            .kpi-value {
+                color: #ffffff;
+                font-size: 1.65rem;
+                font-weight: 800;
+                text-shadow: 0 0 8px rgba(0,245,255,0.18);
+            }
+
+            .kpi-good {
+                color: var(--green);
+                text-shadow: 0 0 10px rgba(25,245,193,0.25);
+            }
+
+            .kpi-bad {
+                color: #ff5f7e;
+                text-shadow: 0 0 10px rgba(255,95,126,0.20);
+            }
+
+            .stButton > button {
+                width: 100%;
+                border-radius: 14px;
+                border: 1px solid rgba(0,245,255,0.18);
+                background: linear-gradient(135deg, rgba(12,22,40,0.98), rgba(9,16,30,0.98));
+                color: #f2fbff;
+                font-weight: 700;
+                min-height: 2.9rem;
+                box-shadow:
+                    0 0 0 1px rgba(0,245,255,0.03),
+                    0 0 14px rgba(0,245,255,0.06);
+            }
+
+            .stButton > button:hover {
+                border-color: rgba(0,245,255,0.36);
+                box-shadow:
+                    0 0 0 1px rgba(0,245,255,0.05),
+                    0 0 22px rgba(0,245,255,0.12);
+            }
+
+            .stDataFrame, [data-testid="stDataFrame"] {
+                border-radius: 16px;
+                overflow: hidden;
+                border: 1px solid rgba(0,245,255,0.08);
+            }
+
+            .stAlert {
+                border-radius: 14px;
+                border: 1px solid rgba(0,245,255,0.08);
+            }
+
+            hr {
+                border-color: rgba(0,245,255,0.08);
+            }
+
+            .tiny-note {
+                color: var(--muted);
+                font-size: 0.9rem;
             }
         </style>
         """,
         unsafe_allow_html=True,
     )
+
+
+def render_hero() -> None:
+    st.markdown(
+        """
+        <div class="hero-box">
+            <div class="hero-title">Invest Pro Bot</div>
+            <div class="hero-sub">
+                Sistema de Pesquisa e Negociação Quantitativa Institucional ·
+                visual premium neon · robustez &gt; rentabilidade · validação &gt; suposição
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_kpi_row(items: list[tuple[str, str, str]]) -> None:
+    cards = []
+    for label, value, css_class in items:
+        cards.append(
+            f"""
+            <div class="kpi-card">
+                <div class="kpi-label">{label}</div>
+                <div class="kpi-value {css_class}">{value}</div>
+            </div>
+            """
+        )
+    st.markdown(f'<div class="kpi-grid">{"".join(cards)}</div>', unsafe_allow_html=True)
 
 
 @st.cache_data(ttl=3600, show_spinner=False)
@@ -239,13 +451,6 @@ def run_pipeline(
         "holdout_metrics": holdout_metrics,
         "mc": mc,
         "report": report,
-        "wf_config_used": {
-            "train_window": wf["fold_metrics"]["n_train_rows"].iloc[0] if not wf["fold_metrics"].empty else None,
-            "test_window": None,
-            "step_size": None,
-            "embargo": None,
-            "holdout_ratio": holdout_ratio,
-        },
         "filters": filters,
     }
 
@@ -260,7 +465,13 @@ def plot_equity(backtest_result, title: str):
             name=title,
         )
     )
-    fig.update_layout(template="plotly_dark", height=360, title=title)
+    fig.update_layout(
+        template="plotly_dark",
+        height=360,
+        title=title,
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+    )
     return fig
 
 
@@ -275,7 +486,13 @@ def plot_drawdown(backtest_result, title: str):
             name=title,
         )
     )
-    fig.update_layout(template="plotly_dark", height=320, title=title)
+    fig.update_layout(
+        template="plotly_dark",
+        height=320,
+        title=title,
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+    )
     return fig
 
 
@@ -289,7 +506,13 @@ def plot_holdout_comparison(strategy_bt, spy_bt, random_bt):
     for col in df.columns:
         fig.add_trace(go.Scatter(x=df.index, y=df[col], mode="lines", name=col))
 
-    fig.update_layout(template="plotly_dark", height=420, title="Holdout Final: Strategy vs SPY vs Random")
+    fig.update_layout(
+        template="plotly_dark",
+        height=420,
+        title="Holdout Final: Strategy vs SPY vs Random",
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+    )
     return fig
 
 
@@ -305,7 +528,14 @@ def plot_filter_states(filters_df: pd.DataFrame):
     fig.add_trace(go.Scatter(x=plot_df["date"], y=plot_df["regime"], mode="lines", name="Bull Regime"))
     fig.add_trace(go.Scatter(x=plot_df["date"], y=plot_df["vol_filter"], mode="lines", name="Volatilidade OK"))
     fig.add_trace(go.Scatter(x=plot_df["date"], y=plot_df["trade_allowed"], mode="lines", name="Operar Permitido"))
-    fig.update_layout(template="plotly_dark", height=320, title="Estados dos Filtros de Mercado", yaxis=dict(tickmode="array", tickvals=[0, 1]))
+    fig.update_layout(
+        template="plotly_dark",
+        height=320,
+        title="Estados dos Filtros de Mercado",
+        yaxis=dict(tickmode="array", tickvals=[0, 1]),
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+    )
     return fig
 
 
@@ -319,7 +549,13 @@ def plot_paper_equity(paper_equity_df: pd.DataFrame):
             name="Paper Equity",
         )
     )
-    fig.update_layout(template="plotly_dark", height=320, title="Paper Trading Equity")
+    fig.update_layout(
+        template="plotly_dark",
+        height=320,
+        title="Paper Trading Equity",
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+    )
     return fig
 
 
@@ -327,8 +563,7 @@ def main():
     inject_css()
     ensure_paper_files()
 
-    st.title("Invest Pro Bot - Sistema de Pesquisa e Negociação Quantitativa Institucional")
-    st.caption("Robustez > rentabilidade | estatística > intuição | validação > pressupostos")
+    render_hero()
 
     st.sidebar.header("Configuração de pesquisa")
 
@@ -355,7 +590,9 @@ def main():
     run = st.sidebar.button("Executar pesquisa institucional", use_container_width=True)
 
     if not run:
-        st.info("Configure e execute.")
+        st.markdown('<div class="section-card">', unsafe_allow_html=True)
+        st.info("Configure os parâmetros e execute a pesquisa institucional.")
+        st.markdown("</div>", unsafe_allow_html=True)
     else:
         try:
             result = run_pipeline(
@@ -373,7 +610,9 @@ def main():
                 holdout_ratio,
             )
         except Exception as e:
+            st.markdown('<div class="section-card">', unsafe_allow_html=True)
             st.error(f"Erro: {e}")
+            st.markdown("</div>", unsafe_allow_html=True)
             result = None
 
         if result is not None:
@@ -381,19 +620,26 @@ def main():
             research_metrics = result["research_metrics"]
             holdout_metrics = result["holdout_metrics"]
 
-            st.subheader("Métricas da pesquisa (walk-forward)")
-            c1, c2, c3, c4 = st.columns(4)
-            c1.metric("Sharpe Pesquisa", f"{research_metrics['sharpe']:.2f}")
-            c2.metric("Sortino Pesquisa", f"{research_metrics['sortino']:.2f}")
-            c3.metric("Calmar Pesquisa", f"{research_metrics['calmar']:.2f}")
-            c4.metric("Max DD Pesquisa", f"{research_metrics['max_drawdown']:.2%}")
+            st.markdown('<div class="section-card">', unsafe_allow_html=True)
+            st.subheader("Pesquisa quantitativa")
+            render_kpi_row(
+                [
+                    ("Sharpe Pesquisa", f"{research_metrics['sharpe']:.2f}", "kpi-good"),
+                    ("Sortino Pesquisa", f"{research_metrics['sortino']:.2f}", "kpi-good"),
+                    ("Calmar Pesquisa", f"{research_metrics['calmar']:.2f}", "kpi-good"),
+                    ("Max DD Pesquisa", f"{research_metrics['max_drawdown']:.2%}", "kpi-bad"),
+                ]
+            )
+            render_kpi_row(
+                [
+                    ("Strategy Sharpe", f"{holdout_metrics['sharpe']:.2f}", "kpi-good"),
+                    ("SPY Sharpe", f"{wf['holdout_spy_metrics']['sharpe']:.2f}", "kpi-good"),
+                    ("Random Sharpe", f"{wf['holdout_random_metrics']['sharpe']:.2f}", "kpi-bad"),
+                ]
+            )
+            st.markdown("</div>", unsafe_allow_html=True)
 
-            st.subheader("Métricas do holdout final")
-            h1, h2, h3 = st.columns(3)
-            h1.metric("Strategy Sharpe", f"{holdout_metrics['sharpe']:.2f}")
-            h2.metric("SPY Sharpe", f"{wf['holdout_spy_metrics']['sharpe']:.2f}")
-            h3.metric("Random Sharpe", f"{wf['holdout_random_metrics']['sharpe']:.2f}")
-
+            st.markdown('<div class="section-card">', unsafe_allow_html=True)
             st.plotly_chart(
                 plot_holdout_comparison(
                     result["holdout_bt"],
@@ -402,31 +648,57 @@ def main():
                 ),
                 use_container_width=True,
             )
+            st.markdown("</div>", unsafe_allow_html=True)
 
             left, right = st.columns(2)
             with left:
+                st.markdown('<div class="section-card">', unsafe_allow_html=True)
                 st.plotly_chart(plot_equity(result["research_bt"], "Equity Curve - Pesquisa"), use_container_width=True)
+                st.markdown("</div>", unsafe_allow_html=True)
             with right:
+                st.markdown('<div class="section-card">', unsafe_allow_html=True)
                 st.plotly_chart(plot_equity(result["holdout_bt"], "Equity Curve - Holdout"), use_container_width=True)
+                st.markdown("</div>", unsafe_allow_html=True)
 
             left2, right2 = st.columns(2)
             with left2:
+                st.markdown('<div class="section-card">', unsafe_allow_html=True)
                 st.plotly_chart(plot_drawdown(result["research_bt"], "Drawdown - Pesquisa"), use_container_width=True)
+                st.markdown("</div>", unsafe_allow_html=True)
             with right2:
+                st.markdown('<div class="section-card">', unsafe_allow_html=True)
                 st.plotly_chart(plot_drawdown(result["holdout_bt"], "Drawdown - Holdout"), use_container_width=True)
+                st.markdown("</div>", unsafe_allow_html=True)
 
+            st.markdown('<div class="section-card">', unsafe_allow_html=True)
             st.plotly_chart(
-                px.histogram(result["mc"]["simulations"], x="sharpe", title="Distribuição de Sharpe - Monte Carlo (Holdout)"),
+                px.histogram(
+                    result["mc"]["simulations"],
+                    x="sharpe",
+                    title="Distribuição de Sharpe - Monte Carlo (Holdout)",
+                ),
                 use_container_width=True,
             )
+            st.markdown("</div>", unsafe_allow_html=True)
 
-            st.plotly_chart(plot_filter_states(result["filters"]), use_container_width=True)
-            st.dataframe(wf["fold_metrics"], use_container_width=True)
+            bottom_left, bottom_right = st.columns(2)
+            with bottom_left:
+                st.markdown('<div class="section-card">', unsafe_allow_html=True)
+                st.plotly_chart(plot_filter_states(result["filters"]), use_container_width=True)
+                st.markdown("</div>", unsafe_allow_html=True)
+            with bottom_right:
+                st.markdown('<div class="section-card">', unsafe_allow_html=True)
+                st.subheader("Walk-forward folds")
+                st.dataframe(wf["fold_metrics"], use_container_width=True)
+                st.markdown("</div>", unsafe_allow_html=True)
 
+            st.markdown('<div class="section-card">', unsafe_allow_html=True)
             with st.expander("Relatório institucional"):
                 st.json(result["report"])
+            st.markdown("</div>", unsafe_allow_html=True)
 
     st.divider()
+    st.markdown('<div class="section-card">', unsafe_allow_html=True)
     st.subheader("Paper Trading")
 
     paper_cfg = PaperTradingConfig(
@@ -460,32 +732,40 @@ def main():
     paper_trades = read_paper_trades(limit=200)
     paper_report = build_paper_report(initial_capital=capital)
 
-    p1, p2, p3, p4 = st.columns(4)
-    p1.metric("Cash", f"{state.get('cash', 0.0):,.2f}")
-    p2.metric("Equity", f"{state.get('equity', 0.0):,.2f}")
-    p3.metric("Posições", f"{len(state.get('positions', {}))}")
-    p4.metric("Runs", f"{state.get('run_count', 0)}")
+    render_kpi_row(
+        [
+            ("Cash", f"{state.get('cash', 0.0):,.2f}", ""),
+            ("Equity", f"{state.get('equity', 0.0):,.2f}", "kpi-good"),
+            ("Posições", f"{len(state.get('positions', {}))}", ""),
+            ("Runs", f"{state.get('run_count', 0)}", ""),
+        ]
+    )
 
     if not paper_equity_df.empty:
         st.plotly_chart(plot_paper_equity(paper_equity_df), use_container_width=True)
 
-    st.markdown("### Relatório automático do paper trading")
-    r1, r2, r3, r4 = st.columns(4)
-    r1.metric("Retorno %", f"{paper_report['return_pct']:.2f}%")
-    r2.metric("Max Drawdown %", f"{paper_report['max_drawdown_pct']:.2f}%")
-    r3.metric("Trades", f"{paper_report['trades_count']}")
-    r4.metric("Trades fechados", f"{paper_report['closed_trades_count']}")
-
-    r5, r6, r7, r8 = st.columns(4)
-    r5.metric("Win Rate %", f"{paper_report['win_rate_pct']:.2f}%")
-    r6.metric("Payoff", f"{paper_report['payoff_ratio']:.2f}")
-    r7.metric("PnL realizado", f"{paper_report['realized_pnl']:.2f}")
-    r8.metric("Ativo mais operado", f"{paper_report['most_traded_asset'] or '-'}")
+    st.subheader("Relatório automático do paper trading")
+    render_kpi_row(
+        [
+            ("Retorno %", f"{paper_report['return_pct']:.2f}%", "kpi-good" if paper_report["return_pct"] >= 0 else "kpi-bad"),
+            ("Max Drawdown %", f"{paper_report['max_drawdown_pct']:.2f}%", "kpi-bad"),
+            ("Trades", f"{paper_report['trades_count']}", ""),
+            ("Trades fechados", f"{paper_report['closed_trades_count']}", ""),
+        ]
+    )
+    render_kpi_row(
+        [
+            ("Win Rate %", f"{paper_report['win_rate_pct']:.2f}%", ""),
+            ("Payoff", f"{paper_report['payoff_ratio']:.2f}", ""),
+            ("PnL realizado", f"{paper_report['realized_pnl']:.2f}", "kpi-good" if paper_report["realized_pnl"] >= 0 else "kpi-bad"),
+            ("Ativo mais operado", f"{paper_report['most_traded_asset'] or '-'}", ""),
+        ]
+    )
 
     left3, right3 = st.columns(2)
 
     with left3:
-        st.markdown("### Posições atuais")
+        st.subheader("Posições atuais")
         positions = state.get("positions", {}) or {}
         if positions:
             rows = []
@@ -509,21 +789,23 @@ def main():
             st.info("Sem posições abertas no paper trading.")
 
     with right3:
-        st.markdown("### Últimos trades")
+        st.subheader("Últimos trades")
         if paper_trades:
             st.dataframe(pd.DataFrame(paper_trades[::-1]), use_container_width=True)
         else:
             st.info("Sem trades ainda.")
 
-    st.markdown("### Diagnóstico automático")
+    st.subheader("Diagnóstico automático")
     if paper_report["diagnosis"]:
         for item in paper_report["diagnosis"]:
-            st.write(f"- {item}")
+            st.write(f"• {item}")
     else:
         st.info("Ainda não há dados suficientes para diagnóstico.")
 
     with st.expander("Estado bruto do paper trading"):
         st.json(state)
+
+    st.markdown("</div>", unsafe_allow_html=True)
 
 
 if __name__ == "__main__":
