@@ -3,62 +3,88 @@ import numpy as np
 import pandas as pd
 
 
-# =========================
-# CONFIG
-# =========================
 @dataclass
 class MLEngineConfig:
     lookback: int = 20
 
 
-# =========================
-# FEATURE ENGINEERING
-# =========================
-def create_features(df: pd.DataFrame) -> pd.DataFrame:
+def _normalize_price_columns(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
 
-    df["return"] = df["close"].pct_change()
-    df["ma9"] = df["close"].rolling(9).mean()
-    df["ma21"] = df["close"].rolling(21).mean()
-    df["volatility"] = df["return"].rolling(10).std()
+    rename_map = {}
+    for col in df.columns:
+        col_str = str(col)
+        lower = col_str.lower()
 
-    df = df.dropna()
+        if lower == "close":
+            rename_map[col] = "close"
+        elif lower == "open":
+            rename_map[col] = "open"
+        elif lower == "high":
+            rename_map[col] = "high"
+        elif lower == "low":
+            rename_map[col] = "low"
+        elif lower == "volume":
+            rename_map[col] = "volume"
+
+    df = df.rename(columns=rename_map)
+
+    if "close" not in df.columns:
+        raise ValueError("DataFrame precisa ter coluna 'close' ou 'Close'.")
 
     return df
 
 
+def create_features(df: pd.DataFrame) -> pd.DataFrame:
+    df = _normalize_price_columns(df)
+
+    out = df.copy()
+
+    out["return"] = out["close"].pct_change()
+    out["ma9"] = out["close"].rolling(9).mean()
+    out["ma21"] = out["close"].rolling(21).mean()
+    out["volatility"] = out["return"].rolling(10).std()
+
+    if "volume" not in out.columns:
+        out["volume"] = 0.0
+
+    out = out.dropna().reset_index(drop=True)
+    return out
+
+
 def build_feature_panel(df: pd.DataFrame, config: MLEngineConfig):
-    df_feat = create_features(df)
-
-    X = df_feat[["return", "ma9", "ma21", "volatility"]]
-
+    feat = create_features(df)
+    X = feat[["return", "ma9", "ma21", "volatility"]].copy()
     return X
 
 
 def create_labels(df: pd.DataFrame):
+    df = _normalize_price_columns(df).copy()
     future_return = df["close"].pct_change().shift(-1)
-    return (future_return > 0).astype(int)
+    y = (future_return > 0).astype(int)
+    return y.dropna().reset_index(drop=True)
 
 
-# =========================
-# MODEL
-# =========================
 class EnsembleProbabilityModel:
     def __init__(self):
         self.trained = False
+        self.default_prob = 0.5
 
     def fit(self, X, y):
         self.trained = True
+        if len(y) > 0:
+            y_arr = np.asarray(y, dtype=float)
+            self.default_prob = float(np.clip(np.nanmean(y_arr), 0.05, 0.95))
 
     def predict(self, X):
-        if not self.trained:
-            return np.zeros(len(X))
-        return np.random.randint(0, 2, size=len(X))
+        probs = self.predict_proba(X)[:, 1]
+        return (probs >= 0.5).astype(int)
 
     def predict_proba(self, X):
-        probs = np.random.rand(len(X))
+        n = len(X)
+        probs = np.full(n, self.default_prob, dtype=float)
         return np.vstack([1 - probs, probs]).T
 
 
-# compatibilidade com código antigo
+# compatibilidade com imports antigos
 EnsembleModel = EnsembleProbabilityModel
