@@ -12,7 +12,6 @@ from strategy_engine import (
     combined_market_filter,
     generate_target_weights,
 )
-from portfolio_optimizer import OptimizerConfig, build_rolling_optimized_weights
 from walk_forward import WalkForwardConfig, run_walk_forward_validation
 from metrics import compute_all_metrics
 from monte_carlo import MonteCarloConfig, run_monte_carlo
@@ -67,46 +66,39 @@ def _build_dynamic_wf_config(
     initial_capital: float,
     execution_delay: int,
     fast_mode: bool,
+    holdout_ratio: float,
 ) -> WalkForwardConfig:
     unique_dates = pd.Index(sorted(pd.to_datetime(feature_panel["date"]).unique()))
     n_dates = len(unique_dates)
 
-    if n_dates < 80:
+    if n_dates < 120:
         raise ValueError(
             f"Poucas datas disponíveis após limpeza ({n_dates}). "
             f"Tente uma data inicial mais antiga ou desligue o modo rápido."
         )
 
     if fast_mode:
-        train_window = min(160, max(60, int(n_dates * 0.55)))
-        test_window = min(20, max(10, int(n_dates * 0.12)))
+        train_window = min(160, max(60, int(n_dates * 0.45)))
+        test_window = min(20, max(10, int(n_dates * 0.08)))
         step_size = max(10, min(test_window, 15))
+        embargo = 5
     else:
-        train_window = min(252, max(120, int(n_dates * 0.60)))
-        test_window = min(30, max(15, int(n_dates * 0.12)))
+        train_window = min(252, max(120, int(n_dates * 0.50)))
+        test_window = min(30, max(15, int(n_dates * 0.10)))
         step_size = max(10, min(test_window, 21))
-
-    while train_window + test_window + 1 >= n_dates and train_window > 40:
-        train_window -= 10
-
-    while train_window + test_window + 1 >= n_dates and test_window > 10:
-        test_window -= 5
-
-    if train_window + test_window + 1 >= n_dates:
-        raise ValueError(
-            f"Não foi possível montar walk-forward com {n_dates} datas úteis. "
-            f"Tente desligar o modo rápido ou usar mais histórico."
-        )
+        embargo = 5
 
     return WalkForwardConfig(
         train_window=train_window,
         test_window=test_window,
         step_size=step_size,
+        embargo=embargo,
         min_assets=3,
         initial_capital=initial_capital,
         fee_rate=0.0005,
         slippage_rate=0.0005,
         execution_delay=execution_delay,
+        holdout_ratio=holdout_ratio,
     )
 
 
@@ -115,7 +107,6 @@ def run_pipeline(
     initial_capital: float,
     probability_threshold: float,
     top_n: int,
-    optimizer_method: str,
     execution_delay: int,
     fast_mode: bool,
     use_regime_filter: bool,
@@ -123,6 +114,7 @@ def run_pipeline(
     vol_threshold: float,
     cash_threshold: float,
     target_portfolio_vol: float,
+    holdout_ratio: float,
 ):
     progress = st.progress(0, text="Iniciando pipeline institucional...")
 
@@ -142,19 +134,12 @@ def run_pipeline(
         target_portfolio_vol=target_portfolio_vol,
     )
 
-    optimizer_config = OptimizerConfig(
-        method=optimizer_method,
-        lookback_window=40 if fast_mode else 60,
-        max_weight=0.40,
-        min_weight=0.0,
-        target_gross_exposure=1.0,
-    )
-
     wf_config = _build_dynamic_wf_config(
         feature_panel=feature_panel,
         initial_capital=initial_capital,
         execution_delay=execution_delay,
         fast_mode=fast_mode,
+        holdout_ratio=holdout_ratio,
     )
 
     mc_config = MonteCarloConfig(
@@ -193,20 +178,7 @@ def run_pipeline(
         weighted.loc[~weighted["trade_allowed"], "weight"] = 0.0
         weighted.loc[~weighted["trade_allowed"], "selected"] = False
 
-        optimized_matrix = build_rolling_optimized_weights(
-            prices=prices,
-            selected_signals=weighted[["date", "asset", "selected", "probability", "weight"]],
-            config=optimizer_config,
-        )
-
-        optimized_long = _safe_reset_index_with_date(optimized_matrix)
-        optimized_long = optimized_long.melt(
-            id_vars="date",
-            var_name="asset",
-            value_name="weight",
-        ).sort_values(["date", "asset"])
-
-        return optimized_long
+        return weighted[["date", "asset", "weight"]].copy()
 
     progress.progress(50, text="Executando walk-forward validation...")
     wf_result = run_walk_forward_validation(
@@ -218,28 +190,31 @@ def run_pipeline(
     )
 
     progress.progress(72, text="Calculando métricas institucionais...")
-    backtest_result = wf_result["backtest_result"]
 
-    weight_cols = [c for c in backtest_result["portfolio_history"].columns if str(c).startswith("w_")]
-    weights_df = backtest_result["portfolio_history"][weight_cols].copy()
-    weights_df.columns = [c.replace("w_", "") for c in weights_df.columns]
+    research_backtest = wf_result["backtest_result"]
+    holdout_backtest = wf_result["holdout_backtest"]
 
-    metrics = compute_all_metrics(
-        returns=backtest_result["returns"]["return"],
-        equity=backtest_result["equity_curve"]["equity"],
-        weights=weights_df,
+    research_weights = wf_result["target_weights"].copy()
+    research_metrics = compute_all_metrics(
+        returns=research_backtest["returns"]["return"],
+        equity=research_backtest["equity_curve"]["equity"],
+        weights=research_weights,
         initial_capital=initial_capital,
     )
 
-    progress.progress(85, text="Rodando Monte Carlo...")
+    holdout_metrics = wf_result["holdout_metrics"]
+    spy_holdout_metrics = wf_result["holdout_spy_metrics"]
+    random_holdout_metrics = wf_result["holdout_random_metrics"]
+
+    progress.progress(85, text="Rodando Monte Carlo no holdout...")
     mc_result = run_monte_carlo(
-        returns=backtest_result["returns"]["return"],
+        returns=holdout_backtest["returns"]["return"],
         config=mc_config,
     )
 
     progress.progress(95, text="Gerando relatório institucional...")
     report = build_institutional_report(
-        metrics=metrics,
+        metrics=research_metrics,
         monte_carlo=mc_result,
         walk_forward=wf_result,
     )
@@ -252,69 +227,41 @@ def run_pipeline(
         "prices": prices,
         "feature_panel": feature_panel,
         "wf_result": wf_result,
-        "backtest_result": backtest_result,
-        "metrics": metrics,
+        "research_backtest": research_backtest,
+        "research_metrics": research_metrics,
+        "holdout_backtest": holdout_backtest,
+        "holdout_metrics": holdout_metrics,
+        "holdout_spy_metrics": spy_holdout_metrics,
+        "holdout_random_metrics": random_holdout_metrics,
         "mc_result": mc_result,
         "report": report,
-        "weights_df": weights_df,
         "filters_df": filters_df,
         "wf_config_used": {
             "train_window": wf_config.train_window,
             "test_window": wf_config.test_window,
             "step_size": wf_config.step_size,
+            "embargo": wf_config.embargo,
+            "holdout_ratio": wf_config.holdout_ratio,
         },
     }
 
 
-def plot_equity_curve(equity_curve: pd.DataFrame):
+def plot_equity_curve(equity_curve: pd.DataFrame, title: str):
     fig = go.Figure()
-    fig.add_trace(go.Scatter(x=equity_curve.index, y=equity_curve["equity"], mode="lines", name="Equity"))
-    fig.update_layout(title="Equity Curve", template="plotly_dark", height=420, margin=dict(l=20, r=20, t=50, b=20))
+    fig.add_trace(go.Scatter(x=equity_curve.index, y=equity_curve["equity"], mode="lines", name=title))
+    fig.update_layout(title=title, template="plotly_dark", height=420, margin=dict(l=20, r=20, t=50, b=20))
     return fig
 
 
-def plot_drawdown(drawdown: pd.Series):
+def plot_drawdown(drawdown: pd.Series, title: str):
     fig = go.Figure()
-    fig.add_trace(go.Scatter(x=drawdown.index, y=drawdown.values, mode="lines", fill="tozeroy", name="Drawdown"))
-    fig.update_layout(title="Drawdown", template="plotly_dark", height=320, margin=dict(l=20, r=20, t=50, b=20))
+    fig.add_trace(go.Scatter(x=drawdown.index, y=drawdown.values, mode="lines", fill="tozeroy", name=title))
+    fig.update_layout(title=title, template="plotly_dark", height=320, margin=dict(l=20, r=20, t=50, b=20))
     return fig
 
 
 def plot_monte_carlo_histogram(mc_df: pd.DataFrame):
-    fig = px.histogram(mc_df, x="sharpe", nbins=30, title="Distribuição de Sharpe - Monte Carlo")
-    fig.update_layout(template="plotly_dark", height=360, margin=dict(l=20, r=20, t=50, b=20))
-    return fig
-
-
-def plot_allocation(weights_df: pd.DataFrame):
-    if weights_df.empty:
-        return go.Figure()
-
-    latest = weights_df.iloc[-1]
-    latest = latest[latest > 0].sort_values(ascending=False)
-
-    if latest.empty:
-        return go.Figure()
-
-    fig = px.pie(names=latest.index, values=latest.values, title="Alocação Final do Portfólio")
-    fig.update_layout(template="plotly_dark", height=360, margin=dict(l=20, r=20, t=50, b=20))
-    return fig
-
-
-def plot_strategy_comparison(metrics: dict, mc_result: dict, wf_result: dict):
-    comparison = pd.DataFrame(
-        {
-            "Métrica": ["Sharpe", "Sortino", "Calmar", "Robustez MC", "WFE"],
-            "Valor": [
-                metrics.get("sharpe", 0.0),
-                metrics.get("sortino", 0.0),
-                metrics.get("calmar", 0.0),
-                mc_result.get("robustness_score", 0.0),
-                wf_result.get("degradation_analysis", {}).get("wfe_proxy", 0.0),
-            ],
-        }
-    )
-    fig = px.bar(comparison, x="Métrica", y="Valor", title="Comparação de Qualidade da Estratégia")
+    fig = px.histogram(mc_df, x="sharpe", nbins=30, title="Distribuição de Sharpe - Monte Carlo (Holdout)")
     fig.update_layout(template="plotly_dark", height=360, margin=dict(l=20, r=20, t=50, b=20))
     return fig
 
@@ -338,6 +285,25 @@ def plot_filter_states(filters_df: pd.DataFrame):
     return fig
 
 
+def plot_holdout_comparison(strategy_backtest, spy_backtest, random_backtest):
+    df = pd.DataFrame(index=strategy_backtest["equity_curve"].index)
+    df["Strategy"] = strategy_backtest["equity_curve"]["equity"]
+    df["SPY"] = spy_backtest["equity_curve"]["equity"].reindex(df.index).ffill()
+    df["Random"] = random_backtest["equity_curve"]["equity"].reindex(df.index).ffill()
+
+    fig = go.Figure()
+    for col in df.columns:
+        fig.add_trace(go.Scatter(x=df.index, y=df[col], mode="lines", name=col))
+
+    fig.update_layout(
+        title="Holdout Final: Strategy vs SPY vs Random",
+        template="plotly_dark",
+        height=420,
+        margin=dict(l=20, r=20, t=50, b=20),
+    )
+    return fig
+
+
 def main():
     inject_css()
 
@@ -350,16 +316,6 @@ def main():
     initial_capital = st.sidebar.number_input("Capital inicial", min_value=1000.0, value=10000.0, step=1000.0)
     probability_threshold = st.sidebar.slider("Limiar de probabilidade", 0.50, 0.85, 0.60, 0.01)
     top_n = st.sidebar.slider("Principais ativos N", 1, 6, 2, 1)
-    optimizer_method = st.sidebar.selectbox(
-        "Método de otimização",
-        ["equal_weight", "risk_parity", "markowitz"],
-        index=1,
-        format_func=lambda x: {
-            "equal_weight": "peso igual",
-            "risk_parity": "paridade de risco",
-            "markowitz": "markowitz",
-        }[x],
-    )
     execution_delay = st.sidebar.slider("Atraso de execução (barras)", 1, 3, 1, 1)
     fast_mode = st.sidebar.toggle("Modo rápido para Streamlit", value=True)
 
@@ -369,8 +325,11 @@ def main():
     vol_threshold = st.sidebar.slider("Limite de volatilidade", 0.010, 0.050, 0.025, 0.001)
 
     st.sidebar.subheader("Controles de convicção")
-    cash_threshold = st.sidebar.slider("Threshold para ficar em caixa", 0.50, 0.85, 0.62, 0.01)
-    target_portfolio_vol = st.sidebar.slider("Vol alvo do portfólio", 0.05, 0.30, 0.12, 0.01)
+    cash_threshold = st.sidebar.slider("Threshold para ficar em caixa", 0.50, 0.85, 0.50, 0.01)
+    target_portfolio_vol = st.sidebar.slider("Vol alvo do portfólio", 0.05, 0.30, 0.08, 0.01)
+
+    st.sidebar.subheader("Validação final")
+    holdout_ratio = st.sidebar.slider("Parcela final fora da amostra", 0.10, 0.40, 0.20, 0.05)
 
     run_button = st.sidebar.button("Executar pesquisa institucional", use_container_width=True)
 
@@ -384,7 +343,6 @@ def main():
             initial_capital=initial_capital,
             probability_threshold=probability_threshold,
             top_n=top_n,
-            optimizer_method=optimizer_method,
             execution_delay=execution_delay,
             fast_mode=fast_mode,
             use_regime_filter=use_regime_filter,
@@ -392,47 +350,78 @@ def main():
             vol_threshold=vol_threshold,
             cash_threshold=cash_threshold,
             target_portfolio_vol=target_portfolio_vol,
+            holdout_ratio=holdout_ratio,
         )
     except Exception as e:
         st.error(f"Erro ao executar pipeline: {e}")
         return
 
-    backtest_result = result["backtest_result"]
-    metrics = result["metrics"]
-    mc_result = result["mc_result"]
-    wf_result = result["wf_result"]
-    weights_df = result["weights_df"]
-    filters_df = result["filters_df"]
+    research_metrics = result["research_metrics"]
+    holdout_metrics = result["holdout_metrics"]
+    spy_holdout_metrics = result["holdout_spy_metrics"]
+    random_holdout_metrics = result["holdout_random_metrics"]
 
-    col1, col2, col3, col4 = st.columns(4)
-    col1.metric("Sharpe", f"{metrics.get('sharpe', 0.0):.2f}")
-    col2.metric("Sortino", f"{metrics.get('sortino', 0.0):.2f}")
-    col3.metric("Calmar", f"{metrics.get('calmar', 0.0):.2f}")
-    col4.metric("Max Drawdown", f"{metrics.get('max_drawdown', 0.0):.2%}")
+    st.subheader("Métricas da pesquisa (walk-forward)")
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Sharpe Pesquisa", f"{research_metrics.get('sharpe', 0.0):.2f}")
+    c2.metric("Sortino Pesquisa", f"{research_metrics.get('sortino', 0.0):.2f}")
+    c3.metric("Calmar Pesquisa", f"{research_metrics.get('calmar', 0.0):.2f}")
+    c4.metric("Max DD Pesquisa", f"{research_metrics.get('max_drawdown', 0.0):.2%}")
+
+    st.subheader("Métricas do holdout final")
+    h1, h2, h3 = st.columns(3)
+    h1.metric("Strategy Sharpe", f"{holdout_metrics.get('sharpe', 0.0):.2f}")
+    h2.metric("SPY Sharpe", f"{spy_holdout_metrics.get('sharpe', 0.0):.2f}")
+    h3.metric("Random Sharpe", f"{random_holdout_metrics.get('sharpe', 0.0):.2f}")
 
     st.caption(
         f"Walk-forward usado: train={result['wf_config_used']['train_window']} | "
         f"test={result['wf_config_used']['test_window']} | "
-        f"step={result['wf_config_used']['step_size']}"
+        f"step={result['wf_config_used']['step_size']} | "
+        f"embargo={result['wf_config_used']['embargo']} | "
+        f"holdout={result['wf_config_used']['holdout_ratio']:.0%}"
     )
 
-    st.plotly_chart(plot_equity_curve(backtest_result["equity_curve"]), use_container_width=True)
-    st.plotly_chart(plot_drawdown(backtest_result["drawdown"]), use_container_width=True)
+    st.plotly_chart(
+        plot_holdout_comparison(
+            result["holdout_backtest"],
+            result["wf_result"]["holdout_spy_backtest"],
+            result["wf_result"]["holdout_random_backtest"],
+        ),
+        use_container_width=True,
+    )
 
     left, right = st.columns(2)
     with left:
-        st.plotly_chart(plot_monte_carlo_histogram(mc_result["simulations"]), use_container_width=True)
+        st.plotly_chart(
+            plot_equity_curve(result["research_backtest"]["equity_curve"], "Equity Curve - Pesquisa"),
+            use_container_width=True,
+        )
     with right:
-        st.plotly_chart(plot_allocation(weights_df), use_container_width=True)
+        st.plotly_chart(
+            plot_equity_curve(result["holdout_backtest"]["equity_curve"], "Equity Curve - Holdout"),
+            use_container_width=True,
+        )
+
+    left2, right2 = st.columns(2)
+    with left2:
+        st.plotly_chart(
+            plot_drawdown(result["research_backtest"]["drawdown"], "Drawdown - Pesquisa"),
+            use_container_width=True,
+        )
+    with right2:
+        st.plotly_chart(
+            plot_drawdown(result["holdout_backtest"]["drawdown"], "Drawdown - Holdout"),
+            use_container_width=True,
+        )
+
+    st.plotly_chart(plot_monte_carlo_histogram(result["mc_result"]["simulations"]), use_container_width=True)
 
     st.subheader("Filtros de mercado")
-    st.plotly_chart(plot_filter_states(filters_df), use_container_width=True)
+    st.plotly_chart(plot_filter_states(result["filters_df"]), use_container_width=True)
 
     st.subheader("Resultados do Walk-Forward")
-    st.dataframe(wf_result["fold_metrics"], use_container_width=True)
-
-    st.subheader("Painel de Comparação da Estratégia")
-    st.plotly_chart(plot_strategy_comparison(metrics, mc_result, wf_result), use_container_width=True)
+    st.dataframe(result["wf_result"]["fold_metrics"], use_container_width=True)
 
     with st.expander("Relatório institucional"):
         st.json(result["report"])
