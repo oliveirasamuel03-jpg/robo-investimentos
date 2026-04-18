@@ -167,3 +167,15 @@ def save_paper_state(state: dict):
 
     with open("data/paper_state.json", "w") as f:
         json.dump(state, f, indent=2)
+# =========================
+# EQUITY READER (ÚLTIMO)
+# =========================
+def read_paper_equity():
+    state = load_paper_state()
+
+    balance = state.get("balance", 10000)
+
+    # cria curva simples baseada no saldo
+    equity = [balance * (1 + i * 0.001) for i in range(50)]
+
+    return equity
