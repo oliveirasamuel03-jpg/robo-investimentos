@@ -36,16 +36,13 @@ def inject_css() -> None:
                 --bg-main: #020611;
                 --bg-soft: #071120;
                 --card-bg: rgba(8, 16, 32, 0.88);
-                --card-bg-2: rgba(10, 20, 38, 0.92);
                 --line: rgba(0, 245, 255, 0.22);
                 --cyan: #00f5ff;
-                --blue: #3b82f6;
                 --purple: #8b5cf6;
                 --pink: #ff2bd6;
                 --green: #19f5c1;
                 --text: #eaf6ff;
                 --muted: #8aa0b8;
-                --warning: #ffb703;
             }
 
             .stApp {
@@ -65,17 +62,8 @@ def inject_css() -> None:
 
             .block-container {
                 max-width: 1450px;
-                padding-top: 1.0rem;
+                padding-top: 1rem;
                 padding-bottom: 2rem;
-            }
-
-            h1, h2, h3, h4, h5 {
-                color: var(--text) !important;
-                letter-spacing: -0.02em;
-            }
-
-            p, div, span, label {
-                color: var(--text);
             }
 
             .hero-box {
@@ -91,28 +79,6 @@ def inject_css() -> None:
                     0 0 30px rgba(0,245,255,0.08),
                     0 0 60px rgba(139,92,246,0.06);
                 margin-bottom: 1rem;
-            }
-
-            .hero-box::before {
-                content: "";
-                position: absolute;
-                top: -80px;
-                right: -80px;
-                width: 220px;
-                height: 220px;
-                background: radial-gradient(circle, rgba(0,245,255,0.20), transparent 60%);
-                pointer-events: none;
-            }
-
-            .hero-box::after {
-                content: "";
-                position: absolute;
-                bottom: -90px;
-                left: -70px;
-                width: 240px;
-                height: 240px;
-                background: radial-gradient(circle, rgba(255,43,214,0.12), transparent 60%);
-                pointer-events: none;
             }
 
             .hero-title {
@@ -172,15 +138,8 @@ def inject_css() -> None:
                 text-shadow: 0 0 8px rgba(0,245,255,0.18);
             }
 
-            .kpi-good {
-                color: var(--green);
-                text-shadow: 0 0 10px rgba(25,245,193,0.25);
-            }
-
-            .kpi-bad {
-                color: #ff5f7e;
-                text-shadow: 0 0 10px rgba(255,95,126,0.20);
-            }
+            .kpi-good { color: var(--green); }
+            .kpi-bad { color: #ff5f7e; }
 
             .stButton > button {
                 width: 100%;
@@ -195,31 +154,10 @@ def inject_css() -> None:
                     0 0 14px rgba(0,245,255,0.06);
             }
 
-            .stButton > button:hover {
-                border-color: rgba(0,245,255,0.36);
-                box-shadow:
-                    0 0 0 1px rgba(0,245,255,0.05),
-                    0 0 22px rgba(0,245,255,0.12);
-            }
-
             .stDataFrame, [data-testid="stDataFrame"] {
                 border-radius: 16px;
                 overflow: hidden;
                 border: 1px solid rgba(0,245,255,0.08);
-            }
-
-            .stAlert {
-                border-radius: 14px;
-                border: 1px solid rgba(0,245,255,0.08);
-            }
-
-            hr {
-                border-color: rgba(0,245,255,0.08);
-            }
-
-            .tiny-note {
-                color: var(--muted);
-                font-size: 0.9rem;
             }
         </style>
         """,
@@ -233,8 +171,7 @@ def render_hero() -> None:
         <div class="hero-box">
             <div class="hero-title">Invest Pro Bot</div>
             <div class="hero-sub">
-                Sistema de Pesquisa e Negociação Quantitativa Institucional ·
-                visual premium neon · robustez &gt; rentabilidade · validação &gt; suposição
+                Plataforma quantitativa institucional · multi-asset · paper trading · visual premium neon
             </div>
         </div>
         """,
@@ -257,9 +194,29 @@ def render_kpi_row(items: list[tuple[str, str, str]]) -> None:
 
 
 @st.cache_data(ttl=3600, show_spinner=False)
-def cached_load_data(start_date: str, fast_mode: bool):
+def cached_load_data(
+    start_date: str,
+    fast_mode: bool,
+    include_brazil_stocks: bool,
+    include_us_stocks: bool,
+    include_etfs: bool,
+    include_fiis: bool,
+    include_crypto: bool,
+    include_grains: bool,
+    custom_tickers: tuple[str, ...],
+):
     history_limit = 500 if fast_mode else 1500
-    return load_data(start=start_date, history_limit=history_limit)
+    return load_data(
+        start=start_date,
+        history_limit=history_limit,
+        include_brazil_stocks=include_brazil_stocks,
+        include_us_stocks=include_us_stocks,
+        include_etfs=include_etfs,
+        include_fiis=include_fiis,
+        include_crypto=include_crypto,
+        include_grains=include_grains,
+        custom_tickers=list(custom_tickers),
+    )
 
 
 @st.cache_data(ttl=3600, show_spinner=False)
@@ -342,8 +299,25 @@ def run_pipeline(
     cash_threshold: float,
     target_portfolio_vol: float,
     holdout_ratio: float,
+    include_brazil_stocks: bool,
+    include_us_stocks: bool,
+    include_etfs: bool,
+    include_fiis: bool,
+    include_crypto: bool,
+    include_grains: bool,
+    custom_tickers: list[str],
 ):
-    prices = cached_load_data(start_date, fast_mode)
+    prices = cached_load_data(
+        start_date,
+        fast_mode,
+        include_brazil_stocks,
+        include_us_stocks,
+        include_etfs,
+        include_fiis,
+        include_crypto,
+        include_grains,
+        tuple(custom_tickers),
+    )
     features = cached_features(prices)
 
     strategy_config = StrategyConfig(
@@ -400,19 +374,15 @@ def run_pipeline(
         weighted.loc[~weighted["trade_allowed"], "weight"] = 0.0
 
         out_rows = []
-
         for _, group in weighted.groupby("date", sort=True):
             base_weights = group.set_index("asset")["weight"]
-
             safe_weights = apply_portfolio_risk_overlay(
                 base_weights,
                 equity_curve=None,
                 config=risk_config,
             )
-
             tmp = group.copy()
             tmp["weight"] = tmp["asset"].map(safe_weights).fillna(0.0)
-
             out_rows.append(tmp[["date", "asset", "weight"]])
 
         return pd.concat(out_rows, ignore_index=True)
@@ -452,47 +422,32 @@ def run_pipeline(
         "mc": mc,
         "report": report,
         "filters": filters,
+        "prices_columns": list(prices.columns),
     }
 
 
 def plot_equity(backtest_result, title: str):
     fig = go.Figure()
-    fig.add_trace(
-        go.Scatter(
-            x=backtest_result["equity_curve"].index,
-            y=backtest_result["equity_curve"]["equity"],
-            mode="lines",
-            name=title,
-        )
-    )
-    fig.update_layout(
-        template="plotly_dark",
-        height=360,
-        title=title,
-        paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(0,0,0,0)",
-    )
+    fig.add_trace(go.Scatter(
+        x=backtest_result["equity_curve"].index,
+        y=backtest_result["equity_curve"]["equity"],
+        mode="lines",
+        name=title,
+    ))
+    fig.update_layout(template="plotly_dark", height=360, title=title, paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
     return fig
 
 
 def plot_drawdown(backtest_result, title: str):
     fig = go.Figure()
-    fig.add_trace(
-        go.Scatter(
-            x=backtest_result["drawdown"].index,
-            y=backtest_result["drawdown"].values,
-            mode="lines",
-            fill="tozeroy",
-            name=title,
-        )
-    )
-    fig.update_layout(
-        template="plotly_dark",
-        height=320,
-        title=title,
-        paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(0,0,0,0)",
-    )
+    fig.add_trace(go.Scatter(
+        x=backtest_result["drawdown"].index,
+        y=backtest_result["drawdown"].values,
+        mode="lines",
+        fill="tozeroy",
+        name=title,
+    ))
+    fig.update_layout(template="plotly_dark", height=320, title=title, paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
     return fig
 
 
@@ -505,14 +460,7 @@ def plot_holdout_comparison(strategy_bt, spy_bt, random_bt):
     fig = go.Figure()
     for col in df.columns:
         fig.add_trace(go.Scatter(x=df.index, y=df[col], mode="lines", name=col))
-
-    fig.update_layout(
-        template="plotly_dark",
-        height=420,
-        title="Holdout Final: Strategy vs SPY vs Random",
-        paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(0,0,0,0)",
-    )
+    fig.update_layout(template="plotly_dark", height=420, title="Holdout Final: Strategy vs SPY vs Random", paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
     return fig
 
 
@@ -528,41 +476,25 @@ def plot_filter_states(filters_df: pd.DataFrame):
     fig.add_trace(go.Scatter(x=plot_df["date"], y=plot_df["regime"], mode="lines", name="Bull Regime"))
     fig.add_trace(go.Scatter(x=plot_df["date"], y=plot_df["vol_filter"], mode="lines", name="Volatilidade OK"))
     fig.add_trace(go.Scatter(x=plot_df["date"], y=plot_df["trade_allowed"], mode="lines", name="Operar Permitido"))
-    fig.update_layout(
-        template="plotly_dark",
-        height=320,
-        title="Estados dos Filtros de Mercado",
-        yaxis=dict(tickmode="array", tickvals=[0, 1]),
-        paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(0,0,0,0)",
-    )
+    fig.update_layout(template="plotly_dark", height=320, title="Estados dos Filtros de Mercado", yaxis=dict(tickmode="array", tickvals=[0, 1]), paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
     return fig
 
 
 def plot_paper_equity(paper_equity_df: pd.DataFrame):
     fig = go.Figure()
-    fig.add_trace(
-        go.Scatter(
-            x=paper_equity_df["timestamp"],
-            y=paper_equity_df["equity_after"],
-            mode="lines+markers",
-            name="Paper Equity",
-        )
-    )
-    fig.update_layout(
-        template="plotly_dark",
-        height=320,
-        title="Paper Trading Equity",
-        paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(0,0,0,0)",
-    )
+    fig.add_trace(go.Scatter(
+        x=paper_equity_df["timestamp"],
+        y=paper_equity_df["equity_after"],
+        mode="lines+markers",
+        name="Paper Equity",
+    ))
+    fig.update_layout(template="plotly_dark", height=320, title="Paper Trading Equity", paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
     return fig
 
 
 def main():
     inject_css()
     ensure_paper_files()
-
     render_hero()
 
     st.sidebar.header("Configuração de pesquisa")
@@ -572,8 +504,22 @@ def main():
     threshold = st.sidebar.slider("Limiar de probabilidade", 0.50, 0.85, 0.60, 0.01)
     top_n = st.sidebar.slider("Principais ativos N", 1, 5, 2, 1)
     delay = st.sidebar.slider("Atraso de execução (barras)", 1, 3, 1, 1)
-
     fast_mode = st.sidebar.toggle("Modo rápido para Streamlit", True)
+
+    st.sidebar.subheader("Classes de ativos")
+    include_brazil_stocks = st.sidebar.checkbox("Ações Brasil", value=True)
+    include_us_stocks = st.sidebar.checkbox("Ações EUA", value=True)
+    include_etfs = st.sidebar.checkbox("ETFs", value=True)
+    include_fiis = st.sidebar.checkbox("FIIs", value=True)
+    include_crypto = st.sidebar.checkbox("Cripto", value=True)
+    include_grains = st.sidebar.checkbox("Grãos / Commodities agrícolas", value=True)
+
+    custom_tickers_text = st.sidebar.text_area(
+        "Tickers extras (separados por vírgula)",
+        value="",
+        help="Ex.: SLV, USO, BOVA11.SA",
+    )
+    custom_tickers = [x.strip().upper() for x in custom_tickers_text.split(",") if x.strip()]
 
     st.sidebar.subheader("Filtros de mercado")
     bull_filter = st.sidebar.toggle("Filtro bull/bear", True)
@@ -608,6 +554,13 @@ def main():
                 cash_threshold,
                 target_vol,
                 holdout_ratio,
+                include_brazil_stocks,
+                include_us_stocks,
+                include_etfs,
+                include_fiis,
+                include_crypto,
+                include_grains,
+                custom_tickers,
             )
         except Exception as e:
             st.markdown('<div class="section-card">', unsafe_allow_html=True)
@@ -622,21 +575,18 @@ def main():
 
             st.markdown('<div class="section-card">', unsafe_allow_html=True)
             st.subheader("Pesquisa quantitativa")
-            render_kpi_row(
-                [
-                    ("Sharpe Pesquisa", f"{research_metrics['sharpe']:.2f}", "kpi-good"),
-                    ("Sortino Pesquisa", f"{research_metrics['sortino']:.2f}", "kpi-good"),
-                    ("Calmar Pesquisa", f"{research_metrics['calmar']:.2f}", "kpi-good"),
-                    ("Max DD Pesquisa", f"{research_metrics['max_drawdown']:.2%}", "kpi-bad"),
-                ]
-            )
-            render_kpi_row(
-                [
-                    ("Strategy Sharpe", f"{holdout_metrics['sharpe']:.2f}", "kpi-good"),
-                    ("SPY Sharpe", f"{wf['holdout_spy_metrics']['sharpe']:.2f}", "kpi-good"),
-                    ("Random Sharpe", f"{wf['holdout_random_metrics']['sharpe']:.2f}", "kpi-bad"),
-                ]
-            )
+            render_kpi_row([
+                ("Sharpe Pesquisa", f"{research_metrics['sharpe']:.2f}", "kpi-good"),
+                ("Sortino Pesquisa", f"{research_metrics['sortino']:.2f}", "kpi-good"),
+                ("Calmar Pesquisa", f"{research_metrics['calmar']:.2f}", "kpi-good"),
+                ("Max DD Pesquisa", f"{research_metrics['max_drawdown']:.2%}", "kpi-bad"),
+            ])
+            render_kpi_row([
+                ("Strategy Sharpe", f"{holdout_metrics['sharpe']:.2f}", "kpi-good"),
+                ("SPY Sharpe", f"{wf['holdout_spy_metrics']['sharpe']:.2f}", "kpi-good"),
+                ("Random Sharpe", f"{wf['holdout_random_metrics']['sharpe']:.2f}", "kpi-bad"),
+            ])
+            st.caption(f"Ativos carregados: {len(result['prices_columns'])}")
             st.markdown("</div>", unsafe_allow_html=True)
 
             st.markdown('<div class="section-card">', unsafe_allow_html=True)
@@ -672,11 +622,7 @@ def main():
 
             st.markdown('<div class="section-card">', unsafe_allow_html=True)
             st.plotly_chart(
-                px.histogram(
-                    result["mc"]["simulations"],
-                    x="sharpe",
-                    title="Distribuição de Sharpe - Monte Carlo (Holdout)",
-                ),
+                px.histogram(result["mc"]["simulations"], x="sharpe", title="Distribuição de Sharpe - Monte Carlo (Holdout)"),
                 use_container_width=True,
             )
             st.markdown("</div>", unsafe_allow_html=True)
@@ -711,6 +657,13 @@ def main():
         vol_threshold=vol_limit,
         cash_threshold=cash_threshold,
         target_portfolio_vol=target_vol,
+        include_brazil_stocks=include_brazil_stocks,
+        include_us_stocks=include_us_stocks,
+        include_etfs=include_etfs,
+        include_fiis=include_fiis,
+        include_crypto=include_crypto,
+        include_grains=include_grains,
+        custom_tickers=custom_tickers,
     )
 
     col_a, col_b = st.columns(2)
@@ -732,38 +685,31 @@ def main():
     paper_trades = read_paper_trades(limit=200)
     paper_report = build_paper_report(initial_capital=capital)
 
-    render_kpi_row(
-        [
-            ("Cash", f"{state.get('cash', 0.0):,.2f}", ""),
-            ("Equity", f"{state.get('equity', 0.0):,.2f}", "kpi-good"),
-            ("Posições", f"{len(state.get('positions', {}))}", ""),
-            ("Runs", f"{state.get('run_count', 0)}", ""),
-        ]
-    )
+    render_kpi_row([
+        ("Cash", f"{state.get('cash', 0.0):,.2f}", ""),
+        ("Equity", f"{state.get('equity', 0.0):,.2f}", "kpi-good"),
+        ("Posições", f"{len(state.get('positions', {}))}", ""),
+        ("Runs", f"{state.get('run_count', 0)}", ""),
+    ])
 
     if not paper_equity_df.empty:
         st.plotly_chart(plot_paper_equity(paper_equity_df), use_container_width=True)
 
     st.subheader("Relatório automático do paper trading")
-    render_kpi_row(
-        [
-            ("Retorno %", f"{paper_report['return_pct']:.2f}%", "kpi-good" if paper_report["return_pct"] >= 0 else "kpi-bad"),
-            ("Max Drawdown %", f"{paper_report['max_drawdown_pct']:.2f}%", "kpi-bad"),
-            ("Trades", f"{paper_report['trades_count']}", ""),
-            ("Trades fechados", f"{paper_report['closed_trades_count']}", ""),
-        ]
-    )
-    render_kpi_row(
-        [
-            ("Win Rate %", f"{paper_report['win_rate_pct']:.2f}%", ""),
-            ("Payoff", f"{paper_report['payoff_ratio']:.2f}", ""),
-            ("PnL realizado", f"{paper_report['realized_pnl']:.2f}", "kpi-good" if paper_report["realized_pnl"] >= 0 else "kpi-bad"),
-            ("Ativo mais operado", f"{paper_report['most_traded_asset'] or '-'}", ""),
-        ]
-    )
+    render_kpi_row([
+        ("Retorno %", f"{paper_report['return_pct']:.2f}%", "kpi-good" if paper_report["return_pct"] >= 0 else "kpi-bad"),
+        ("Max Drawdown %", f"{paper_report['max_drawdown_pct']:.2f}%", "kpi-bad"),
+        ("Trades", f"{paper_report['trades_count']}", ""),
+        ("Trades fechados", f"{paper_report['closed_trades_count']}", ""),
+    ])
+    render_kpi_row([
+        ("Win Rate %", f"{paper_report['win_rate_pct']:.2f}%", ""),
+        ("Payoff", f"{paper_report['payoff_ratio']:.2f}", ""),
+        ("PnL realizado", f"{paper_report['realized_pnl']:.2f}", "kpi-good" if paper_report["realized_pnl"] >= 0 else "kpi-bad"),
+        ("Ativo mais operado", f"{paper_report['most_traded_asset'] or '-'}", ""),
+    ])
 
     left3, right3 = st.columns(2)
-
     with left3:
         st.subheader("Posições atuais")
         positions = state.get("positions", {}) or {}
@@ -774,16 +720,14 @@ def main():
                 qty = float(pos.get("quantity", 0.0))
                 px = float(last_prices.get(asset, pos.get("last_price", 0.0)))
                 avg = float(pos.get("avg_price", px))
-                rows.append(
-                    {
-                        "asset": asset,
-                        "quantity": qty,
-                        "avg_price": avg,
-                        "last_price": px,
-                        "market_value": qty * px,
-                        "unrealized_pnl": (px - avg) * qty,
-                    }
-                )
+                rows.append({
+                    "asset": asset,
+                    "quantity": qty,
+                    "avg_price": avg,
+                    "last_price": px,
+                    "market_value": qty * px,
+                    "unrealized_pnl": (px - avg) * qty,
+                })
             st.dataframe(pd.DataFrame(rows), use_container_width=True)
         else:
             st.info("Sem posições abertas no paper trading.")
