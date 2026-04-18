@@ -15,6 +15,7 @@ from report_generator import build_institutional_report, save_report
 from risk_engine import RiskConfig, apply_portfolio_risk_overlay
 from paper_trading_engine import (
     PaperTradingConfig,
+    build_paper_report,
     ensure_paper_files,
     load_paper_state,
     read_paper_equity,
@@ -188,7 +189,7 @@ def run_pipeline(
 
         out_rows = []
 
-        for dt, group in weighted.groupby("date", sort=True):
+        for _, group in weighted.groupby("date", sort=True):
             base_weights = group.set_index("asset")["weight"]
 
             safe_weights = apply_portfolio_risk_overlay(
@@ -239,11 +240,11 @@ def run_pipeline(
         "mc": mc,
         "report": report,
         "wf_config_used": {
-            "train_window": wf_config.train_window,
-            "test_window": wf_config.test_window,
-            "step_size": wf_config.step_size,
-            "embargo": wf_config.embargo,
-            "holdout_ratio": wf_config.holdout_ratio,
+            "train_window": wf["fold_metrics"]["n_train_rows"].iloc[0] if not wf["fold_metrics"].empty else None,
+            "test_window": None,
+            "step_size": None,
+            "embargo": None,
+            "holdout_ratio": holdout_ratio,
         },
         "filters": filters,
     }
@@ -288,11 +289,7 @@ def plot_holdout_comparison(strategy_bt, spy_bt, random_bt):
     for col in df.columns:
         fig.add_trace(go.Scatter(x=df.index, y=df[col], mode="lines", name=col))
 
-    fig.update_layout(
-        template="plotly_dark",
-        height=420,
-        title="Holdout Final: Strategy vs SPY vs Random",
-    )
+    fig.update_layout(template="plotly_dark", height=420, title="Holdout Final: Strategy vs SPY vs Random")
     return fig
 
 
@@ -308,12 +305,7 @@ def plot_filter_states(filters_df: pd.DataFrame):
     fig.add_trace(go.Scatter(x=plot_df["date"], y=plot_df["regime"], mode="lines", name="Bull Regime"))
     fig.add_trace(go.Scatter(x=plot_df["date"], y=plot_df["vol_filter"], mode="lines", name="Volatilidade OK"))
     fig.add_trace(go.Scatter(x=plot_df["date"], y=plot_df["trade_allowed"], mode="lines", name="Operar Permitido"))
-    fig.update_layout(
-        template="plotly_dark",
-        height=320,
-        title="Estados dos Filtros de Mercado",
-        yaxis=dict(tickmode="array", tickvals=[0, 1]),
-    )
+    fig.update_layout(template="plotly_dark", height=320, title="Estados dos Filtros de Mercado", yaxis=dict(tickmode="array", tickvals=[0, 1]))
     return fig
 
 
@@ -327,11 +319,7 @@ def plot_paper_equity(paper_equity_df: pd.DataFrame):
             name="Paper Equity",
         )
     )
-    fig.update_layout(
-        template="plotly_dark",
-        height=320,
-        title="Paper Trading Equity",
-    )
+    fig.update_layout(template="plotly_dark", height=320, title="Paper Trading Equity")
     return fig
 
 
@@ -406,14 +394,6 @@ def main():
             h2.metric("SPY Sharpe", f"{wf['holdout_spy_metrics']['sharpe']:.2f}")
             h3.metric("Random Sharpe", f"{wf['holdout_random_metrics']['sharpe']:.2f}")
 
-            st.caption(
-                f"Walk-forward usado: train={result['wf_config_used']['train_window']} | "
-                f"test={result['wf_config_used']['test_window']} | "
-                f"step={result['wf_config_used']['step_size']} | "
-                f"embargo={result['wf_config_used']['embargo']} | "
-                f"holdout={result['wf_config_used']['holdout_ratio']:.0%}"
-            )
-
             st.plotly_chart(
                 plot_holdout_comparison(
                     result["holdout_bt"],
@@ -477,7 +457,8 @@ def main():
 
     state = load_paper_state()
     paper_equity_df = read_paper_equity(limit=300)
-    paper_trades = read_paper_trades(limit=50)
+    paper_trades = read_paper_trades(limit=200)
+    paper_report = build_paper_report(initial_capital=capital)
 
     p1, p2, p3, p4 = st.columns(4)
     p1.metric("Cash", f"{state.get('cash', 0.0):,.2f}")
@@ -487,6 +468,19 @@ def main():
 
     if not paper_equity_df.empty:
         st.plotly_chart(plot_paper_equity(paper_equity_df), use_container_width=True)
+
+    st.markdown("### Relatório automático do paper trading")
+    r1, r2, r3, r4 = st.columns(4)
+    r1.metric("Retorno %", f"{paper_report['return_pct']:.2f}%")
+    r2.metric("Max Drawdown %", f"{paper_report['max_drawdown_pct']:.2f}%")
+    r3.metric("Trades", f"{paper_report['trades_count']}")
+    r4.metric("Trades fechados", f"{paper_report['closed_trades_count']}")
+
+    r5, r6, r7, r8 = st.columns(4)
+    r5.metric("Win Rate %", f"{paper_report['win_rate_pct']:.2f}%")
+    r6.metric("Payoff", f"{paper_report['payoff_ratio']:.2f}")
+    r7.metric("PnL realizado", f"{paper_report['realized_pnl']:.2f}")
+    r8.metric("Ativo mais operado", f"{paper_report['most_traded_asset'] or '-'}")
 
     left3, right3 = st.columns(2)
 
@@ -499,12 +493,15 @@ def main():
             for asset, pos in positions.items():
                 qty = float(pos.get("quantity", 0.0))
                 px = float(last_prices.get(asset, pos.get("last_price", 0.0)))
+                avg = float(pos.get("avg_price", px))
                 rows.append(
                     {
                         "asset": asset,
                         "quantity": qty,
+                        "avg_price": avg,
                         "last_price": px,
                         "market_value": qty * px,
+                        "unrealized_pnl": (px - avg) * qty,
                     }
                 )
             st.dataframe(pd.DataFrame(rows), use_container_width=True)
@@ -517,6 +514,13 @@ def main():
             st.dataframe(pd.DataFrame(paper_trades[::-1]), use_container_width=True)
         else:
             st.info("Sem trades ainda.")
+
+    st.markdown("### Diagnóstico automático")
+    if paper_report["diagnosis"]:
+        for item in paper_report["diagnosis"]:
+            st.write(f"- {item}")
+    else:
+        st.info("Ainda não há dados suficientes para diagnóstico.")
 
     with st.expander("Estado bruto do paper trading"):
         st.json(state)
