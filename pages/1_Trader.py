@@ -54,6 +54,9 @@ def load_chart_data(ticker: str, period: str, interval: str) -> pd.DataFrame:
     ).copy()
 
     df.index = pd.to_datetime(df.index)
+    if df.index.tz is not None:
+        df.index = df.index.tz_convert(None)
+
     df = df.sort_index()
 
     for col in ["open", "high", "low", "close"]:
@@ -68,7 +71,121 @@ def load_chart_data(ticker: str, period: str, interval: str) -> pd.DataFrame:
     return df
 
 
-def build_candle_chart(df: pd.DataFrame, ticker: str, entry_price: float | None = None) -> go.Figure:
+def load_trader_orders() -> pd.DataFrame:
+    try:
+        df = pd.read_csv(TRADER_ORDERS_FILE)
+    except Exception:
+        return pd.DataFrame()
+
+    if df.empty:
+        return df
+
+    if "timestamp" in df.columns:
+        df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce", utc=True)
+        df["timestamp"] = df["timestamp"].dt.tz_convert(None)
+
+    if "asset" in df.columns:
+        df["asset"] = df["asset"].astype(str).str.upper()
+
+    if "side" in df.columns:
+        df["side"] = df["side"].astype(str).str.upper()
+
+    return df
+
+
+def align_orders_to_chart(df_orders: pd.DataFrame, df_chart: pd.DataFrame, ticker: str) -> pd.DataFrame:
+    if df_orders.empty or df_chart.empty:
+        return pd.DataFrame()
+
+    orders = df_orders.copy()
+    orders = orders[orders["asset"] == ticker.upper()].copy()
+    if orders.empty:
+        return pd.DataFrame()
+
+    orders = orders.dropna(subset=["timestamp"])
+    if orders.empty:
+        return pd.DataFrame()
+
+    chart_index = pd.DataFrame({"chart_time": df_chart.index}).sort_values("chart_time")
+    orders = orders.sort_values("timestamp")
+
+    aligned = pd.merge_asof(
+        orders,
+        chart_index,
+        left_on="timestamp",
+        right_on="chart_time",
+        direction="nearest",
+    )
+
+    aligned["plot_time"] = aligned["chart_time"].fillna(aligned["timestamp"])
+
+    if "price" in aligned.columns:
+        aligned["plot_price"] = pd.to_numeric(aligned["price"], errors="coerce")
+    else:
+        aligned["plot_price"] = pd.NA
+
+    missing_price = aligned["plot_price"].isna()
+    if missing_price.any():
+        close_map = df_chart["close"]
+        aligned.loc[missing_price, "plot_price"] = aligned.loc[missing_price, "plot_time"].map(close_map)
+
+    aligned["plot_price"] = pd.to_numeric(aligned["plot_price"], errors="coerce")
+    aligned = aligned.dropna(subset=["plot_time", "plot_price"])
+    return aligned
+
+
+def add_trade_markers(fig: go.Figure, aligned_orders: pd.DataFrame) -> None:
+    if aligned_orders.empty:
+        return
+
+    buys = aligned_orders[aligned_orders["side"] == "BUY"].copy()
+    sells = aligned_orders[aligned_orders["side"] == "SELL"].copy()
+
+    if not buys.empty:
+        fig.add_trace(
+            go.Scatter(
+                x=buys["plot_time"],
+                y=buys["plot_price"],
+                mode="markers+text",
+                name="BUY",
+                text=["BUY"] * len(buys),
+                textposition="top center",
+                marker=dict(symbol="triangle-up", size=13, color="#19f5c1"),
+                hovertemplate=(
+                    "BUY<br>"
+                    "Tempo: %{x}<br>"
+                    "Preço: %{y:.2f}<br>"
+                    "<extra></extra>"
+                ),
+            )
+        )
+
+    if not sells.empty:
+        fig.add_trace(
+            go.Scatter(
+                x=sells["plot_time"],
+                y=sells["plot_price"],
+                mode="markers+text",
+                name="SELL",
+                text=["SELL"] * len(sells),
+                textposition="bottom center",
+                marker=dict(symbol="triangle-down", size=13, color="#ff5f7e"),
+                hovertemplate=(
+                    "SELL<br>"
+                    "Tempo: %{x}<br>"
+                    "Preço: %{y:.2f}<br>"
+                    "<extra></extra>"
+                ),
+            )
+        )
+
+
+def build_candle_chart(
+    df: pd.DataFrame,
+    ticker: str,
+    entry_price: float | None = None,
+    aligned_orders: pd.DataFrame | None = None,
+) -> go.Figure:
     fig = go.Figure()
 
     fig.add_trace(
@@ -82,27 +199,25 @@ def build_candle_chart(df: pd.DataFrame, ticker: str, entry_price: float | None 
         )
     )
 
-    if "ma9" in df.columns:
-        fig.add_trace(
-            go.Scatter(
-                x=df.index,
-                y=df["ma9"],
-                mode="lines",
-                name="MA 9",
-                line=dict(width=1.5),
-            )
+    fig.add_trace(
+        go.Scatter(
+            x=df.index,
+            y=df["ma9"],
+            mode="lines",
+            name="MA 9",
+            line=dict(width=1.5),
         )
+    )
 
-    if "ma21" in df.columns:
-        fig.add_trace(
-            go.Scatter(
-                x=df.index,
-                y=df["ma21"],
-                mode="lines",
-                name="MA 21",
-                line=dict(width=1.5),
-            )
+    fig.add_trace(
+        go.Scatter(
+            x=df.index,
+            y=df["ma21"],
+            mode="lines",
+            name="MA 21",
+            line=dict(width=1.5),
         )
+    )
 
     if entry_price is not None and entry_price > 0:
         fig.add_hline(
@@ -111,6 +226,9 @@ def build_candle_chart(df: pd.DataFrame, ticker: str, entry_price: float | None 
             line_dash="dot",
             annotation_text=f"Entrada {entry_price:.2f}",
         )
+
+    if aligned_orders is not None and not aligned_orders.empty:
+        add_trade_markers(fig, aligned_orders)
 
     fig.update_layout(
         template="plotly_dark",
@@ -122,6 +240,7 @@ def build_candle_chart(df: pd.DataFrame, ticker: str, entry_price: float | None 
         plot_bgcolor="rgba(0,0,0,0)",
         xaxis_rangeslider_visible=False,
         margin=dict(l=20, r=20, t=50, b=20),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
     )
     return fig
 
@@ -258,6 +377,8 @@ selected_position = next(
 entry_price = float(selected_position.get("entry_price", 0.0)) if selected_position else None
 
 chart_df = pd.DataFrame()
+orders_df = load_trader_orders()
+
 try:
     with st.spinner("Carregando preço real..."):
         chart_df = load_chart_data(selected_ticker, period, interval)
@@ -267,11 +388,18 @@ except Exception as e:
 if chart_df.empty:
     st.warning("Não foi possível carregar dados reais para esse ativo/período.")
 else:
+    aligned_orders = align_orders_to_chart(orders_df, chart_df, selected_ticker)
+
     left_chart, right_info = st.columns([2.2, 1.0])
 
     with left_chart:
         st.plotly_chart(
-            build_candle_chart(chart_df, selected_ticker, entry_price=entry_price),
+            build_candle_chart(
+                chart_df,
+                selected_ticker,
+                entry_price=entry_price,
+                aligned_orders=aligned_orders,
+            ),
             use_container_width=True,
         )
         st.plotly_chart(
@@ -303,6 +431,15 @@ else:
             st.write(f"**PnL não realizado:** R$ {unrealized:,.2f}")
         else:
             st.info("Nenhuma posição aberta nesse ativo no momento.")
+
+        st.subheader("Trades no gráfico")
+        if not aligned_orders.empty:
+            st.dataframe(
+                aligned_orders[["timestamp", "asset", "side", "plot_price"]].tail(20).iloc[::-1],
+                use_container_width=True,
+            )
+        else:
+            st.info("Sem trades do trader nesse ativo/período.")
 
 if not paper_equity_df.empty:
     st.subheader("Equity do Trader")
