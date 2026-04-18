@@ -35,7 +35,6 @@ def build_feature_panel(prices: pd.DataFrame, config: MLEngineConfig | None = No
 
     vol_20 = rets.rolling(20).std()
 
-    # z-score do retorno atual contra janela de 20 dias
     mean_20 = rets.rolling(20).mean()
     std_20 = rets.rolling(20).std()
     z_20 = (rets - mean_20) / (std_20 + 1e-8)
@@ -86,12 +85,9 @@ def build_feature_panel(prices: pd.DataFrame, config: MLEngineConfig | None = No
     df = pd.DataFrame(rows)
     df = df.replace([np.inf, -np.inf], np.nan).dropna()
 
-    import numpy as np
-df["target"] = np.random.randint(0, 2, len(df)) (
-        df.groupby("date")["target_ret"]
-        .transform(lambda x: x >= x.quantile(1 - config.quantile_top))
-        .astype(int)
-    )
+    # TESTE 1: TARGET ALEATÓRIO
+    rng = np.random.default_rng(config.random_state)
+    df["target"] = rng.integers(0, 2, size=len(df))
 
     return df
 
@@ -124,20 +120,14 @@ class EnsembleProbabilityModel:
             random_state=config.random_state,
         )
 
-        self.feature_names: list[str] = []
-
     def fit(self, X: pd.DataFrame, y: pd.Series):
         Xp = self.preprocess.fit_transform(X)
-        self.feature_names = list(X.columns)
-
         self.rf.fit(Xp, y)
         self.gb.fit(Xp, y)
 
     def predict_proba(self, X: pd.DataFrame) -> np.ndarray:
         Xp = self.preprocess.transform(X)
-
         p1 = self.rf.predict_proba(Xp)[:, 1]
         p2 = self.gb.predict_proba(Xp)[:, 1]
-
         p = (p1 + p2) / 2.0
         return np.column_stack([1.0 - p, p])
