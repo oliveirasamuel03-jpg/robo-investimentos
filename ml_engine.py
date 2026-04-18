@@ -86,7 +86,8 @@ def build_feature_panel(prices: pd.DataFrame, config: MLEngineConfig | None = No
     df = pd.DataFrame(rows)
     df = df.replace([np.inf, -np.inf], np.nan).dropna()
 
-    df["target"] = (
+    import numpy as np
+df["target"] = np.random.randint(0, 2, len(df)) (
         df.groupby("date")["target_ret"]
         .transform(lambda x: x >= x.quantile(1 - config.quantile_top))
         .astype(int)
