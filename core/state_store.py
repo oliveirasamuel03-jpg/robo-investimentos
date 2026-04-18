@@ -31,6 +31,11 @@ DEFAULT_STATE = {
     "custom_tickers": [],
     "realized_pnl": 0.0,
     "positions": [],
+    "last_action": "Nenhuma ação recente",
+    "last_run_at": "",
+    "next_run_at": "",
+    "worker_status": "offline",
+    "worker_heartbeat": "",
     "trader": {
         "enabled": True,
         "ticket_value": 100.0,
@@ -58,6 +63,7 @@ def ensure_storage() -> None:
     STORAGE_DIR.mkdir(parents=True, exist_ok=True)
     if not BOT_STATE_FILE.exists():
         save_bot_state(deepcopy(DEFAULT_STATE))
+
     _ensure_csv(
         TRADER_ORDERS_FILE,
         ["timestamp", "asset", "side", "quantity", "price", "gross_value", "cost", "cash_after", "source"],
@@ -66,13 +72,28 @@ def ensure_storage() -> None:
         INVESTOR_ORDERS_FILE,
         ["timestamp", "metric", "value", "notes"],
     )
-    _ensure_csv(BOT_LOG_FILE, ["timestamp", "level", "message"])
+    _ensure_csv(
+        BOT_LOG_FILE,
+        ["timestamp", "level", "message"],
+    )
+
+
+def _merge_missing_keys(current: dict, default: dict) -> dict:
+    for key, value in default.items():
+        if key not in current:
+            current[key] = deepcopy(value)
+        elif isinstance(value, dict) and isinstance(current.get(key), dict):
+            current[key] = _merge_missing_keys(current[key], value)
+    return current
 
 
 def load_bot_state() -> dict:
     ensure_storage()
     with open(BOT_STATE_FILE, "r", encoding="utf-8") as f:
-        return json.load(f)
+        state = json.load(f)
+
+    state = _merge_missing_keys(state, deepcopy(DEFAULT_STATE))
+    return state
 
 
 def save_bot_state(state: dict) -> None:
@@ -103,3 +124,10 @@ def log_event(level: str, message: str) -> None:
             "message": message,
         },
     )
+
+
+def update_worker_heartbeat(status: str = "online") -> None:
+    state = load_bot_state()
+    state["worker_status"] = status
+    state["worker_heartbeat"] = datetime.utcnow().isoformat()
+    save_bot_state(state)
