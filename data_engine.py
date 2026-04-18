@@ -14,11 +14,19 @@ class DataUniverse:
     etfs: list[str]
     fiis: list[str]
     crypto: list[str]
+    grains: list[str]
 
     @property
     def all_assets(self) -> list[str]:
         seen = []
-        for group in [self.brazil_stocks, self.us_stocks, self.etfs, self.fiis, self.crypto]:
+        for group in [
+            self.brazil_stocks,
+            self.us_stocks,
+            self.etfs,
+            self.fiis,
+            self.crypto,
+            self.grains,
+        ]:
             for ticker in group:
                 if ticker not in seen:
                     seen.append(ticker)
@@ -69,6 +77,14 @@ DEFAULT_UNIVERSE = DataUniverse(
         "BTC-USD",
         "ETH-USD",
     ],
+    grains=[
+        "KC=F",  # café
+        "ZC=F",  # milho
+        "ZS=F",  # soja
+        "ZW=F",  # trigo
+        "ZR=F",  # arroz
+        "ZO=F",  # aveia
+    ],
 )
 
 
@@ -104,7 +120,6 @@ def _download_single_batch(
     if raw.empty:
         return pd.DataFrame()
 
-    # Caso yfinance retorne colunas MultiIndex
     if isinstance(raw.columns, pd.MultiIndex):
         if "Close" in raw.columns.get_level_values(0):
             closes = raw["Close"].copy()
@@ -112,7 +127,6 @@ def _download_single_batch(
             closes = raw.xs("Close", axis=1, level=0, drop_level=False)
             closes.columns = [c[-1] for c in closes.columns]
     else:
-        # Um único ticker
         closes = raw.rename(columns={"Close": tickers[0]})[[tickers[0]]]
 
     closes.index = pd.to_datetime(closes.index)
@@ -127,6 +141,7 @@ def _clean_prices(df: pd.DataFrame, min_non_na_ratio: float = 0.65) -> pd.DataFr
         return df
 
     out = df.copy().sort_index()
+
     valid_ratio = out.notna().mean()
     keep_cols = valid_ratio[valid_ratio >= min_non_na_ratio].index.tolist()
     out = out[keep_cols]
@@ -134,7 +149,6 @@ def _clean_prices(df: pd.DataFrame, min_non_na_ratio: float = 0.65) -> pd.DataFr
     out = out.ffill()
     out = out.dropna(how="all")
 
-    # remove ativos sem variação útil
     keep_cols = []
     for col in out.columns:
         s = out[col].dropna()
@@ -156,6 +170,7 @@ def load_data(
     include_etfs: bool = True,
     include_fiis: bool = True,
     include_crypto: bool = True,
+    include_grains: bool = True,
     custom_tickers: list[str] | None = None,
 ) -> pd.DataFrame:
     universe_parts: list[str] = []
@@ -170,6 +185,8 @@ def load_data(
         universe_parts.extend(DEFAULT_UNIVERSE.fiis)
     if include_crypto:
         universe_parts.extend(DEFAULT_UNIVERSE.crypto)
+    if include_grains:
+        universe_parts.extend(DEFAULT_UNIVERSE.grains)
 
     universe_parts.extend(_ensure_list(custom_tickers))
 
@@ -181,7 +198,6 @@ def load_data(
     if not tickers:
         raise ValueError("No tickers selected for load_data")
 
-    # baixa em lotes para ficar mais estável
     batch_size = 10
     batches = [tickers[i:i + batch_size] for i in range(0, len(tickers), batch_size)]
 
