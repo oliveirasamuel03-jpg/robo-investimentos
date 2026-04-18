@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import datetime, timedelta
+
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
@@ -60,8 +62,7 @@ def load_chart_data(ticker: str, period: str, interval: str) -> pd.DataFrame:
 
     df = df.sort_index()
 
-    needed = ["open", "high", "low", "close"]
-    for col in needed:
+    for col in ["open", "high", "low", "close"]:
         if col not in df.columns:
             return pd.DataFrame()
 
@@ -94,11 +95,7 @@ def load_trader_orders() -> pd.DataFrame:
     return df
 
 
-def align_orders_to_chart(
-    df_orders: pd.DataFrame,
-    df_chart: pd.DataFrame,
-    ticker: str,
-) -> pd.DataFrame:
+def align_orders_to_chart(df_orders: pd.DataFrame, df_chart: pd.DataFrame, ticker: str) -> pd.DataFrame:
     if df_orders.empty or df_chart.empty:
         return pd.DataFrame()
 
@@ -142,8 +139,7 @@ def align_orders_to_chart(
 
     missing = aligned["plot_price"].isna()
     if missing.any():
-        close_series = df_chart["close"]
-        aligned.loc[missing, "plot_price"] = aligned.loc[missing, "plot_time"].map(close_series)
+        aligned.loc[missing, "plot_price"] = aligned.loc[missing, "plot_time"].map(df_chart["close"])
 
     aligned = aligned.dropna(subset=["plot_time", "plot_price"]).copy()
     return aligned
@@ -273,6 +269,10 @@ def br_money(value: float) -> str:
     return f"R$ {value:,.2f}"
 
 
+def br_pct(value: float) -> str:
+    return f"{value * 100:.2f}%"
+
+
 def simple_signal_text(chart_df: pd.DataFrame) -> str:
     if chart_df.empty or len(chart_df) < 2:
         return "Aguardando dados"
@@ -304,21 +304,73 @@ def signal_badge_color(signal_text: str) -> str:
     return "#38bdf8"
 
 
-st.set_page_config(page_title="Trader Premium", layout="wide")
+def get_last_action_text(paper_trades: list[dict]) -> str:
+    if not paper_trades:
+        return "Nenhuma operação recente"
+
+    last = paper_trades[-1]
+    side = str(last.get("side", "")).upper()
+    asset = str(last.get("asset", "-"))
+    price = float(last.get("price", 0.0) or 0.0)
+
+    if side == "BUY":
+        return f"Comprou {asset} a {price:,.2f}"
+    if side == "SELL":
+        return f"Vendeu {asset} a {price:,.2f}"
+    return f"Última ação em {asset}"
+
+
+def get_last_execution_text(paper_state: dict) -> str:
+    updated_at = paper_state.get("updated_at") or paper_state.get("last_run_at")
+    if not updated_at:
+        return "Ainda não executado"
+    return str(updated_at)
+
+
+def get_next_execution_text(robot_status: str) -> str:
+    if robot_status != "RUNNING":
+        return "Pausado"
+    return "Em breve"
+
+
+def build_robot_log(signal_text: str, robot_label: str, paper_trades: list[dict], open_positions: list[dict]) -> list[str]:
+    logs = []
+
+    if robot_label == "Ligado":
+        logs.append("Robô ativo e monitorando o mercado.")
+    elif robot_label == "Pausado":
+        logs.append("Robô pausado. Não fará novas entradas.")
+    else:
+        logs.append("Robô desligado.")
+
+    logs.append(signal_text)
+
+    if paper_trades:
+        logs.append(f"Última ação: {get_last_action_text(paper_trades)}")
+
+    if open_positions:
+        logs.append(f"Operações abertas agora: {len(open_positions)}")
+    else:
+        logs.append("Nenhuma operação aberta no momento.")
+
+    return logs[:4]
+
+
+st.set_page_config(page_title="Trader Premium Max", layout="wide")
 
 st.markdown(
     """
     <style>
     .block-container {
-        padding-top: 1.4rem;
+        padding-top: 1.2rem;
         padding-bottom: 2rem;
-        max-width: 1400px;
+        max-width: 1450px;
     }
 
     .main-title {
-        font-size: 2.1rem;
+        font-size: 2.15rem;
         font-weight: 800;
-        margin-bottom: 0.2rem;
+        margin-bottom: 0.15rem;
         letter-spacing: -0.02em;
     }
 
@@ -328,12 +380,21 @@ st.markdown(
     }
 
     .glass-card {
-        background: linear-gradient(180deg, rgba(15,23,42,0.90), rgba(2,6,23,0.95));
+        background: linear-gradient(180deg, rgba(15,23,42,0.92), rgba(2,6,23,0.96));
         border: 1px solid rgba(148,163,184,0.16);
         border-radius: 18px;
         padding: 18px 18px 14px 18px;
         box-shadow: 0 10px 30px rgba(0,0,0,0.28);
         margin-bottom: 14px;
+    }
+
+    .hero-box {
+        background: linear-gradient(135deg, rgba(30,41,59,0.95), rgba(2,6,23,0.98));
+        border: 1px solid rgba(148,163,184,0.16);
+        border-radius: 22px;
+        padding: 18px;
+        margin-bottom: 14px;
+        box-shadow: 0 14px 35px rgba(0,0,0,0.30);
     }
 
     .metric-label {
@@ -360,15 +421,6 @@ st.markdown(
         color: #f8fafc;
     }
 
-    .hero-box {
-        background: linear-gradient(135deg, rgba(30,41,59,0.95), rgba(2,6,23,0.98));
-        border: 1px solid rgba(148,163,184,0.16);
-        border-radius: 22px;
-        padding: 18px;
-        margin-bottom: 14px;
-        box-shadow: 0 14px 35px rgba(0,0,0,0.30);
-    }
-
     .signal-pill {
         display: inline-block;
         padding: 8px 14px;
@@ -377,6 +429,7 @@ st.markdown(
         font-size: 0.95rem;
         margin-top: 8px;
         color: white;
+        animation: pulseGlow 2.2s infinite;
     }
 
     .status-line {
@@ -394,6 +447,24 @@ st.markdown(
     .small-note {
         color: #94a3b8;
         font-size: 0.92rem;
+    }
+
+    .log-card {
+        background: linear-gradient(180deg, rgba(15,23,42,0.82), rgba(2,6,23,0.92));
+        border: 1px solid rgba(148,163,184,0.14);
+        border-radius: 16px;
+        padding: 14px;
+        min-height: 280px;
+    }
+
+    .log-item {
+        padding: 10px 12px;
+        border-radius: 12px;
+        background: rgba(255,255,255,0.03);
+        border: 1px solid rgba(148,163,184,0.10);
+        color: #e2e8f0;
+        margin-bottom: 8px;
+        font-size: 0.95rem;
     }
 
     div[data-testid="stMetric"] {
@@ -416,14 +487,20 @@ st.markdown(
         font-size: 1rem;
         border: 1px solid rgba(255,255,255,0.10);
     }
+
+    @keyframes pulseGlow {
+        0% { box-shadow: 0 0 0 rgba(255,255,255,0.0); }
+        50% { box-shadow: 0 0 18px rgba(255,255,255,0.14); }
+        100% { box-shadow: 0 0 0 rgba(255,255,255,0.0); }
+    }
     </style>
     """,
     unsafe_allow_html=True,
 )
 
-st.markdown("<div class='main-title'>💎 Trader Premium</div>", unsafe_allow_html=True)
+st.markdown("<div class='main-title'>💎 Trader Premium Max</div>", unsafe_allow_html=True)
 st.markdown(
-    "<div class='subtitle'>Visual mais moderno, leitura fácil e área avançada escondida para não poluir a tela.</div>",
+    "<div class='subtitle'>Visual premium, leitura simples e um robô com status mais inteligente e vivo.</div>",
     unsafe_allow_html=True,
 )
 
@@ -473,7 +550,7 @@ robot_status = state.get("bot_status", "PAUSED")
 robot_label = "Ligado" if robot_status == "RUNNING" else "Pausado" if robot_status == "PAUSED" else "Desligado"
 robot_class = "metric-good" if robot_label == "Ligado" else "metric-bad" if robot_label == "Desligado" else "metric-neutral"
 
-m1, m2, m3 = st.columns(3)
+m1, m2, m3, m4 = st.columns(4)
 
 with m1:
     st.markdown(
@@ -505,6 +582,22 @@ with m3:
         <div class="glass-card">
             <div class="metric-label">Status do robô</div>
             <div class="metric-value {robot_class}">{robot_label}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+with m4:
+    equity_value = float(paper_state.get("equity", 0.0))
+    return_pct = 0.0
+    initial_capital = float(state.get("wallet_value", 0.0))
+    if initial_capital > 0:
+        return_pct = (equity_value - initial_capital) / initial_capital
+    st.markdown(
+        f"""
+        <div class="glass-card">
+            <div class="metric-label">Resultado %</div>
+            <div class="metric-value metric-neutral">{br_pct(return_pct)}</div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -554,14 +647,13 @@ with b3:
         except Exception as e:
             st.error(f"Erro ao rodar ciclo trader: {e}")
 
-if chart_df.empty:
-    st.warning("Não foi possível carregar dados desse ativo agora.")
-else:
-    aligned_orders = align_orders_to_chart(orders_df, chart_df, selected_ticker)
+chart_col, side_col = st.columns([2.3, 0.95])
 
-    chart_col, info_col = st.columns([2.2, 0.9])
-
-    with chart_col:
+with chart_col:
+    if chart_df.empty:
+        st.warning("Não foi possível carregar dados desse ativo agora.")
+    else:
+        aligned_orders = align_orders_to_chart(orders_df, chart_df, selected_ticker)
         st.plotly_chart(
             build_candle_chart(
                 chart_df,
@@ -575,27 +667,48 @@ else:
         with st.expander("Mostrar volume"):
             st.plotly_chart(build_volume_chart(chart_df, selected_ticker), use_container_width=True)
 
-    with info_col:
-        current_max = float(chart_df["high"].max()) if not chart_df.empty else 0.0
-        current_min = float(chart_df["low"].min()) if not chart_df.empty else 0.0
+with side_col:
+    if not chart_df.empty:
+        current_max = float(chart_df["high"].max())
+        current_min = float(chart_df["low"].min())
+    else:
+        current_max = 0.0
+        current_min = 0.0
 
-        st.metric("Preço atual", f"{last_price:,.2f}")
-        st.metric("Máxima", f"{current_max:,.2f}")
-        st.metric("Mínima", f"{current_min:,.2f}")
+    st.metric("Preço atual", f"{last_price:,.2f}")
+    st.metric("Máxima", f"{current_max:,.2f}")
+    st.metric("Mínima", f"{current_min:,.2f}")
 
-        if selected_position:
-            qty = float(selected_position.get("qty", 0.0))
-            avg_price = float(selected_position.get("entry_price", 0.0))
-            market_value = qty * last_price if last_price else 0.0
-            unrealized = (last_price - avg_price) * qty if last_price else 0.0
+    if selected_position:
+        qty = float(selected_position.get("qty", 0.0))
+        avg_price = float(selected_position.get("entry_price", 0.0))
+        market_value = qty * last_price if last_price else 0.0
+        unrealized = (last_price - avg_price) * qty if last_price else 0.0
 
-            st.markdown("### Operação aberta")
-            st.write(f"**Quantidade:** {qty:,.6f}")
-            st.write(f"**Preço médio:** {avg_price:,.2f}")
-            st.write(f"**Valor atual:** {br_money(market_value)}")
-            st.write(f"**Resultado atual:** {br_money(unrealized)}")
-        else:
-            st.info("Nenhuma operação aberta nesse ativo.")
+        st.markdown("### Operação aberta")
+        st.write(f"**Quantidade:** {qty:,.6f}")
+        st.write(f"**Preço médio:** {avg_price:,.2f}")
+        st.write(f"**Valor atual:** {br_money(market_value)}")
+        st.write(f"**Resultado atual:** {br_money(unrealized)}")
+    else:
+        st.info("Nenhuma operação aberta nesse ativo.")
+
+    st.markdown("<div class='log-card'>", unsafe_allow_html=True)
+    st.markdown("### Robô em tempo real")
+    st.caption("Resumo vivo do comportamento do robô")
+
+    last_action = get_last_action_text(paper_trades)
+    last_execution = get_last_execution_text(paper_state)
+    next_execution = get_next_execution_text(robot_status)
+
+    st.write(f"**Última ação:** {last_action}")
+    st.write(f"**Última execução:** {last_execution}")
+    st.write(f"**Próxima análise:** {next_execution}")
+
+    for item in build_robot_log(signal_text, robot_label, paper_trades, open_positions):
+        st.markdown(f"<div class='log-item'>{item}</div>", unsafe_allow_html=True)
+
+    st.markdown("</div>", unsafe_allow_html=True)
 
 with st.expander("Modo avançado"):
     st.markdown("### Configuração avançada")
