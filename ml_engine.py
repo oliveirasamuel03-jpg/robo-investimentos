@@ -12,7 +12,7 @@ from sklearn.preprocessing import StandardScaler
 
 @dataclass
 class MLEngineConfig:
-    lookahead: int = 5
+    lookahead: int = 1
     quantile_top: float = 0.3
     use_scaler: bool = True
     random_state: int = 42
@@ -90,12 +90,6 @@ def build_feature_panel(prices: pd.DataFrame, config: MLEngineConfig | None = No
         .transform(lambda x: x >= x.quantile(1 - config.quantile_top))
         .astype(int)
     )
-
-    # TESTE 2: ATRASAR FEATURES EM 1 LINHA POR ATIVO
-    feature_cols = [c for c in df.columns if c not in ["date", "asset", "target", "target_ret"]]
-    df = df.sort_values(["asset", "date"]).copy()
-    df[feature_cols] = df.groupby("asset")[feature_cols].shift(1)
-    df = df.dropna().reset_index(drop=True)
 
     return df
 
