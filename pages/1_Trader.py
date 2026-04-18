@@ -697,13 +697,19 @@ with side_col:
     st.markdown("### Robô em tempo real")
     st.caption("Resumo vivo do comportamento do robô")
 
-    last_action = get_last_action_text(paper_trades)
-    last_execution = get_last_execution_text(paper_state)
-    next_execution = get_next_execution_text(robot_status)
+    state_runtime = load_bot_state()
 
+    last_action = state_runtime.get("last_action", get_last_action_text(paper_trades))
+    last_execution = state_runtime.get("last_run_at", "")
+    next_execution = state_runtime.get("next_run_at", "")
+    worker_status = state_runtime.get("worker_status", "offline")
+    worker_heartbeat = state_runtime.get("worker_heartbeat", "")
+
+    st.write(f"**Status do worker:** {worker_status}")
     st.write(f"**Última ação:** {last_action}")
-    st.write(f"**Última execução:** {last_execution}")
-    st.write(f"**Próxima análise:** {next_execution}")
+    st.write(f"**Última execução:** {last_execution or 'Ainda não executado'}")
+    st.write(f"**Próxima análise:** {next_execution or 'Aguardando'}")
+    st.write(f"**Heartbeat:** {worker_heartbeat or 'Sem sinal'}")
 
     for item in build_robot_log(signal_text, robot_label, paper_trades, open_positions):
         st.markdown(f"<div class='log-item'>{item}</div>", unsafe_allow_html=True)
