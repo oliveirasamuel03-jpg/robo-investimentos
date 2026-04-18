@@ -14,6 +14,7 @@ class WalkForwardConfig:
     train_window: int = 252 * 2
     test_window: int = 21
     step_size: int = 21
+    embargo: int = 5
     min_assets: int = 3
     initial_capital: float = 100000.0
     fee_rate: float = 0.0005
@@ -80,7 +81,6 @@ def _build_target_matrix(
     tmp["asset"] = tmp["asset"].astype(str)
     tmp["weight"] = pd.to_numeric(tmp["weight"], errors="coerce").fillna(0.0)
 
-    # evita duplicatas antes do pivot
     tmp = tmp.groupby(["date", "asset"], as_index=False)["weight"].sum()
 
     pivot = tmp.pivot_table(
@@ -107,7 +107,6 @@ def run_walk_forward_validation(
 
     if prices.empty:
         raise ValueError("prices is empty")
-
     if feature_data.empty:
         raise ValueError("feature_data is empty")
 
@@ -120,7 +119,6 @@ def run_walk_forward_validation(
     data["date"] = pd.to_datetime(data["date"])
     data["asset"] = data["asset"].astype(str)
 
-    # remove duplicatas do painel de features
     non_key_cols = [c for c in data.columns if c not in {"date", "asset"}]
     agg_map = {c: "mean" for c in non_key_cols}
     data = (
@@ -140,13 +138,12 @@ def run_walk_forward_validation(
         raise ValueError("No feature columns found in feature_data")
 
     unique_dates = pd.Index(sorted(data["date"].dropna().unique()))
-    if len(unique_dates) < (config.train_window + config.test_window + 1):
+    if len(unique_dates) < (config.train_window + config.test_window + config.embargo + 1):
         raise ValueError("Not enough dates for walk-forward validation")
 
     fold_summaries: List[Dict[str, object]] = []
     prediction_frames: List[pd.DataFrame] = []
     fold_backtests: List[pd.DataFrame] = []
-
     fold_number = 0
 
     for train_end_idx in range(
@@ -154,24 +151,30 @@ def run_walk_forward_validation(
         len(unique_dates) - config.test_window + 1,
         config.step_size,
     ):
+        test_start_idx = train_end_idx + config.embargo
+        test_end_idx = test_start_idx + config.test_window
+
+        if test_end_idx > len(unique_dates):
+            break
+
         train_start_idx = train_end_idx - config.train_window
-        test_end_idx = train_end_idx + config.test_window
 
         train_dates = unique_dates[train_start_idx:train_end_idx]
-        test_dates = unique_dates[train_end_idx:test_end_idx]
+        test_dates = unique_dates[test_start_idx:test_end_idx]
 
         train_df = data[data["date"].isin(train_dates)].copy()
         test_df = data[data["date"].isin(test_dates)].copy()
+
+        if train_df.empty or test_df.empty:
+            continue
 
         train_assets_per_day = train_df.groupby("date")["asset"].nunique()
         test_assets_per_day = test_df.groupby("date")["asset"].nunique()
 
         if train_assets_per_day.empty or test_assets_per_day.empty:
             continue
-
         if int(train_assets_per_day.min()) < config.min_assets:
             continue
-
         if int(test_assets_per_day.min()) < config.min_assets:
             continue
 
@@ -198,7 +201,6 @@ def run_walk_forward_validation(
         pred_df["target"] = y_test.values
         pred_df["fold"] = fold_number
 
-        # blindagem contra duplicatas antes do signal_builder
         pred_df = (
             pred_df.groupby(["date", "asset"], as_index=False)
             .agg(
@@ -208,6 +210,7 @@ def run_walk_forward_validation(
             )
         )
 
+        # IMPORTANT: signal builder sees only fold predictions, not future labels
         weights_df = signal_builder(pred_df[["date", "asset", "probability"]].copy())
         if not {"date", "asset", "weight"}.issubset(weights_df.columns):
             raise ValueError("signal_builder must return columns ['date', 'asset', 'weight']")
@@ -216,7 +219,6 @@ def run_walk_forward_validation(
         weights_df["date"] = pd.to_datetime(weights_df["date"])
         weights_df["asset"] = weights_df["asset"].astype(str)
         weights_df["weight"] = pd.to_numeric(weights_df["weight"], errors="coerce").fillna(0.0)
-
         weights_df = weights_df.groupby(["date", "asset"], as_index=False)["weight"].sum()
 
         merged = pred_df.merge(
@@ -295,8 +297,6 @@ def run_walk_forward_validation(
         )
     )
 
-    fold_metrics = pd.DataFrame(fold_summaries)
-
     full_target_weights = _build_target_matrix(
         predictions=predictions_all[["date", "asset", "weight"]],
         price_index=prices.index,
@@ -314,6 +314,8 @@ def run_walk_forward_validation(
 
     full_returns = full_backtest["returns"]["return"]
     full_equity = full_backtest["equity_curve"]["equity"]
+
+    fold_metrics = pd.DataFrame(fold_summaries)
 
     aggregate_metrics = {
         "folds": int(len(fold_metrics)),
