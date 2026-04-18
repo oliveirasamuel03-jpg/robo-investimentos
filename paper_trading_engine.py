@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
@@ -14,14 +15,25 @@ from ml_engine import (
 from backtest_engine import backtest
 
 
-def load_prices(symbol: str = "AAPL", period: str = "6mo", interval: str = "1d") -> pd.DataFrame:
+# =========================
+# CONFIG (FALTAVA ISSO)
+# =========================
+@dataclass
+class PaperTradingConfig:
+    symbol: str = "AAPL"
+    period: str = "6mo"
+    interval: str = "1d"
+
+
+# =========================
+# DADOS
+# =========================
+def load_prices(config: PaperTradingConfig) -> pd.DataFrame:
     df = yf.download(
-        tickers=symbol,
-        period=period,
-        interval=interval,
-        auto_adjust=False,
+        tickers=config.symbol,
+        period=config.period,
+        interval=config.interval,
         progress=False,
-        threads=False,
     )
 
     if df is None or df.empty:
@@ -32,66 +44,43 @@ def load_prices(symbol: str = "AAPL", period: str = "6mo", interval: str = "1d")
 
     df = df.reset_index()
 
-    rename_map = {
+    df = df.rename(columns={
         "Date": "datetime",
-        "Datetime": "datetime",
         "Open": "open",
         "High": "high",
         "Low": "low",
         "Close": "close",
-        "Adj Close": "adj_close",
         "Volume": "volume",
-    }
-    df = df.rename(columns=rename_map)
+    })
 
-    if "close" not in df.columns:
-        return pd.DataFrame()
-
-    if "volume" not in df.columns:
-        df["volume"] = 0.0
-
-    keep_cols = [c for c in ["datetime", "open", "high", "low", "close", "volume"] if c in df.columns]
-    return df[keep_cols].copy()
+    return df
 
 
-def _build_fallback_prices(n: int = 120) -> pd.DataFrame:
-    base = np.linspace(100, 110, n)
-    return pd.DataFrame(
-        {
-            "datetime": pd.date_range(end=pd.Timestamp.utcnow(), periods=n, freq="D"),
-            "open": base,
-            "high": base * 1.01,
-            "low": base * 0.99,
-            "close": base,
-            "volume": np.zeros(n),
-        }
-    )
+def fallback_data():
+    base = np.linspace(100, 110, 100)
+    return pd.DataFrame({
+        "close": base,
+        "volume": np.zeros(len(base)),
+    })
 
 
-def _build_equity_curve(total_return: float, steps: int = 50) -> list[float]:
-    start = 1.0
-    end = 1.0 + float(total_return)
-    return np.linspace(start, end, steps).tolist()
+# =========================
+# MAIN
+# =========================
+def run_paper_trading_demo(config: PaperTradingConfig = PaperTradingConfig()):
+    prices = load_prices(config)
 
+    if prices.empty or "close" not in prices.columns:
+        prices = fallback_data()
 
-def run_paper_trading_demo(symbol: str = "AAPL") -> dict:
-    prices = load_prices(symbol=symbol)
-
-    if prices.empty:
-        prices = _build_fallback_prices()
-
-    config = MLEngineConfig()
-    X = build_feature_panel(prices, config)
+    # ML
+    ml_config = MLEngineConfig()
+    X = build_feature_panel(prices, ml_config)
     y = create_labels(prices)
 
-    if len(X) == 0:
-        prices = _build_fallback_prices()
-        X = build_feature_panel(prices, config)
-        y = create_labels(prices)
-
     min_len = min(len(X), len(y))
-    X = X.iloc[:min_len].copy()
-    y = y.iloc[:min_len].copy()
+    X = X.iloc[:min_len]
+    y = y.iloc[:min_len]
 
     model = EnsembleProbabilityModel()
     model.fit(X, y)
@@ -99,30 +88,19 @@ def run_paper_trading_demo(symbol: str = "AAPL") -> dict:
     probs = model.predict_proba(X)
     signals = (probs[:, 1] > 0.5).astype(int)
 
-    bt = backtest(prices.iloc[-len(signals):].copy(), signals)
+    # BACKTEST
+    result = backtest(prices.iloc[-len(signals):], signals)
 
-    equity_curve = _build_equity_curve(bt.get("total_return", 0.0), steps=max(len(signals), 50))
+    # curva fake (evita erro plotly)
+    equity = np.linspace(1, 1 + result["total_return"], 50)
 
+    # gráfico
     fig = go.Figure()
-    fig.add_trace(go.Scatter(y=equity_curve, mode="lines", name="Equity Curve"))
-    fig.update_layout(
-        template="plotly_dark",
-        title=f"Paper Trading Demo - {symbol}",
-        xaxis_title="Passos",
-        yaxis_title="Equity",
-        paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(0,0,0,0)",
-        height=420,
-    )
+    fig.add_trace(go.Scatter(y=equity, name="Equity Curve"))
 
     return {
-        "symbol": symbol,
-        "prices_rows": int(len(prices)),
-        "features_rows": int(len(X)),
-        "signals_count": int(len(signals)),
         "signals": signals.tolist(),
-        "probabilities": probs[:, 1].tolist(),
-        "backtest": bt,
-        "equity_curve": equity_curve,
+        "result": result,
+        "equity": equity.tolist(),
         "figure": fig,
     }
