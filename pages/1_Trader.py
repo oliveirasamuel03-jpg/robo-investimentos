@@ -102,6 +102,50 @@ def align_orders_to_chart(df_orders: pd.DataFrame, df_chart: pd.DataFrame, ticke
     if orders.empty:
         return pd.DataFrame()
 
+    # 🔥 CORREÇÃO PRINCIPAL
+    orders["timestamp"] = pd.to_datetime(orders["timestamp"], errors="coerce")
+    orders = orders.dropna(subset=["timestamp"])
+
+    # 🔥 REMOVE timezone (CRUCIAL)
+    orders["timestamp"] = orders["timestamp"].dt.tz_localize(None)
+
+    chart_index = pd.DataFrame({"chart_time": df_chart.index})
+    chart_index["chart_time"] = pd.to_datetime(chart_index["chart_time"], errors="coerce")
+
+    # 🔥 REMOVE timezone também no gráfico
+    chart_index["chart_time"] = chart_index["chart_time"].dt.tz_localize(None)
+
+    orders = orders.sort_values("timestamp")
+    chart_index = chart_index.sort_values("chart_time")
+
+    aligned = pd.merge_asof(
+        orders,
+        chart_index,
+        left_on="timestamp",
+        right_on="chart_time",
+        direction="nearest",
+    )
+
+    aligned["plot_time"] = aligned["chart_time"]
+
+    aligned["plot_price"] = pd.to_numeric(aligned.get("price"), errors="coerce")
+
+    # fallback se preço vier vazio
+    missing = aligned["plot_price"].isna()
+    if missing.any():
+        aligned.loc[missing, "plot_price"] = aligned.loc[missing, "plot_time"].map(df_chart["close"])
+
+    aligned = aligned.dropna(subset=["plot_time", "plot_price"])
+
+    return aligned
+    if df_orders.empty or df_chart.empty:
+        return pd.DataFrame()
+
+    orders = df_orders.copy()
+    orders = orders[orders["asset"] == ticker.upper()].copy()
+    if orders.empty:
+        return pd.DataFrame()
+
     orders = orders.dropna(subset=["timestamp"])
     if orders.empty:
         return pd.DataFrame()
