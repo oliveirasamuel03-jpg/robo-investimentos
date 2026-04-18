@@ -3,8 +3,10 @@ from __future__ import annotations
 from pathlib import Path
 
 APP_TITLE = "Invest Pro Desk"
+
 BASE_DIR = Path(__file__).resolve().parents[1]
 STORAGE_DIR = BASE_DIR / "storage"
+
 BOT_STATE_FILE = STORAGE_DIR / "bot_state.json"
 TRADER_ORDERS_FILE = STORAGE_DIR / "trader_orders.csv"
 INVESTOR_ORDERS_FILE = STORAGE_DIR / "investor_orders.csv"
