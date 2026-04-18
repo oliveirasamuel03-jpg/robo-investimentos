@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from core.state_store import load_bot_state, save_bot_state, log_event, update_worker_heartbeat
 from engines.trader_engine import run_trader_cycle
@@ -11,26 +11,34 @@ PAUSED_SLEEP_SECONDS = 5
 
 
 def utc_now_iso() -> str:
-    return datetime.utcnow().isoformat()
+    return datetime.now(timezone.utc).isoformat()
 
 
 def update_runtime_state(last_action: str, next_run_delta_seconds: int) -> None:
     state = load_bot_state()
+
+    now = datetime.now(timezone.utc)
+
     state["last_action"] = last_action
-    state["last_run_at"] = utc_now_iso()
-    state["next_run_at"] = (datetime.utcnow() + timedelta(seconds=next_run_delta_seconds)).isoformat()
+    state["last_run_at"] = now.isoformat()
+    state["next_run_at"] = (now + timedelta(seconds=next_run_delta_seconds)).isoformat()
     state["worker_status"] = "online"
-    state["worker_heartbeat"] = utc_now_iso()
+    state["worker_heartbeat"] = now.isoformat()
+
     save_bot_state(state)
 
 
 def mark_error(message: str) -> None:
     state = load_bot_state()
+
+    now = datetime.now(timezone.utc)
+
     state["last_action"] = f"Erro: {message}"
-    state["last_run_at"] = utc_now_iso()
-    state["next_run_at"] = (datetime.utcnow() + timedelta(seconds=SLEEP_SECONDS)).isoformat()
+    state["last_run_at"] = now.isoformat()
+    state["next_run_at"] = (now + timedelta(seconds=SLEEP_SECONDS)).isoformat()
     state["worker_status"] = "error"
-    state["worker_heartbeat"] = utc_now_iso()
+    state["worker_heartbeat"] = now.isoformat()
+
     save_bot_state(state)
 
 
@@ -67,6 +75,7 @@ def worker_loop() -> None:
                 last_action=action_text,
                 next_run_delta_seconds=SLEEP_SECONDS,
             )
+
             log_event("INFO", action_text)
 
         except Exception as e:
