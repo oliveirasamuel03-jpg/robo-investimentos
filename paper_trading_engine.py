@@ -89,6 +89,8 @@ def ensure_paper_files(config: PaperTradingConfig | None = None) -> None:
             "updated_at": _utc_now_iso(),
             "cash": _round_money(config.initial_capital),
             "positions": {},
+            "realized_pnl": 0.0,
+            "closed_trades": [],
             "last_run_at": None,
             "last_signal_date": None,
             "last_prices": {},
@@ -121,6 +123,8 @@ def reset_paper_state(config: PaperTradingConfig | None = None) -> dict:
         "updated_at": _utc_now_iso(),
         "cash": _round_money(config.initial_capital),
         "positions": {},
+        "realized_pnl": 0.0,
+        "closed_trades": [],
         "last_run_at": None,
         "last_signal_date": None,
         "last_prices": {},
@@ -240,7 +244,7 @@ def _build_target_weights_for_live_date(
     weighted.loc[~weighted["trade_allowed"], "weight"] = 0.0
 
     out_rows = []
-    for dt, group in weighted.groupby("date", sort=True):
+    for _, group in weighted.groupby("date", sort=True):
         base_weights = group.set_index("asset")["weight"]
         safe_weights = apply_portfolio_risk_overlay(
             base_weights,
@@ -283,10 +287,13 @@ def _sell_first(
     logs: list[dict] = []
     cash = _safe_float(state.get("cash", 0.0))
     positions = state.get("positions", {}) or {}
+    closed_trades = state.get("closed_trades", []) or []
+    realized_pnl = _safe_float(state.get("realized_pnl", 0.0))
 
     for asset in list(positions.keys()):
         pos = positions[asset]
         qty = _safe_float(pos.get("quantity", 0.0))
+        avg_price = _safe_float(pos.get("avg_price", pos.get("last_price", 0.0)))
         price = _safe_float(latest_prices.get(asset), _safe_float(pos.get("last_price", 0.0)))
         current_value = qty * price
         desired_value = _safe_float(target_notional.get(asset, 0.0))
@@ -307,30 +314,38 @@ def _sell_first(
         cost = gross * (config.execution_fee_rate + config.execution_slippage_rate)
         net_cash = gross - cost
 
+        pnl = (price - avg_price) * sell_qty - cost
+        realized_pnl += pnl
+
         new_qty = max(0.0, qty - sell_qty)
         cash += net_cash
 
-        logs.append(
-            {
-                "timestamp": _utc_now_iso(),
-                "asset": asset,
-                "side": "SELL",
-                "quantity": _round_money(sell_qty),
-                "price": _round_money(price),
-                "gross_value": _round_money(gross),
-                "cost": _round_money(cost),
-                "cash_after": _round_money(cash),
-            }
-        )
+        trade_row = {
+            "timestamp": _utc_now_iso(),
+            "asset": asset,
+            "side": "SELL",
+            "quantity": _round_money(sell_qty),
+            "price": _round_money(price),
+            "avg_entry_price": _round_money(avg_price),
+            "gross_value": _round_money(gross),
+            "cost": _round_money(cost),
+            "realized_pnl": _round_money(pnl),
+            "cash_after": _round_money(cash),
+        }
+        logs.append(trade_row)
+        closed_trades.append(trade_row)
 
         if new_qty <= 1e-10:
             positions.pop(asset, None)
         else:
             pos["quantity"] = _round_money(new_qty)
             pos["last_price"] = _round_money(price)
+            pos["avg_price"] = _round_money(avg_price)
 
     state["cash"] = _round_money(cash)
     state["positions"] = positions
+    state["closed_trades"] = closed_trades[-1000:]
+    state["realized_pnl"] = _round_money(realized_pnl)
     return logs
 
 
@@ -349,8 +364,9 @@ def _buy_second(
         if price <= 0:
             continue
 
-        pos = positions.get(asset, {"quantity": 0.0, "last_price": price})
+        pos = positions.get(asset, {"quantity": 0.0, "last_price": price, "avg_price": price})
         qty = _safe_float(pos.get("quantity", 0.0))
+        avg_price = _safe_float(pos.get("avg_price", price))
         current_value = qty * price
 
         delta_value = desired_value - current_value
@@ -376,11 +392,13 @@ def _buy_second(
             continue
 
         new_qty = qty + buy_qty
+        new_avg_price = ((qty * avg_price) + (buy_qty * price)) / new_qty if new_qty > 0 else price
         cash -= total_cash
 
         positions[asset] = {
             "quantity": _round_money(new_qty),
             "last_price": _round_money(price),
+            "avg_price": _round_money(new_avg_price),
         }
 
         logs.append(
@@ -462,12 +480,15 @@ def run_paper_cycle(config: PaperTradingConfig | None = None) -> dict:
     for asset, pos in (state.get("positions", {}) or {}).items():
         px = _safe_float(latest_prices.get(asset), _safe_float(pos.get("last_price", 0.0)))
         qty = _safe_float(pos.get("quantity", 0.0))
+        avg_price = _safe_float(pos.get("avg_price", px))
         current_positions.append(
             {
                 "asset": asset,
                 "quantity": _round_money(qty),
+                "avg_price": _round_money(avg_price),
                 "last_price": _round_money(px),
                 "market_value": _round_money(qty * px),
+                "unrealized_pnl": _round_money((px - avg_price) * qty),
             }
         )
 
@@ -499,3 +520,80 @@ def read_paper_equity(limit: int = 200) -> pd.DataFrame:
     df = pd.DataFrame(rows)
     df["timestamp"] = pd.to_datetime(df["timestamp"])
     return df.tail(limit).reset_index(drop=True)
+
+
+def build_paper_report(initial_capital: float | None = None) -> dict:
+    state = load_paper_state()
+    equity_df = read_paper_equity(limit=5000)
+    trades = read_paper_trades(limit=5000)
+
+    if initial_capital is None:
+        initial_capital = _safe_float(
+            state.get("config", {}).get("initial_capital", 10000.0),
+            10000.0,
+        )
+
+    report = {
+        "equity": _safe_float(state.get("equity", initial_capital)),
+        "cash": _safe_float(state.get("cash", 0.0)),
+        "realized_pnl": _safe_float(state.get("realized_pnl", 0.0)),
+        "return_pct": 0.0,
+        "max_drawdown_pct": 0.0,
+        "runs": int(state.get("run_count", 0)),
+        "trades_count": len(trades),
+        "closed_trades_count": 0,
+        "win_rate_pct": 0.0,
+        "avg_win": 0.0,
+        "avg_loss": 0.0,
+        "payoff_ratio": 0.0,
+        "most_traded_asset": None,
+        "diagnosis": [],
+    }
+
+    report["return_pct"] = ((report["equity"] / initial_capital) - 1.0) * 100.0 if initial_capital > 0 else 0.0
+
+    if not equity_df.empty:
+        eq = equity_df["equity_after"].astype(float)
+        peak = eq.cummax()
+        dd = eq / peak - 1.0
+        report["max_drawdown_pct"] = float(dd.min() * 100.0)
+
+    sells = [t for t in trades if t.get("side") == "SELL" and "realized_pnl" in t]
+    report["closed_trades_count"] = len(sells)
+
+    if sells:
+        pnl = pd.Series([_safe_float(x.get("realized_pnl", 0.0)) for x in sells], dtype=float)
+        wins = pnl[pnl > 0]
+        losses = pnl[pnl < 0]
+
+        report["win_rate_pct"] = float((len(wins) / len(pnl)) * 100.0) if len(pnl) > 0 else 0.0
+        report["avg_win"] = float(wins.mean()) if len(wins) > 0 else 0.0
+        report["avg_loss"] = float(losses.mean()) if len(losses) > 0 else 0.0
+        if len(losses) > 0 and abs(float(losses.mean())) > 1e-12:
+            report["payoff_ratio"] = float(abs(float(wins.mean())) / abs(float(losses.mean()))) if len(wins) > 0 else 0.0
+
+    if trades:
+        assets = pd.Series([str(t.get("asset")) for t in trades])
+        vc = assets.value_counts()
+        if not vc.empty:
+            report["most_traded_asset"] = str(vc.index[0])
+
+    diagnosis: list[str] = []
+
+    if report["trades_count"] < 5:
+        diagnosis.append("Poucos trades ainda. Rode mais ciclos para um diagnóstico confiável.")
+    if report["return_pct"] < 0:
+        diagnosis.append("Paper trading está negativo. Reduzir agressividade ou revisar sinais pode ajudar.")
+    if report["max_drawdown_pct"] < -8:
+        diagnosis.append("Drawdown elevado no paper trading. Considere limitar exposição por ativo.")
+    if report["closed_trades_count"] >= 5 and report["win_rate_pct"] < 45:
+        diagnosis.append("Taxa de acerto baixa. O modelo pode estar entrando cedo demais.")
+    if report["closed_trades_count"] >= 5 and report["payoff_ratio"] < 1.0:
+        diagnosis.append("Payoff fraco. Ganhos médios não estão compensando perdas.")
+    if report["return_pct"] > 0 and report["max_drawdown_pct"] > -5:
+        diagnosis.append("Paper trading saudável até aqui: retorno positivo com drawdown controlado.")
+    if report["most_traded_asset"]:
+        diagnosis.append(f"Ativo mais operado até agora: {report['most_traded_asset']}.")
+
+    report["diagnosis"] = diagnosis
+    return report
