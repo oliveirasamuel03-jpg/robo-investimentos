@@ -85,9 +85,17 @@ def build_feature_panel(prices: pd.DataFrame, config: MLEngineConfig | None = No
     df = pd.DataFrame(rows)
     df = df.replace([np.inf, -np.inf], np.nan).dropna()
 
-    # TESTE 1: TARGET ALEATÓRIO
-    rng = np.random.default_rng(config.random_state)
-    df["target"] = rng.integers(0, 2, size=len(df))
+    df["target"] = (
+        df.groupby("date")["target_ret"]
+        .transform(lambda x: x >= x.quantile(1 - config.quantile_top))
+        .astype(int)
+    )
+
+    # TESTE 2: ATRASAR FEATURES EM 1 LINHA POR ATIVO
+    feature_cols = [c for c in df.columns if c not in ["date", "asset", "target", "target_ret"]]
+    df = df.sort_values(["asset", "date"]).copy()
+    df[feature_cols] = df.groupby("asset")[feature_cols].shift(1)
+    df = df.dropna().reset_index(drop=True)
 
     return df
 
