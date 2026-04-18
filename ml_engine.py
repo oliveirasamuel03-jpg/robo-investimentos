@@ -14,7 +14,6 @@ from sklearn.preprocessing import StandardScaler
 @dataclass
 class MLEngineConfig:
     lookahead: int = 5
-    quantile_top: float = 0.30
     use_scaler: bool = True
     random_state: int = 42
     min_history: int = 220
@@ -37,8 +36,8 @@ def build_feature_panel(
     """
     Versão anti-vazamento:
     - todas as features usam apenas informação disponível até t-1
-    - target usa retorno futuro a partir de t
-    - ranking cross-sectional por data
+    - target usa retorno futuro absoluto
+    - features cross-sectionais continuam como inputs, mas o alvo deixa de ser rank por data
     """
     if config is None:
         config = MLEngineConfig()
@@ -62,6 +61,7 @@ def build_feature_panel(
     ret_3 = px.pct_change(3)
     ret_5 = px.pct_change(5)
     ret_10 = px.pct_change(10)
+
     mom_20 = px.pct_change(20)
     mom_60 = px.pct_change(60)
     mom_120 = px.pct_change(120)
@@ -107,6 +107,7 @@ def build_feature_panel(
     cs_ret_3 = _cs_rank(ret_3)
     cs_ret_5 = _cs_rank(ret_5)
     cs_ret_10 = _cs_rank(ret_10)
+
     cs_mom_20 = _cs_rank(mom_20)
     cs_mom_60 = _cs_rank(mom_60)
     cs_mom_120 = _cs_rank(mom_120)
@@ -172,7 +173,7 @@ def build_feature_panel(
     feature_map = {name: frame.shift(1) for name, frame in feature_map.items()}
 
     # =========================
-    # TARGET FUTURO
+    # TARGET FUTURO ABSOLUTO
     # retorno entre t e t+lookahead
     # =========================
     target_ret = px.shift(-config.lookahead) / px - 1.0
@@ -194,14 +195,9 @@ def build_feature_panel(
     df = df.replace([np.inf, -np.inf], np.nan).dropna()
 
     # =========================
-    # TARGET CROSS-SECTIONAL
-    # top quantile do retorno futuro por data
+    # TARGET BINÁRIO ABSOLUTO
     # =========================
-    df["target"] = (
-        df.groupby("date")["target_ret"]
-        .transform(lambda x: x >= x.quantile(1 - config.quantile_top))
-        .astype(int)
-    )
+    df["target"] = (df["target_ret"] > 0.0).astype(int)
 
     return df.sort_values(["date", "asset"]).reset_index(drop=True)
 
