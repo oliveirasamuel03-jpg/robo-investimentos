@@ -193,3 +193,23 @@ def read_paper_trades():
 
     with open(path, "r") as f:
         return json.load(f)
+# =========================
+# RESET STATE (ÚLTIMO)
+# =========================
+def reset_paper_state():
+    default_state = {
+        "balance": 10000,
+        "positions": [],
+        "history": []
+    }
+
+    save_paper_state(default_state)
+
+    # também limpa trades
+    import os
+    import json
+
+    os.makedirs("data", exist_ok=True)
+
+    with open("data/paper_trades.json", "w") as f:
+        json.dump([], f)
