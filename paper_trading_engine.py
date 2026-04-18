@@ -104,3 +104,13 @@ def run_paper_trading_demo(config: PaperTradingConfig = PaperTradingConfig()):
         "equity": equity.tolist(),
         "figure": fig,
     }
+# =========================
+# REPORT (FALTAVA ISSO)
+# =========================
+def build_paper_report(result: dict) -> dict:
+    return {
+        "total_return": result.get("result", {}).get("total_return", 0),
+        "trades": result.get("result", {}).get("trades", 0),
+        "signals": len(result.get("signals", [])),
+        "status": "running",
+    }
