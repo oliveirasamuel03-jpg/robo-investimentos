@@ -24,7 +24,6 @@ from paper_trading_engine import (
     run_paper_cycle,
 )
 
-
 st.set_page_config(page_title="Invest Pro Bot", layout="wide")
 
 
@@ -428,26 +427,42 @@ def run_pipeline(
 
 def plot_equity(backtest_result, title: str):
     fig = go.Figure()
-    fig.add_trace(go.Scatter(
-        x=backtest_result["equity_curve"].index,
-        y=backtest_result["equity_curve"]["equity"],
-        mode="lines",
-        name=title,
-    ))
-    fig.update_layout(template="plotly_dark", height=360, title=title, paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
+    fig.add_trace(
+        go.Scatter(
+            x=backtest_result["equity_curve"].index,
+            y=backtest_result["equity_curve"]["equity"],
+            mode="lines",
+            name=title,
+        )
+    )
+    fig.update_layout(
+        template="plotly_dark",
+        height=360,
+        title=title,
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+    )
     return fig
 
 
 def plot_drawdown(backtest_result, title: str):
     fig = go.Figure()
-    fig.add_trace(go.Scatter(
-        x=backtest_result["drawdown"].index,
-        y=backtest_result["drawdown"].values,
-        mode="lines",
-        fill="tozeroy",
-        name=title,
-    ))
-    fig.update_layout(template="plotly_dark", height=320, title=title, paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
+    fig.add_trace(
+        go.Scatter(
+            x=backtest_result["drawdown"].index,
+            y=backtest_result["drawdown"].values,
+            mode="lines",
+            fill="tozeroy",
+            name=title,
+        )
+    )
+    fig.update_layout(
+        template="plotly_dark",
+        height=320,
+        title=title,
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+    )
     return fig
 
 
@@ -460,7 +475,13 @@ def plot_holdout_comparison(strategy_bt, spy_bt, random_bt):
     fig = go.Figure()
     for col in df.columns:
         fig.add_trace(go.Scatter(x=df.index, y=df[col], mode="lines", name=col))
-    fig.update_layout(template="plotly_dark", height=420, title="Holdout Final: Strategy vs SPY vs Random", paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
+    fig.update_layout(
+        template="plotly_dark",
+        height=420,
+        title="Holdout Final: Strategy vs SPY vs Random",
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+    )
     return fig
 
 
@@ -476,19 +497,34 @@ def plot_filter_states(filters_df: pd.DataFrame):
     fig.add_trace(go.Scatter(x=plot_df["date"], y=plot_df["regime"], mode="lines", name="Bull Regime"))
     fig.add_trace(go.Scatter(x=plot_df["date"], y=plot_df["vol_filter"], mode="lines", name="Volatilidade OK"))
     fig.add_trace(go.Scatter(x=plot_df["date"], y=plot_df["trade_allowed"], mode="lines", name="Operar Permitido"))
-    fig.update_layout(template="plotly_dark", height=320, title="Estados dos Filtros de Mercado", yaxis=dict(tickmode="array", tickvals=[0, 1]), paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
+    fig.update_layout(
+        template="plotly_dark",
+        height=320,
+        title="Estados dos Filtros de Mercado",
+        yaxis=dict(tickmode="array", tickvals=[0, 1]),
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+    )
     return fig
 
 
 def plot_paper_equity(paper_equity_df: pd.DataFrame):
     fig = go.Figure()
-    fig.add_trace(go.Scatter(
-        x=paper_equity_df["timestamp"],
-        y=paper_equity_df["equity_after"],
-        mode="lines+markers",
-        name="Paper Equity",
-    ))
-    fig.update_layout(template="plotly_dark", height=320, title="Paper Trading Equity", paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
+    fig.add_trace(
+        go.Scatter(
+            x=paper_equity_df["timestamp"],
+            y=paper_equity_df["equity_after"],
+            mode="lines+markers",
+            name="Paper Equity",
+        )
+    )
+    fig.update_layout(
+        template="plotly_dark",
+        height=320,
+        title="Paper Trading Equity",
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+    )
     return fig
 
 
@@ -622,7 +658,11 @@ def main():
 
             st.markdown('<div class="section-card">', unsafe_allow_html=True)
             st.plotly_chart(
-                px.histogram(result["mc"]["simulations"], x="sharpe", title="Distribuição de Sharpe - Monte Carlo (Holdout)"),
+                px.histogram(
+                    result["mc"]["simulations"],
+                    x="sharpe",
+                    title="Distribuição de Sharpe - Monte Carlo (Holdout)",
+                ),
                 use_container_width=True,
             )
             st.markdown("</div>", unsafe_allow_html=True)
