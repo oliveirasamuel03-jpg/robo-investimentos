@@ -1,4 +1,3 @@
-from risk_engine import RiskConfig, apply_portfolio_risk_overlay
 from __future__ import annotations
 
 import pandas as pd
@@ -13,6 +12,7 @@ from walk_forward import WalkForwardConfig, run_walk_forward_validation
 from metrics import compute_all_metrics
 from monte_carlo import MonteCarloConfig, run_monte_carlo
 from report_generator import build_institutional_report, save_report
+from risk_engine import RiskConfig, apply_portfolio_risk_overlay
 
 
 st.set_page_config(page_title="Invest Pro Bot", layout="wide")
@@ -82,7 +82,6 @@ def _build_dynamic_wf_config(
     step_size = max(5, min(15, test_window))
     embargo = 5
 
-    # garantir pelo menos 1 fold válido
     while train_window + embargo + test_window + 5 >= research_size and train_window > 30:
         train_window -= 10
     while train_window + embargo + test_window + 5 >= research_size and test_window > 5:
@@ -125,10 +124,10 @@ def run_pipeline(
     prices = cached_load_data(start_date, fast_mode)
     features = cached_features(prices)
 
-    strategy = StrategyConfig(
+    strategy_config = StrategyConfig(
         probability_threshold=probability_threshold,
         top_n=top_n,
-        max_weight_per_asset=0.40,
+        max_weight_per_asset=0.35,
         cash_threshold=cash_threshold,
         target_portfolio_vol=target_portfolio_vol,
     )
@@ -148,18 +147,53 @@ def run_pipeline(
     )
     filters = _safe_reset_index_with_date(filters)
 
+    risk_config = RiskConfig(
+        max_weight_per_asset=0.35,
+        max_gross_exposure=1.0,
+        max_net_exposure=1.0,
+        max_drawdown_circuit_breaker=0.12,
+        recovery_exposure=0.35,
+        min_nav_fraction=0.70,
+    )
+
     def model_factory():
         return EnsembleProbabilityModel(MLEngineConfig())
 
-    def signal_builder(pred: pd.DataFrame):
-        w = generate_target_weights(pred, prices, strategy).copy()
-        w["date"] = pd.to_datetime(w["date"])
+    def signal_builder(pred_df: pd.DataFrame) -> pd.DataFrame:
+        weighted = generate_target_weights(
+            pred_df,
+            prices=prices,
+            config=strategy_config,
+        ).copy()
 
-        w = w.merge(filters[["date", "regime", "vol_filter", "trade_allowed"]], on="date", how="left")
-        w["trade_allowed"] = w["trade_allowed"].fillna(False)
-        w.loc[~w["trade_allowed"], "weight"] = 0.0
+        weighted["date"] = pd.to_datetime(weighted["date"])
 
-        return w[["date", "asset", "weight"]]
+        weighted = weighted.merge(
+            filters[["date", "regime", "vol_filter", "trade_allowed"]],
+            on="date",
+            how="left",
+        )
+
+        weighted["trade_allowed"] = weighted["trade_allowed"].fillna(False)
+        weighted.loc[~weighted["trade_allowed"], "weight"] = 0.0
+
+        out_rows = []
+
+        for dt, group in weighted.groupby("date", sort=True):
+            base_weights = group.set_index("asset")["weight"]
+
+            safe_weights = apply_portfolio_risk_overlay(
+                base_weights,
+                equity_curve=None,
+                config=risk_config,
+            )
+
+            tmp = group.copy()
+            tmp["weight"] = tmp["asset"].map(safe_weights).fillna(0.0)
+
+            out_rows.append(tmp[["date", "asset", "weight"]])
+
+        return pd.concat(out_rows, ignore_index=True)
 
     wf = run_walk_forward_validation(
         prices,
