@@ -30,16 +30,15 @@ def _rolling_zscore(df: pd.DataFrame, window: int) -> pd.DataFrame:
     return (df - mean) / (std + 1e-8)
 
 
-def _cross_sectional_standardize(df: pd.DataFrame) -> pd.DataFrame:
-    return df.sub(df.mean(axis=1), axis=0).div(df.std(axis=1).replace(0, np.nan), axis=0).fillna(0.0)
-
-
-def build_feature_panel(prices: pd.DataFrame, config: MLEngineConfig | None = None) -> pd.DataFrame:
+def build_feature_panel(
+    prices: pd.DataFrame,
+    config: MLEngineConfig | None = None,
+) -> pd.DataFrame:
     """
-    Anti-leakage version:
-    - all features use only information available at date t
-    - target uses returns from t+1 ... t+lookahead
-    - features are shifted by 1 bar after engineering
+    Versão anti-vazamento:
+    - todas as features usam apenas informação disponível até t-1
+    - target usa retorno futuro a partir de t
+    - ranking cross-sectional por data
     """
     if config is None:
         config = MLEngineConfig()
@@ -56,19 +55,19 @@ def build_feature_panel(prices: pd.DataFrame, config: MLEngineConfig | None = No
     if px.empty:
         raise ValueError("No assets with sufficient history")
 
-    rets_1 = px.pct_change()
-
-    # -------- time-series features built with information up to t --------
-    mom_5 = px.pct_change(5)
+    # =========================
+    # BASE SERIES
+    # =========================
+    ret_1 = px.pct_change(1)
+    ret_3 = px.pct_change(3)
+    ret_5 = px.pct_change(5)
+    ret_10 = px.pct_change(10)
     mom_20 = px.pct_change(20)
     mom_60 = px.pct_change(60)
     mom_120 = px.pct_change(120)
 
-    rev_3 = -px.pct_change(3)
-    rev_5 = -px.pct_change(5)
-
-    vol_20 = rets_1.rolling(20).std()
-    vol_60 = rets_1.rolling(60).std()
+    vol_20 = ret_1.rolling(20).std()
+    vol_60 = ret_1.rolling(60).std()
 
     ma_20 = px.rolling(20).mean()
     ma_50 = px.rolling(50).mean()
@@ -81,32 +80,36 @@ def build_feature_panel(prices: pd.DataFrame, config: MLEngineConfig | None = No
     trend_50_100 = (ma_50 / (ma_100 + 1e-8)) - 1.0
     price_vs_ma200 = (px / (ma_200 + 1e-8)) - 1.0
 
-    zret_20 = _rolling_zscore(rets_1, 20)
+    zret_20 = _rolling_zscore(ret_1, 20)
     zpx_20 = _rolling_zscore(px, 20)
 
-    # -------- market-relative features --------
+    # =========================
+    # RELATIVE FEATURES VS SPY
+    # =========================
     if "SPY" in px.columns:
         spy = px["SPY"]
-        spy_ret_1 = spy.pct_change()
+
+        spy_ret_1 = spy.pct_change(1)
         spy_mom_20 = spy.pct_change(20)
         spy_mom_60 = spy.pct_change(60)
 
-        rel_ret_1 = rets_1.sub(spy_ret_1, axis=0)
+        rel_ret_1 = ret_1.sub(spy_ret_1, axis=0)
         rel_mom_20 = mom_20.sub(spy_mom_20, axis=0)
         rel_mom_60 = mom_60.sub(spy_mom_60, axis=0)
     else:
-        rel_ret_1 = rets_1 * 0.0
+        rel_ret_1 = ret_1 * 0.0
         rel_mom_20 = mom_20 * 0.0
         rel_mom_60 = mom_60 * 0.0
 
-    # -------- cross-sectional transforms at date t only --------
-    cs_mom_5 = _cs_rank(mom_5)
+    # =========================
+    # CROSS-SECTIONAL FEATURES
+    # =========================
+    cs_ret_3 = _cs_rank(ret_3)
+    cs_ret_5 = _cs_rank(ret_5)
+    cs_ret_10 = _cs_rank(ret_10)
     cs_mom_20 = _cs_rank(mom_20)
     cs_mom_60 = _cs_rank(mom_60)
     cs_mom_120 = _cs_rank(mom_120)
-
-    cs_rev_3 = _cs_rank(rev_3)
-    cs_rev_5 = _cs_rank(rev_5)
 
     cs_vol_20 = _cs_rank(-vol_20)
     cs_vol_60 = _cs_rank(-vol_60)
@@ -125,12 +128,12 @@ def build_feature_panel(prices: pd.DataFrame, config: MLEngineConfig | None = No
     cs_rel_mom_60 = _cs_rank(rel_mom_60)
 
     feature_map = {
-        "mom_5": mom_5,
+        "ret_3": ret_3,
+        "ret_5": ret_5,
+        "ret_10": ret_10,
         "mom_20": mom_20,
         "mom_60": mom_60,
         "mom_120": mom_120,
-        "rev_3": rev_3,
-        "rev_5": rev_5,
         "vol_20": vol_20,
         "vol_60": vol_60,
         "dist_ma20": dist_ma20,
@@ -143,12 +146,12 @@ def build_feature_panel(prices: pd.DataFrame, config: MLEngineConfig | None = No
         "rel_ret_1": rel_ret_1,
         "rel_mom_20": rel_mom_20,
         "rel_mom_60": rel_mom_60,
-        "cs_mom_5": cs_mom_5,
+        "cs_ret_3": cs_ret_3,
+        "cs_ret_5": cs_ret_5,
+        "cs_ret_10": cs_ret_10,
         "cs_mom_20": cs_mom_20,
         "cs_mom_60": cs_mom_60,
         "cs_mom_120": cs_mom_120,
-        "cs_rev_3": cs_rev_3,
-        "cs_rev_5": cs_rev_5,
         "cs_vol_20": cs_vol_20,
         "cs_vol_60": cs_vol_60,
         "cs_dist_ma20": cs_dist_ma20,
@@ -163,11 +166,16 @@ def build_feature_panel(prices: pd.DataFrame, config: MLEngineConfig | None = No
         "cs_rel_mom_60": cs_rel_mom_60,
     }
 
-    # critical anti-leakage step: lag all engineered features by 1 bar
+    # =========================
+    # ANTI-LEAKAGE: SHIFT 1 BAR
+    # =========================
     feature_map = {name: frame.shift(1) for name, frame in feature_map.items()}
 
-    # -------- future target: forward return from t+1 onward --------
-    fwd_ret = px.shift(-config.lookahead) / px.shift(-1) - 1.0
+    # =========================
+    # TARGET FUTURO
+    # retorno entre t e t+lookahead
+    # =========================
+    target_ret = px.shift(-config.lookahead) / px - 1.0
 
     rows = []
     for dt in px.index:
@@ -175,7 +183,7 @@ def build_feature_panel(prices: pd.DataFrame, config: MLEngineConfig | None = No
             row = {
                 "date": dt,
                 "asset": asset,
-                "target_ret": fwd_ret.loc[dt, asset],
+                "target_ret": target_ret.loc[dt, asset],
             }
             for name, frame in feature_map.items():
                 row[name] = frame.loc[dt, asset]
@@ -185,7 +193,10 @@ def build_feature_panel(prices: pd.DataFrame, config: MLEngineConfig | None = No
     df["date"] = pd.to_datetime(df["date"])
     df = df.replace([np.inf, -np.inf], np.nan).dropna()
 
-    # cross-sectional target at each date
+    # =========================
+    # TARGET CROSS-SECTIONAL
+    # top quantile do retorno futuro por data
+    # =========================
     df["target"] = (
         df.groupby("date")["target_ret"]
         .transform(lambda x: x >= x.quantile(1 - config.quantile_top))
