@@ -13,6 +13,15 @@ from metrics import compute_all_metrics
 from monte_carlo import MonteCarloConfig, run_monte_carlo
 from report_generator import build_institutional_report, save_report
 from risk_engine import RiskConfig, apply_portfolio_risk_overlay
+from paper_trading_engine import (
+    PaperTradingConfig,
+    ensure_paper_files,
+    load_paper_state,
+    read_paper_equity,
+    read_paper_trades,
+    reset_paper_state,
+    run_paper_cycle,
+)
 
 
 st.set_page_config(page_title="Invest Pro Bot", layout="wide")
@@ -308,8 +317,27 @@ def plot_filter_states(filters_df: pd.DataFrame):
     return fig
 
 
+def plot_paper_equity(paper_equity_df: pd.DataFrame):
+    fig = go.Figure()
+    fig.add_trace(
+        go.Scatter(
+            x=paper_equity_df["timestamp"],
+            y=paper_equity_df["equity_after"],
+            mode="lines+markers",
+            name="Paper Equity",
+        )
+    )
+    fig.update_layout(
+        template="plotly_dark",
+        height=320,
+        title="Paper Trading Equity",
+    )
+    return fig
+
+
 def main():
     inject_css()
+    ensure_paper_files()
 
     st.title("Invest Pro Bot - Sistema de Pesquisa e Negociação Quantitativa Institucional")
     st.caption("Robustez > rentabilidade | estatística > intuição | validação > pressupostos")
@@ -340,83 +368,158 @@ def main():
 
     if not run:
         st.info("Configure e execute.")
-        return
+    else:
+        try:
+            result = run_pipeline(
+                start_date,
+                capital,
+                threshold,
+                top_n,
+                delay,
+                fast_mode,
+                bull_filter,
+                vol_filter,
+                vol_limit,
+                cash_threshold,
+                target_vol,
+                holdout_ratio,
+            )
+        except Exception as e:
+            st.error(f"Erro: {e}")
+            result = None
 
-    try:
-        result = run_pipeline(
-            start_date,
-            capital,
-            threshold,
-            top_n,
-            delay,
-            fast_mode,
-            bull_filter,
-            vol_filter,
-            vol_limit,
-            cash_threshold,
-            target_vol,
-            holdout_ratio,
-        )
-    except Exception as e:
-        st.error(f"Erro: {e}")
-        return
+        if result is not None:
+            wf = result["wf"]
+            research_metrics = result["research_metrics"]
+            holdout_metrics = result["holdout_metrics"]
 
-    wf = result["wf"]
-    research_metrics = result["research_metrics"]
-    holdout_metrics = result["holdout_metrics"]
+            st.subheader("Métricas da pesquisa (walk-forward)")
+            c1, c2, c3, c4 = st.columns(4)
+            c1.metric("Sharpe Pesquisa", f"{research_metrics['sharpe']:.2f}")
+            c2.metric("Sortino Pesquisa", f"{research_metrics['sortino']:.2f}")
+            c3.metric("Calmar Pesquisa", f"{research_metrics['calmar']:.2f}")
+            c4.metric("Max DD Pesquisa", f"{research_metrics['max_drawdown']:.2%}")
 
-    st.subheader("Métricas da pesquisa (walk-forward)")
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Sharpe Pesquisa", f"{research_metrics['sharpe']:.2f}")
-    c2.metric("Sortino Pesquisa", f"{research_metrics['sortino']:.2f}")
-    c3.metric("Calmar Pesquisa", f"{research_metrics['calmar']:.2f}")
-    c4.metric("Max DD Pesquisa", f"{research_metrics['max_drawdown']:.2%}")
+            st.subheader("Métricas do holdout final")
+            h1, h2, h3 = st.columns(3)
+            h1.metric("Strategy Sharpe", f"{holdout_metrics['sharpe']:.2f}")
+            h2.metric("SPY Sharpe", f"{wf['holdout_spy_metrics']['sharpe']:.2f}")
+            h3.metric("Random Sharpe", f"{wf['holdout_random_metrics']['sharpe']:.2f}")
 
-    st.subheader("Métricas do holdout final")
-    h1, h2, h3 = st.columns(3)
-    h1.metric("Strategy Sharpe", f"{holdout_metrics['sharpe']:.2f}")
-    h2.metric("SPY Sharpe", f"{wf['holdout_spy_metrics']['sharpe']:.2f}")
-    h3.metric("Random Sharpe", f"{wf['holdout_random_metrics']['sharpe']:.2f}")
+            st.caption(
+                f"Walk-forward usado: train={result['wf_config_used']['train_window']} | "
+                f"test={result['wf_config_used']['test_window']} | "
+                f"step={result['wf_config_used']['step_size']} | "
+                f"embargo={result['wf_config_used']['embargo']} | "
+                f"holdout={result['wf_config_used']['holdout_ratio']:.0%}"
+            )
 
-    st.caption(
-        f"Walk-forward usado: train={result['wf_config_used']['train_window']} | "
-        f"test={result['wf_config_used']['test_window']} | "
-        f"step={result['wf_config_used']['step_size']} | "
-        f"embargo={result['wf_config_used']['embargo']} | "
-        f"holdout={result['wf_config_used']['holdout_ratio']:.0%}"
+            st.plotly_chart(
+                plot_holdout_comparison(
+                    result["holdout_bt"],
+                    wf["holdout_spy_backtest"],
+                    wf["holdout_random_backtest"],
+                ),
+                use_container_width=True,
+            )
+
+            left, right = st.columns(2)
+            with left:
+                st.plotly_chart(plot_equity(result["research_bt"], "Equity Curve - Pesquisa"), use_container_width=True)
+            with right:
+                st.plotly_chart(plot_equity(result["holdout_bt"], "Equity Curve - Holdout"), use_container_width=True)
+
+            left2, right2 = st.columns(2)
+            with left2:
+                st.plotly_chart(plot_drawdown(result["research_bt"], "Drawdown - Pesquisa"), use_container_width=True)
+            with right2:
+                st.plotly_chart(plot_drawdown(result["holdout_bt"], "Drawdown - Holdout"), use_container_width=True)
+
+            st.plotly_chart(
+                px.histogram(result["mc"]["simulations"], x="sharpe", title="Distribuição de Sharpe - Monte Carlo (Holdout)"),
+                use_container_width=True,
+            )
+
+            st.plotly_chart(plot_filter_states(result["filters"]), use_container_width=True)
+            st.dataframe(wf["fold_metrics"], use_container_width=True)
+
+            with st.expander("Relatório institucional"):
+                st.json(result["report"])
+
+    st.divider()
+    st.subheader("Paper Trading")
+
+    paper_cfg = PaperTradingConfig(
+        start_date=start_date,
+        initial_capital=capital,
+        probability_threshold=threshold,
+        top_n=top_n,
+        use_regime_filter=bull_filter,
+        use_volatility_filter=vol_filter,
+        vol_threshold=vol_limit,
+        cash_threshold=cash_threshold,
+        target_portfolio_vol=target_vol,
     )
 
-    st.plotly_chart(
-        plot_holdout_comparison(
-            result["holdout_bt"],
-            wf["holdout_spy_backtest"],
-            wf["holdout_random_backtest"],
-        ),
-        use_container_width=True,
-    )
+    col_a, col_b = st.columns(2)
+    with col_a:
+        if st.button("Rodar ciclo de paper trading", use_container_width=True):
+            try:
+                cycle_result = run_paper_cycle(paper_cfg)
+                st.success(f"Ciclo executado com sucesso. Trades: {cycle_result['trades_executed']}")
+            except Exception as e:
+                st.error(f"Erro no paper trading: {e}")
 
-    left, right = st.columns(2)
-    with left:
-        st.plotly_chart(plot_equity(result["research_bt"], "Equity Curve - Pesquisa"), use_container_width=True)
-    with right:
-        st.plotly_chart(plot_equity(result["holdout_bt"], "Equity Curve - Holdout"), use_container_width=True)
+    with col_b:
+        if st.button("Resetar paper trading", use_container_width=True):
+            reset_paper_state(paper_cfg)
+            st.warning("Paper trading resetado.")
 
-    left2, right2 = st.columns(2)
-    with left2:
-        st.plotly_chart(plot_drawdown(result["research_bt"], "Drawdown - Pesquisa"), use_container_width=True)
-    with right2:
-        st.plotly_chart(plot_drawdown(result["holdout_bt"], "Drawdown - Holdout"), use_container_width=True)
+    state = load_paper_state()
+    paper_equity_df = read_paper_equity(limit=300)
+    paper_trades = read_paper_trades(limit=50)
 
-    st.plotly_chart(
-        px.histogram(result["mc"]["simulations"], x="sharpe", title="Distribuição de Sharpe - Monte Carlo (Holdout)"),
-        use_container_width=True,
-    )
+    p1, p2, p3, p4 = st.columns(4)
+    p1.metric("Cash", f"{state.get('cash', 0.0):,.2f}")
+    p2.metric("Equity", f"{state.get('equity', 0.0):,.2f}")
+    p3.metric("Posições", f"{len(state.get('positions', {}))}")
+    p4.metric("Runs", f"{state.get('run_count', 0)}")
 
-    st.plotly_chart(plot_filter_states(result["filters"]), use_container_width=True)
-    st.dataframe(wf["fold_metrics"], use_container_width=True)
+    if not paper_equity_df.empty:
+        st.plotly_chart(plot_paper_equity(paper_equity_df), use_container_width=True)
 
-    with st.expander("Relatório institucional"):
-        st.json(result["report"])
+    left3, right3 = st.columns(2)
+
+    with left3:
+        st.markdown("### Posições atuais")
+        positions = state.get("positions", {}) or {}
+        if positions:
+            rows = []
+            last_prices = state.get("last_prices", {}) or {}
+            for asset, pos in positions.items():
+                qty = float(pos.get("quantity", 0.0))
+                px = float(last_prices.get(asset, pos.get("last_price", 0.0)))
+                rows.append(
+                    {
+                        "asset": asset,
+                        "quantity": qty,
+                        "last_price": px,
+                        "market_value": qty * px,
+                    }
+                )
+            st.dataframe(pd.DataFrame(rows), use_container_width=True)
+        else:
+            st.info("Sem posições abertas no paper trading.")
+
+    with right3:
+        st.markdown("### Últimos trades")
+        if paper_trades:
+            st.dataframe(pd.DataFrame(paper_trades[::-1]), use_container_width=True)
+        else:
+            st.info("Sem trades ainda.")
+
+    with st.expander("Estado bruto do paper trading"):
+        st.json(state)
 
 
 if __name__ == "__main__":
