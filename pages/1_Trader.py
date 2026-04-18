@@ -102,6 +102,52 @@ def align_orders_to_chart(df_orders: pd.DataFrame, df_chart: pd.DataFrame, ticke
     if orders.empty:
         return pd.DataFrame()
 
+    # --- FORÇA timestamp para datetime puro (sem timezone e sem ambiguidade)
+    orders["timestamp"] = pd.to_datetime(orders["timestamp"], errors="coerce")
+    orders = orders.dropna(subset=["timestamp"])
+
+    # 🔥 CONVERTE PARA INT64 (SOLUÇÃO DEFINITIVA)
+    orders["ts_int"] = orders["timestamp"].astype("int64")
+
+    chart_index = pd.DataFrame({"chart_time": df_chart.index})
+    chart_index["chart_time"] = pd.to_datetime(chart_index["chart_time"], errors="coerce")
+
+    # 🔥 MESMA CONVERSÃO
+    chart_index["ts_int"] = chart_index["chart_time"].astype("int64")
+
+    orders = orders.sort_values("ts_int")
+    chart_index = chart_index.sort_values("ts_int")
+
+    # 🔥 AGORA NÃO TEM COMO DAR ERRO
+    aligned = pd.merge_asof(
+        orders,
+        chart_index,
+        left_on="ts_int",
+        right_on="ts_int",
+        direction="nearest",
+    )
+
+    aligned["plot_time"] = aligned["chart_time"]
+
+    # preço
+    aligned["plot_price"] = pd.to_numeric(aligned.get("price"), errors="coerce")
+
+    # fallback
+    missing = aligned["plot_price"].isna()
+    if missing.any():
+        aligned.loc[missing, "plot_price"] = aligned.loc[missing, "plot_time"].map(df_chart["close"])
+
+    aligned = aligned.dropna(subset=["plot_time", "plot_price"])
+
+    return aligned -> pd.DataFrame:
+    if df_orders.empty or df_chart.empty:
+        return pd.DataFrame()
+
+    orders = df_orders.copy()
+    orders = orders[orders["asset"] == ticker.upper()].copy()
+    if orders.empty:
+        return pd.DataFrame()
+
     # 🔥 CORREÇÃO PRINCIPAL
     orders["timestamp"] = pd.to_datetime(orders["timestamp"], errors="coerce")
     orders = orders.dropna(subset=["timestamp"])
