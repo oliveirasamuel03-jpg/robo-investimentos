@@ -179,3 +179,17 @@ def read_paper_equity():
     equity = [balance * (1 + i * 0.001) for i in range(50)]
 
     return equity
+# =========================
+# TRADES READER (ÚLTIMO)
+# =========================
+def read_paper_trades():
+    import os
+    import json
+
+    path = "data/paper_trades.json"
+
+    if not os.path.exists(path):
+        return []
+
+    with open(path, "r") as f:
+        return json.load(f)
