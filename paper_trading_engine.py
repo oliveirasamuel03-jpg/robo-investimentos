@@ -114,3 +114,30 @@ def build_paper_report(result: dict) -> dict:
         "signals": len(result.get("signals", [])),
         "status": "running",
     }
+# =========================
+# FILE SETUP (FALTAVA ISSO)
+# =========================
+import os
+import json
+
+
+def ensure_paper_files():
+    base_path = "data"
+
+    os.makedirs(base_path, exist_ok=True)
+
+    files = {
+        "paper_state.json": {
+            "balance": 10000,
+            "positions": [],
+            "history": []
+        },
+        "paper_trades.json": []
+    }
+
+    for file_name, default_content in files.items():
+        path = os.path.join(base_path, file_name)
+
+        if not os.path.exists(path):
+            with open(path, "w") as f:
+                json.dump(default_content, f)
