@@ -71,6 +71,14 @@ def _append_jsonl(path: Path, payload: dict) -> None:
         f.write(json.dumps(payload, ensure_ascii=False) + "\n")
 
 
+def _safe_reset_index_with_date(df: pd.DataFrame) -> pd.DataFrame:
+    out = df.reset_index().copy()
+    if "date" not in out.columns:
+        out = out.rename(columns={out.columns[0]: "date"})
+    out["date"] = pd.to_datetime(out["date"])
+    return out
+
+
 def ensure_paper_files(config: PaperTradingConfig | None = None) -> None:
     if config is None:
         config = PaperTradingConfig()
@@ -212,7 +220,8 @@ def _build_target_weights_for_live_date(
         vol_threshold=config.vol_threshold,
         use_regime_filter=config.use_regime_filter,
         use_volatility_filter=config.use_volatility_filter,
-    ).reset_index().rename(columns={"index": "date"})
+    )
+    filters = _safe_reset_index_with_date(filters)
 
     weighted = generate_target_weights(
         predictions=pred_df,
@@ -250,15 +259,6 @@ def _build_target_weights_for_live_date(
 def _latest_price_map(prices: pd.DataFrame, signal_date: pd.Timestamp) -> dict[str, float]:
     row = prices.loc[signal_date]
     return {str(asset): _safe_float(px) for asset, px in row.items() if pd.notna(px)}
-
-
-def _current_position_values(state: dict, latest_prices: dict[str, float]) -> dict[str, float]:
-    values: dict[str, float] = {}
-    for asset, pos in (state.get("positions", {}) or {}).items():
-        qty = _safe_float(pos.get("quantity", 0.0))
-        px = _safe_float(latest_prices.get(asset), _safe_float(pos.get("last_price", 0.0)))
-        values[asset] = qty * px
-    return values
 
 
 def _target_notional_map(
