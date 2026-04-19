@@ -1,82 +1,145 @@
 # Deploy no Railway
 
-Este projeto deve ser publicado no Railway com dois services separados apontando para o mesmo repositório:
+Este projeto deve ser publicado com tres componentes no mesmo projeto Railway:
 
 - `web`: interface Streamlit
-- `worker`: processo 24h do trader
+- `worker`: loop continuo do trader
+- `Postgres`: persistencia compartilhada
 
-## Por que separar
+## Antes de comecar
 
-O Railway recomenda worker como um service separado e always-on. Isso evita misturar a interface web com o loop contínuo do robô.
+Confirme que a branch com as alteracoes ja foi mergeada na `main`.
 
-## Service 1: Web
+## Passo 1. Criar ou abrir o projeto no Railway
 
-Crie um service a partir deste repositório e configure:
+1. Entre no Railway.
+2. Crie um projeto novo ou abra o projeto existente.
+3. Conecte o repositorio `oliveirasamuel03-jpg/robo-investimentos`.
 
-- Start Command:
+## Passo 2. Criar o service web
+
+1. Clique em `Add Service`.
+2. Escolha `GitHub Repo`.
+3. Selecione o repositorio.
+4. No service `web`, abra `Settings`.
+5. Em `Start Command`, configure:
 
 ```bash
 streamlit run app.py --server.address 0.0.0.0 --server.port $PORT
 ```
 
-- Healthcheck:
-  use `/` ou deixe sem healthcheck customizado
+6. Gere um dominio publico em `Networking` ou `Domains`.
 
-## Service 2: Worker
+## Passo 3. Criar o service worker
 
-Crie outro service no mesmo projeto Railway usando o mesmo repositório e configure:
-
-- Start Command:
+1. No mesmo projeto, clique em `Add Service`.
+2. Escolha o mesmo repositorio.
+3. Renomeie o service para algo como `worker`.
+4. Em `Settings`, configure:
 
 ```bash
 python -m workers.trader_worker
 ```
 
-Esse processo roda continuamente e atualiza:
+O worker nao precisa de dominio publico.
 
-- `worker_status`
-- `worker_heartbeat`
-- `cash`
-- `equity`
-- `positions`
+## Passo 4. Adicionar Postgres
 
-## Service 3: Postgres compartilhado
+1. Clique em `Add Service`.
+2. Escolha `Database` e depois `Postgres`.
+3. Aguarde o Railway provisionar o banco.
 
-Para o `web` e o `worker` enxergarem o mesmo estado em produção, adicione também um service de Postgres no mesmo projeto Railway.
+Quando o banco ficar pronto, o Railway cria a variavel `DATABASE_URL`.
 
-Quando o Railway criar a variável `DATABASE_URL`, o projeto passa a usar o banco automaticamente para compartilhar:
+## Passo 5. Variaveis de ambiente
 
-- `bot_state`
-- `paper_state`
-- `paper_trades`
-- `trader_orders`
-- `investor_orders`
-- `bot_log`
+No service `web` e no service `worker`, configure:
 
-Sem `DATABASE_URL`, o projeto continua em modo local usando arquivos na pasta `storage/`.
+```env
+APP_ENV=production
+AUTH_REQUIRED=true
+```
 
-## Variáveis e storage
+Opcional para bootstrap do primeiro admin:
 
-- `DATABASE_URL`: fornecida automaticamente pelo Postgres do Railway
-- nenhum volume compartilhado é necessário para o estado principal quando o banco estiver ativo
-- a pasta `storage/` continua sendo o fallback local para desenvolvimento
+```env
+ADMIN_USERNAME=seu_admin
+ADMIN_PASSWORD=sua_senha_forte
+```
 
-## Fluxo recomendado
+Observacoes:
 
-1. Fazer merge do PR com as correções do paper trading.
-2. Deployar o `web` com o comando do Streamlit.
-3. Adicionar um service de Postgres no mesmo projeto.
-4. Confirmar que `DATABASE_URL` foi injetada no `web` e no `worker`.
-5. Deployar o `worker` com `python -m workers.trader_worker`.
-6. Abrir a interface e mudar o bot para `RUNNING`.
-7. Conferir se o painel mostra o worker como `online`.
+- se `ADMIN_USERNAME` e `ADMIN_PASSWORD` nao forem definidos, o app permite criar o primeiro admin na tela de login
+- `DATABASE_URL` deve estar presente no `web` e no `worker`
+- `ROBO_STORAGE_DIR` e opcional; em producao com Postgres o estado principal vem do banco
 
-## Checklist de validação
+## Passo 6. Fazer deploy
 
-- O site abre no domínio do Railway.
-- O botão `Rodar agora` funciona.
-- `web` e `worker` têm a variável `DATABASE_URL`.
-- O `worker_status` muda para `online`.
-- O `worker_heartbeat` atualiza sozinho.
-- `cash` e `equity` deixam de ficar travados.
-- Trades começam a aparecer quando houver sinal.
+1. Rode o deploy do `web`.
+2. Rode o deploy do `worker`.
+3. Confirme que os dois services ficaram saudaveis.
+
+## Passo 7. Validacao pos-deploy
+
+### Web
+
+1. Abra o dominio do `web`.
+2. Confirme que a tela de login abre.
+3. Faça login com admin.
+4. Entre em `Trader`.
+
+### Worker
+
+1. Coloque o bot em `RUNNING`.
+2. Aguarde 1 ou 2 minutos.
+3. Valide:
+   - `worker_status` como `online`
+   - `worker_heartbeat` atualizado
+   - `cash` e `equity` carregando
+   - ordens e historico sendo atualizados
+
+## Troubleshooting
+
+### O web nao sobe
+
+Cheque:
+
+- `Start Command` do Streamlit
+- dominio gerado no service correto
+- logs do deploy
+
+### O worker fica offline
+
+Cheque:
+
+- `Start Command` do worker
+- `DATABASE_URL` disponivel
+- logs do worker
+- bot em `RUNNING`
+
+### O app abre mas o estado parece inconsistente
+
+Quase sempre significa que:
+
+- o `web` e o `worker` nao estao lendo o mesmo `DATABASE_URL`
+- ou um dos services ainda esta em commit antigo
+
+Nesses casos:
+
+1. confirme a `main` atual no GitHub
+2. use `Redeploy` no `web`
+3. use `Redeploy` no `worker`
+
+## Comandos de referencia
+
+Web:
+
+```bash
+streamlit run app.py --server.address 0.0.0.0 --server.port $PORT
+```
+
+Worker:
+
+```bash
+python -m workers.trader_worker
+```

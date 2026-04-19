@@ -1,371 +1,228 @@
-import json
-import math
-import time
-from dataclasses import asdict, dataclass
-from datetime import date, datetime, timedelta
-from pathlib import Path
-from typing import Any
-
-import pandas as pd
-import yfinance as yf
-
-
-APP_DIR = Path(__file__).resolve().parent
-CONFIG_PATH = APP_DIR / "runtime_config.json"
-STATE_PATH = APP_DIR / "bot_state.json"
-LOG_PATH = APP_DIR / "bot_logs.jsonl"
-
-DEFAULT_TICKERS = [
-    "VALE3.SA",
-    "PETR4.SA",
-    "ITUB4.SA",
-    "BBDC4.SA",
-    "BBAS3.SA",
-    "WEGE3.SA",
-]
-
-
-@dataclass
-class StrategyConfig:
-    capital_inicial: float = 1000.0
-    capital_por_operacao: float = 250.0
-    media_curta: int = 9
-    media_longa: int = 21
-    media_tendencia: int = 50
-    periodo_rsi: int = 14
-    rsi_compra_max: float = 68.0
-    rsi_venda_min: float = 75.0
-    stop_loss_pct: float = 3.0
-    taxa_operacao_pct: float = 0.1
-
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
-
-DEFAULT_RUNTIME = {
-    "enabled": False,
-    "mode": "paper",
-    "interval_minutes": 5,
-    "capital_total": 1000.0,
-    "capital_por_operacao": 250.0,
-    "backtest_start": "2020-01-01",
-    "tickers": DEFAULT_TICKERS,
-    "strategy": StrategyConfig().to_dict(),
-}
-
-DEFAULT_STATE = {
-    "cash": 1000.0,
-    "positions": {},
-    "trade_history": [],
-    "last_run_at": None,
-    "run_count": 0,
-}
-
-
-def now_iso() -> str:
-    return datetime.now().isoformat(timespec="seconds")
-
-
-def ensure_runtime_files() -> None:
-    if not CONFIG_PATH.exists():
-        CONFIG_PATH.write_text(json.dumps(DEFAULT_RUNTIME, indent=2), encoding="utf-8")
-    if not STATE_PATH.exists():
-        STATE_PATH.write_text(json.dumps(DEFAULT_STATE, indent=2), encoding="utf-8")
-    if not LOG_PATH.exists():
-        LOG_PATH.write_text("", encoding="utf-8")
-
-
-def load_json(path: Path, fallback: dict) -> dict:
-    if not path.exists():
-        return fallback.copy()
-    return json.loads(path.read_text(encoding="utf-8"))
-
-
-def save_json(path: Path, data: dict) -> None:
-    path.write_text(json.dumps(data, indent=2, ensure_ascii=True), encoding="utf-8")
-
-
-def load_runtime_config() -> dict:
-    ensure_runtime_files()
-    runtime = load_json(CONFIG_PATH, DEFAULT_RUNTIME)
-    runtime.setdefault("strategy", StrategyConfig().to_dict())
-    runtime.setdefault("tickers", DEFAULT_TICKERS)
-    runtime.setdefault("mode", "paper")
-    runtime.setdefault("enabled", False)
-    return runtime
-
-
-def save_runtime_config(runtime: dict) -> None:
-    save_json(CONFIG_PATH, runtime)
-
-
-def load_bot_state() -> dict:
-    ensure_runtime_files()
-    state = load_json(STATE_PATH, DEFAULT_STATE)
-    state.setdefault("cash", float(DEFAULT_STATE["cash"]))
-    state.setdefault("positions", {})
-    state.setdefault("trade_history", [])
-    state.setdefault("run_count", 0)
-    return state
-
-
-def save_bot_state(state: dict) -> None:
-    save_json(STATE_PATH, state)
-
-
-def reset_bot_state(capital_total: float) -> dict:
-    state = {
-        "cash": float(capital_total),
-        "positions": {},
-        "trade_history": [],
-        "last_run_at": None,
-        "run_count": 0,
-    }
-    save_bot_state(state)
-    append_log("INFO", "Conta paper reiniciada.", {"capital_total": capital_total})
-    return state
-
-
-def append_log(level: str, message: str, context: dict | None = None) -> None:
-    payload = {
-        "timestamp": now_iso(),
-        "level": level,
-        "message": message,
-        "context": context or {},
-    }
-    with LOG_PATH.open("a", encoding="utf-8") as log_file:
-        log_file.write(json.dumps(payload, ensure_ascii=True) + "\n")
-
-
-def read_logs(limit: int = 50) -> list[dict]:
-    ensure_runtime_files()
-    lines = LOG_PATH.read_text(encoding="utf-8").splitlines()
-    return [json.loads(line) for line in lines[-limit:] if line.strip()]
-
-
-def normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
-    data = df.copy()
-    if isinstance(data.columns, pd.MultiIndex):
-        data.columns = data.columns.get_level_values(0)
-    data.columns = [str(col).title() for col in data.columns]
-    return data
-
-
-def download_ticker_data(ticker: str, start_date: date) -> pd.DataFrame:
-    df = yf.download(
-        ticker,
-        start=start_date.isoformat(),
-        end=(date.today() + timedelta(days=1)).isoformat(),
-        progress=False,
-        auto_adjust=False,
-    )
-    df = normalize_columns(df)
-    if df.empty:
-        raise ValueError(f"Sem dados para {ticker}")
-    return df
-
-
-def calc_rsi(series: pd.Series, period: int = 14) -> pd.Series:
-    delta = series.diff()
-    gain = delta.clip(lower=0).rolling(period).mean()
-    loss = (-delta.clip(upper=0)).rolling(period).mean()
-    rs = gain / loss.replace(0, pd.NA)
-    return (100 - (100 / (1 + rs))).fillna(50)
-
-
-def enrich_indicators(df: pd.DataFrame, strategy: StrategyConfig) -> pd.DataFrame:
-    data = df.copy()
-    close = data["Close"]
-    data["media_curta"] = close.rolling(strategy.media_curta).mean()
-    data["media_longa"] = close.rolling(strategy.media_longa).mean()
-    data["media_tendencia"] = close.rolling(strategy.media_tendencia).mean()
-    data["rsi"] = calc_rsi(close, strategy.periodo_rsi)
-    data["sinal"] = 0
-    data.loc[data["media_curta"] > data["media_longa"], "sinal"] = 1
-    data.loc[data["media_curta"] < data["media_longa"], "sinal"] = -1
-    return data.dropna().copy()
-
-
-def max_drawdown(equity_curve: pd.Series) -> float:
-    running_peak = equity_curve.cummax()
-    drawdown = (equity_curve / running_peak) - 1
-    return float(drawdown.min()) if not drawdown.empty else 0.0
-
-
-def run_backtest_for_ticker(ticker: str, strategy: StrategyConfig, start_date: date) -> dict:
-    data = enrich_indicators(download_ticker_data(ticker, start_date), strategy)
-    capital = float(strategy.capital_inicial)
-    quantity = 0.0
-    buy_price = 0.0
-    fee_factor = 1 - (strategy.taxa_operacao_pct / 100)
-    stop_factor = 1 - (strategy.stop_loss_pct / 100)
-    equity = []
-
-    for _, row in data.iterrows():
-        price = float(row["Close"])
-        signal = int(row["sinal"])
-        rsi = float(row["rsi"])
-        trend = float(row["media_tendencia"])
-
-        if signal == 1 and capital > 0 and rsi <= strategy.rsi_compra_max and price >= trend:
-            quantity = (capital * fee_factor) / price
-            capital = 0.0
-            buy_price = price
-        elif quantity > 0 and (signal == -1 or rsi >= strategy.rsi_venda_min or price <= buy_price * stop_factor):
-            capital = quantity * price * fee_factor
-            quantity = 0.0
-            buy_price = 0.0
-
-        equity.append(capital + quantity * price)
-
-    equity_curve = pd.Series(equity, index=data.index, name="equity")
-    final_value = float(equity_curve.iloc[-1])
-    summary = {
-        "Ativo": ticker,
-        "Valor final": final_value,
-        "Lucro": final_value - strategy.capital_inicial,
-        "Retorno %": ((final_value / strategy.capital_inicial) - 1) * 100,
-        "Drawdown %": max_drawdown(equity_curve) * 100,
-    }
-    return {"summary": summary, "data": data, "equity": equity_curve}
-
-
-def make_trade_record(ticker: str, side: str, quantity: float, price: float, reason: str) -> dict:
-    return {
-        "timestamp": now_iso(),
-        "ticker": ticker,
-        "side": side,
-        "quantity": round(quantity, 6),
-        "price": round(price, 4),
-        "gross_value": round(quantity * price, 2),
-        "reason": reason,
-    }
-
-
-def _position_snapshot(quantity: float, avg_price: float, stop_price: float, last_price: float, last_rsi: float) -> dict:
-    return {
-        "quantity": round(quantity, 6),
-        "avg_price": round(avg_price, 4),
-        "stop_price": round(stop_price, 4),
-        "last_price": round(last_price, 4),
-        "last_rsi": round(last_rsi, 2),
-        "updated_at": now_iso(),
-    }
-
-
-def evaluate_ticker(state: dict, runtime: dict, ticker: str, data: pd.DataFrame, strategy: StrategyConfig) -> list[dict]:
-    latest = data.iloc[-1]
-    price = float(latest["Close"])
-    signal = int(latest["sinal"])
-    rsi = float(latest["rsi"])
-    trend = float(latest["media_tendencia"])
-    fee_factor = 1 - (strategy.taxa_operacao_pct / 100)
-    max_capital = min(float(runtime["capital_por_operacao"]), float(state["cash"]))
-    trades = []
-
-    if ticker in state["positions"]:
-        position = state["positions"][ticker]
-        stop_price = float(position["stop_price"])
-        sell_signal = signal == -1 or rsi >= strategy.rsi_venda_min or price <= stop_price
-        if sell_signal:
-            quantity = float(position["quantity"])
-            proceeds = quantity * price * fee_factor
-            state["cash"] = round(float(state["cash"]) + proceeds, 2)
-            trades.append(make_trade_record(ticker, "SELL", quantity, price, "saida tecnica"))
-            del state["positions"][ticker]
-        else:
-            state["positions"][ticker] = _position_snapshot(
-                quantity=float(position["quantity"]),
-                avg_price=float(position["avg_price"]),
-                stop_price=float(position["stop_price"]),
-                last_price=price,
-                last_rsi=rsi,
-            )
-        return trades
-
-    should_buy = signal == 1 and rsi <= strategy.rsi_compra_max and price >= trend
-    if should_buy and max_capital >= 50:
-        quantity = (max_capital * fee_factor) / price
-        if quantity > 0 and not math.isclose(quantity, 0.0):
-            state["cash"] = round(float(state["cash"]) - max_capital, 2)
-            stop_price = price * (1 - (strategy.stop_loss_pct / 100))
-            state["positions"][ticker] = _position_snapshot(quantity, price, stop_price, price, rsi)
-            trades.append(make_trade_record(ticker, "BUY", quantity, price, "entrada tecnica"))
-    return trades
-
-
-def scan_market() -> dict:
-    ensure_runtime_files()
-    runtime = load_runtime_config()
-    state = load_bot_state()
-    strategy_data = dict(runtime["strategy"])
-    strategy_data["capital_inicial"] = float(runtime["capital_total"])
-    strategy_data["capital_por_operacao"] = float(runtime["capital_por_operacao"])
-    strategy = StrategyConfig(**strategy_data)
-
-    if runtime.get("mode") != "paper":
-        append_log("ERROR", "Modo real ainda nao implementado. Nenhuma ordem enviada.")
-        return {"status": "blocked", "errors": ["real mode not implemented"], "trades": []}
-
-    if float(state["cash"]) <= 0 and not state["positions"]:
-        state["cash"] = float(runtime["capital_total"])
-
-    trades = []
-    errors = []
-    start_date = date.fromisoformat(runtime["backtest_start"])
-
-    for ticker in runtime["tickers"]:
-        try:
-            data = enrich_indicators(download_ticker_data(ticker, start_date), strategy)
-            ticker_trades = evaluate_ticker(state, runtime, ticker, data, strategy)
-            trades.extend(ticker_trades)
-        except Exception as exc:
-            errors.append(f"{ticker}: {exc}")
-
-    state["trade_history"].extend(trades)
-    state["trade_history"] = state["trade_history"][-300:]
-    state["last_run_at"] = now_iso()
-    state["run_count"] = int(state.get("run_count", 0)) + 1
-    save_bot_state(state)
-
-    if trades:
-        for trade in trades:
-            append_log("INFO", f"{trade['side']} {trade['ticker']} por {trade['price']}", trade)
-    if errors:
-        for error in errors:
-            append_log("ERROR", error)
-    if not trades and not errors:
-        append_log("INFO", "Ciclo executado sem novas ordens.")
-
-    return {
-        "status": "ok" if not errors else "partial",
-        "trades": trades,
-        "errors": errors,
-        "positions": state["positions"],
-        "cash": state["cash"],
-        "last_run_at": state["last_run_at"],
-    }
-
-
-def run_forever(sleep_seconds: int | None = None) -> None:
-    ensure_runtime_files()
-    append_log("INFO", "Runner iniciado.")
-    while True:
-        runtime = load_runtime_config()
-        if runtime.get("enabled"):
-            scan_market()
-        else:
-            append_log("INFO", "Runner acordou, mas o robo esta pausado.")
-
-        wait_seconds = sleep_seconds or int(runtime.get("interval_minutes", 5)) * 60
-        time.sleep(max(wait_seconds, 30))
-
-
-## Deploy no Railway
-
-Para rodar 24h no Railway, use dois services separados apontando para o mesmo repositório:
-
-- `web`: `streamlit run app.py --server.address 0.0.0.0 --server.port $PORT`
-- `worker`: `python -m workers.trader_worker`
-
-O guia completo está em [DEPLOY_RAILWAY.md](DEPLOY_RAILWAY.md).
+# Robo de Investimentos
+
+Plataforma de trading e pesquisa em Streamlit com dois fluxos principais:
+
+- `Trader`: operacao automatizada em paper trading com worker continuo.
+- `Investimento`: pesquisa institucional, backtest, walk-forward e analise de carteira.
+
+O projeto foi endurecido para uso local e deploy com separacao clara entre codigo-fonte, estado de execucao, autenticacao e persistencia compartilhada.
+
+## Visao geral
+
+Esta base combina:
+
+- interface Streamlit multipagina
+- worker continuo para o trader
+- paper trading com sincronizacao de estado
+- persistencia local em arquivos JSON/CSV
+- persistencia compartilhada em PostgreSQL quando `DATABASE_URL` estiver configurado
+- autenticacao com hash de senha e controle por perfil
+
+O objetivo e manter o comportamento atual do app sem simplificar a plataforma, mas deixando o repositório mais previsivel para desenvolvimento e deploy.
+
+## Arquitetura atual
+
+### Interface
+
+- `app.py`: ponto de entrada principal do app
+- `pages/0_Login.py`: login e bootstrap do primeiro admin
+- `pages/1_Trader.py`: painel do trader
+- `pages/2_Investimento.py`: pesquisa institucional
+- `pages/3_Carteira.py`: carteira e capital
+- `pages/4_Controle_do_Bot.py`: acoes administrativas
+- `pages/5_Historico.py`: auditoria de ordens e logs
+
+### Nucleo
+
+- `core/config.py`: configuracao central, env vars e diretorios
+- `core/persistence.py`: persistencia local e PostgreSQL
+- `core/state_store.py`: estado do app trader/investimento
+- `core/auth/`: autenticacao, sessao e autorizacao
+- `core/ui.py`: utilitarios visuais compartilhados
+
+### Engines
+
+- `engines/trader_engine.py`: orquestracao do ciclo do trader
+- `engines/quant_bridge.py`: ponte de compatibilidade entre engines
+- `engines/investment_research_engine.py`: pipeline de pesquisa
+- `paper_trading_engine.py`: simulacao e estado do paper trading
+
+### Execucao
+
+- `workers/trader_worker.py`: loop continuo do trader
+- `bot_engine.py` e `bot_runner.py`: compatibilidade com fluxo legado
+
+## Estrutura de pastas
+
+```text
+.
+|-- app.py
+|-- core/
+|   |-- auth/
+|   |-- config.py
+|   |-- persistence.py
+|   |-- state_store.py
+|   `-- ui.py
+|-- engines/
+|-- institutional/
+|-- pages/
+|-- portfolio/
+|-- storage/
+|   |-- cache/
+|   |-- reports/
+|   `-- runtime/
+|-- workers/
+|-- requirements.txt
+|-- requirements-dev.txt
+`-- DEPLOY_RAILWAY.md
+```
+
+## Persistencia e runtime
+
+O projeto opera em dois modos:
+
+- sem `DATABASE_URL`: usa arquivos locais em `storage/runtime/`
+- com `DATABASE_URL`: usa PostgreSQL para estado compartilhado e mantem o filesystem como fallback local
+
+Arquivos de runtime principais:
+
+- `storage/runtime/bot_state.json`
+- `storage/runtime/paper_state.json`
+- `storage/runtime/paper_trades.json`
+- `storage/runtime/trader_orders.csv`
+- `storage/runtime/investor_orders.csv`
+- `storage/runtime/bot_log.csv`
+- `storage/runtime/auth_users.json`
+
+Arquivos de runtime nao devem ser versionados.
+
+## Variaveis de ambiente
+
+Copie o arquivo de exemplo:
+
+```bash
+cp .env.example .env
+```
+
+Variaveis suportadas:
+
+- `APP_TITLE`: titulo exibido no app
+- `APP_ENV`: `development` ou `production`
+- `ROBO_STORAGE_DIR`: diretorio de armazenamento local
+- `DATABASE_URL`: ativa PostgreSQL quando preenchida
+- `AUTH_REQUIRED`: força autenticacao mesmo em ambiente local
+- `AUTH_SESSION_TIMEOUT_MINUTES`: timeout de sessao
+- `ADMIN_USERNAME`: bootstrap opcional do primeiro admin
+- `ADMIN_PASSWORD`: bootstrap opcional do primeiro admin
+
+## Instalacao local
+
+### 1. Criar ambiente virtual
+
+Windows PowerShell:
+
+```powershell
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+```
+
+Linux ou macOS:
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+```
+
+### 2. Instalar dependencias
+
+```bash
+pip install -r requirements.txt
+```
+
+Para testes:
+
+```bash
+pip install -r requirements-dev.txt
+```
+
+### 3. Configurar ambiente
+
+```bash
+cp .env.example .env
+```
+
+Em desenvolvimento, a autenticacao pode permanecer opcional com:
+
+```env
+AUTH_REQUIRED=false
+```
+
+### 4. Rodar o app
+
+```bash
+streamlit run app.py
+```
+
+### 5. Rodar o worker localmente
+
+```bash
+python -m workers.trader_worker
+```
+
+## Testes basicos
+
+Compilacao:
+
+```bash
+python -m py_compile app.py paper_trading_engine.py
+```
+
+Suite basica:
+
+```bash
+python -m pytest -q
+```
+
+## Deploy
+
+O deploy recomendado usa:
+
+- `web`: Streamlit
+- `worker`: loop continuo do trader
+- `Postgres`: persistencia compartilhada
+
+Guia passo a passo:
+
+- veja [`DEPLOY_RAILWAY.md`](DEPLOY_RAILWAY.md)
+
+## Seguranca
+
+- senhas sao armazenadas com hash `bcrypt`
+- autenticacao e opcional em dev, mas obrigatoria em ambiente de producao
+- `real mode` exige conta admin e confirmacao de senha
+- segredos nao devem ser hardcoded no codigo
+- `.env`, `storage/runtime/` e logs locais ficam fora do versionamento
+
+## Compatibilidade e legado
+
+Alguns arquivos na raiz foram mantidos como wrappers de compatibilidade para fluxos antigos. O caminho oficial para a interface continua sendo `app.py` e `pages/`.
+
+## Comandos uteis
+
+Subir app:
+
+```bash
+streamlit run app.py
+```
+
+Rodar worker:
+
+```bash
+python -m workers.trader_worker
+```
+
+Executar testes:
+
+```bash
+python -m pytest -q
+```

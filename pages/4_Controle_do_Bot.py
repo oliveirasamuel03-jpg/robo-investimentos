@@ -20,8 +20,11 @@ if bool((state.get("security", {}) or {}).get("real_mode_enabled", False)):
 status_options = ["RUNNING", "PAUSED", "STOPPED"]
 mode_options = ["Automático", "Semi-automático"]
 
-status = st.radio("Status do bot", status_options, index=status_options.index(state["bot_status"]))
-mode = st.selectbox("Modo do bot", mode_options, index=mode_options.index(state["bot_mode"]))
+status_index = status_options.index(state["bot_status"]) if state.get("bot_status") in status_options else 1
+mode_index = mode_options.index(state["bot_mode"]) if state.get("bot_mode") in mode_options else 0
+
+status = st.radio("Status do bot", status_options, index=status_index)
+mode = st.selectbox("Modo do bot", mode_options, index=mode_index)
 
 c1, c2, c3, c4 = st.columns(4)
 with c1:

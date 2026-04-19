@@ -4,11 +4,12 @@ from __future__ import annotations
 import streamlit as st
 
 from core.auth.guards import is_admin, render_auth_toolbar, require_auth
+from core.config import APP_TITLE
 from core.state_store import load_bot_state
 from paper_trading_engine import run_paper_cycle
 
 
-st.set_page_config(page_title="Robo Trader", layout="wide")
+st.set_page_config(page_title=APP_TITLE, layout="wide")
 
 current_user = require_auth()
 render_auth_toolbar()

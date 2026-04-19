@@ -32,6 +32,15 @@ def _truthy(value: str | None) -> bool:
     return str(value or "").strip().lower() in {"1", "true", "yes", "y", "on"}
 
 
+def session_timeout_minutes() -> int:
+    raw = str(os.getenv("AUTH_SESSION_TIMEOUT_MINUTES", SESSION_TIMEOUT_MINUTES) or "").strip()
+    try:
+        minutes = int(raw)
+    except ValueError:
+        minutes = SESSION_TIMEOUT_MINUTES
+    return max(minutes, 5)
+
+
 def auth_required() -> bool:
     explicit = os.getenv("AUTH_REQUIRED")
     if explicit not in (None, ""):
@@ -75,7 +84,7 @@ def _session_timed_out() -> bool:
     if last_seen is None:
         return False
 
-    timeout_at = last_seen + timedelta(minutes=SESSION_TIMEOUT_MINUTES)
+    timeout_at = last_seen + timedelta(minutes=session_timeout_minutes())
     return datetime.now(timezone.utc) > timeout_at
 
 

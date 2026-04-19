@@ -3,11 +3,11 @@ from __future__ import annotations
 import streamlit as st
 
 from .session import (
-    SESSION_TIMEOUT_MINUTES,
     auth_required,
     get_current_user,
     has_active_session,
     logout_user,
+    session_timeout_minutes,
 )
 
 
@@ -53,7 +53,7 @@ def render_auth_toolbar() -> None:
         st.markdown("### Sessao")
         st.caption(f"Usuario: {user['username']}")
         st.caption(f"Perfil: {user['role']}")
-        st.caption(f"Timeout: {SESSION_TIMEOUT_MINUTES} min")
+        st.caption(f"Timeout: {session_timeout_minutes()} min")
 
         if user.get("auth_mode") == "dev-bypass":
             st.info("Modo dev ativo. Autenticacao opcional.")

@@ -1,0 +1,57 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Test and tooling caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+
+# Build artifacts
+build/
+dist/
+.eggs/
+*.egg-info/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Local environment files
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Streamlit local secrets
+.streamlit/secrets.toml
+
+# Runtime data
+storage/runtime/*
+!storage/runtime/.gitkeep
+storage/cache/*
+!storage/cache/.gitkeep
+storage/reports/*
+!storage/reports/.gitkeep
+storage/*.csv
+storage/*.json
+storage/*.jsonl
+storage/*.log
+
+# Legacy runtime files kept out of version control
+bot_logs.jsonl
+bot_state.json
+runtime_config.json
