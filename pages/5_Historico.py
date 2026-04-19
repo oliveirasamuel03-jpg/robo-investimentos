@@ -17,7 +17,7 @@ from core.state_store import read_storage_table
 require_auth()
 render_auth_toolbar()
 
-st.title("HistÃ³rico")
+st.title("Histórico")
 
 trader_orders = read_storage_table(TRADER_ORDERS_FILE, columns=TRADER_ORDERS_COLUMNS)
 investor_orders = read_storage_table(INVESTOR_ORDERS_FILE, columns=INVESTOR_ORDERS_COLUMNS)

@@ -38,9 +38,9 @@ k2.metric("Caixa", f"R$ {snapshot['cash']:,.2f}")
 k3.metric("Capital em uso", f"R$ {snapshot['capital_in_use']:,.2f}")
 k4.metric("PnL realizado", f"R$ {snapshot['realized_pnl']:,.2f}")
 
-st.subheader("PosiÃ§Ãµes da Plataforma")
+st.subheader("Posições da Plataforma")
 positions = state.get("positions", [])
 if positions:
     st.dataframe(pd.DataFrame(positions), use_container_width=True)
 else:
-    st.info("Sem posiÃ§Ãµes registradas.")
+    st.info("Sem posições registradas.")
