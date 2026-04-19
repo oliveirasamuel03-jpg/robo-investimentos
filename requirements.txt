@@ -7,3 +7,4 @@ scipy
 yfinance
 matplotlib
 ccxt
+psycopg[binary]
