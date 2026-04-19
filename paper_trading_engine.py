@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
-import json
 from pathlib import Path
 from typing import Any
 
@@ -12,10 +11,19 @@ import plotly.graph_objects as go
 import yfinance as yf
 
 from core.config import STORAGE_DIR
+from core.persistence import (
+    append_json_row,
+    load_json_rows,
+    load_json_state,
+    replace_json_rows,
+    save_json_state,
+)
 
 
 PAPER_STATE_FILE = STORAGE_DIR / "paper_state.json"
 PAPER_TRADES_FILE = STORAGE_DIR / "paper_trades.json"
+PAPER_STATE_NAMESPACE = "paper_state"
+PAPER_TRADES_NAMESPACE = "paper_trades"
 
 
 @dataclass
@@ -70,7 +78,11 @@ def ensure_paper_files(config: PaperTradingConfig | None = None) -> None:
 
 def load_paper_state(config: PaperTradingConfig | None = None) -> dict[str, Any]:
     ensure_paper_files(config)
-    state = json.loads(PAPER_STATE_FILE.read_text(encoding="utf-8"))
+    state = load_json_state(
+        PAPER_STATE_NAMESPACE,
+        lambda: _default_state(float(config.initial_capital) if config else 10000.0),
+        PAPER_STATE_FILE,
+    )
     merged = _default_state(float(config.initial_capital) if config else state.get("initial_capital", 10000.0))
     merged.update(state)
     merged["positions"] = merged.get("positions", {}) or {}
@@ -81,31 +93,27 @@ def load_paper_state(config: PaperTradingConfig | None = None) -> dict[str, Any]
 
 def save_paper_state(state: dict[str, Any]) -> None:
     STORAGE_DIR.mkdir(parents=True, exist_ok=True)
-    PAPER_STATE_FILE.write_text(json.dumps(state, indent=2, ensure_ascii=False), encoding="utf-8")
+    save_json_state(PAPER_STATE_NAMESPACE, state, PAPER_STATE_FILE)
 
 
 def reset_paper_state(config: PaperTradingConfig | None = None) -> dict[str, Any]:
     initial_capital = float(config.initial_capital) if config else 10000.0
     state = _default_state(initial_capital)
     save_paper_state(state)
-    PAPER_TRADES_FILE.write_text("[]", encoding="utf-8")
+    replace_json_rows(PAPER_TRADES_NAMESPACE, [], PAPER_TRADES_FILE)
     return state
 
 
 def read_paper_trades(limit: int | None = None) -> list[dict[str, Any]]:
     ensure_paper_files()
-    trades = json.loads(PAPER_TRADES_FILE.read_text(encoding="utf-8"))
-    if not isinstance(trades, list):
-        return []
+    trades = load_json_rows(PAPER_TRADES_NAMESPACE, PAPER_TRADES_FILE, limit=limit)
     if limit is None:
         return trades
     return trades[-int(limit):]
 
 
 def _append_paper_trade(trade: dict[str, Any]) -> None:
-    trades = read_paper_trades()
-    trades.append(trade)
-    PAPER_TRADES_FILE.write_text(json.dumps(trades, indent=2, ensure_ascii=False), encoding="utf-8")
+    append_json_row(PAPER_TRADES_NAMESPACE, trade, PAPER_TRADES_FILE)
 
 
 def read_paper_equity(limit: int | None = None) -> pd.DataFrame:
