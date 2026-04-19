@@ -11,10 +11,13 @@ from core.config import (
     BOT_STATE_FILE,
     INVESTOR_ORDERS_COLUMNS,
     INVESTOR_ORDERS_FILE,
+    TRADER_REPORTS_COLUMNS,
+    TRADER_REPORTS_FILE,
     TRADER_ORDERS_COLUMNS,
     TRADER_ORDERS_FILE,
     ensure_app_directories,
 )
+from core.trader_profiles import DEFAULT_TRADER_PROFILE
 from core.persistence import (
     append_table_row,
     database_enabled,
@@ -59,6 +62,7 @@ DEFAULT_STATE = {
     },
     "trader": {
         "enabled": True,
+        "profile": DEFAULT_TRADER_PROFILE,
         "ticket_value": 100.0,
         "holding_minutes": 60,
         "max_open_positions": 3,
@@ -92,6 +96,7 @@ def ensure_storage() -> None:
         save_bot_state(deepcopy(DEFAULT_STATE))
 
     _ensure_csv(TRADER_ORDERS_FILE, TRADER_ORDERS_COLUMNS)
+    _ensure_csv(TRADER_REPORTS_FILE, TRADER_REPORTS_COLUMNS)
     _ensure_csv(INVESTOR_ORDERS_FILE, INVESTOR_ORDERS_COLUMNS)
     _ensure_csv(BOT_LOG_FILE, BOT_LOG_COLUMNS)
 
@@ -127,6 +132,7 @@ def append_csv_row(file_path, row: dict) -> None:
     ensure_storage()
     columns_map = {
         str(TRADER_ORDERS_FILE): TRADER_ORDERS_COLUMNS,
+        str(TRADER_REPORTS_FILE): TRADER_REPORTS_COLUMNS,
         str(INVESTOR_ORDERS_FILE): INVESTOR_ORDERS_COLUMNS,
         str(BOT_LOG_FILE): BOT_LOG_COLUMNS,
     }

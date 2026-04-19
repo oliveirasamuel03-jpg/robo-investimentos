@@ -15,6 +15,7 @@ from core.state_store import (
     replace_storage_table,
     save_bot_state,
 )
+from core.trader_profiles import get_trader_profile_config
 from engines.quant_bridge import (
     PaperTradingConfig,
     build_paper_report,
@@ -39,16 +40,36 @@ def build_paper_cfg_from_platform_state(state: dict) -> PaperTradingConfig:
         raise ValueError("O holding do trader precisa ficar entre 1 minuto e 48 horas.")
 
     watchlist = [str(x).strip().upper() for x in (trader.get("watchlist", []) or []) if str(x).strip()]
+    profile_config = get_trader_profile_config(
+        trader.get("profile"),
+        base_ticket_value=ticket_value,
+        base_holding_minutes=holding_minutes,
+        base_max_open_positions=max_open_positions,
+    )
 
     return PaperTradingConfig(
         initial_capital=float(state.get("wallet_value", 10000.0)),
         custom_tickers=watchlist or ["AAPL"],
-        ticket_value=ticket_value,
-        min_trade_notional=max(MIN_TICKET, ticket_value),
-        max_open_positions=max(1, max_open_positions),
-        holding_minutes=holding_minutes,
+        profile_name=str(profile_config["name"]),
+        ticket_value=float(profile_config["ticket_value"]),
+        min_trade_notional=max(MIN_TICKET, float(profile_config["ticket_value"])),
+        max_open_positions=max(1, int(profile_config["max_open_positions"])),
+        holding_minutes=int(profile_config["holding_minutes"]),
         history_limit=500,
         allow_new_entries=state.get("bot_status") == "RUNNING",
+        min_signal_score=float(profile_config["min_signal_score"]),
+        min_atr_pct=float(profile_config["min_atr_pct"]),
+        max_atr_pct=float(profile_config["max_atr_pct"]),
+        trailing_stop_atr_mult=float(profile_config["trailing_stop_atr_mult"]),
+        rsi_entry_min=float(profile_config["rsi_entry_min"]),
+        rsi_entry_max=float(profile_config["rsi_entry_max"]),
+        pullback_min=float(profile_config["pullback_min"]),
+        pullback_max=float(profile_config["pullback_max"]),
+        momentum_min=float(profile_config["momentum_min"]),
+        momentum_8_min=float(profile_config["momentum_8_min"]),
+        breakout_min=float(profile_config["breakout_min"]),
+        ma20_slope_min=float(profile_config["ma20_slope_min"]),
+        ma50_slope_min=float(profile_config["ma50_slope_min"]),
     )
 
 
@@ -66,6 +87,7 @@ def sync_platform_positions_from_paper() -> dict:
             {
                 "module": "TRADER",
                 "asset": asset,
+                "profile": pos.get("profile"),
                 "status": "OPEN",
                 "qty": qty,
                 "entry_price": avg_price,

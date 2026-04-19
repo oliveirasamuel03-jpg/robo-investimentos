@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
 import numpy as np
 import pandas as pd
@@ -19,6 +20,7 @@ from core.persistence import (
     replace_json_rows,
     save_json_state,
 )
+from core.trader_reports import append_trade_report, build_closed_trade_report
 
 
 PAPER_STATE_FILE = RUNTIME_DIR / "paper_state.json"
@@ -33,6 +35,7 @@ class PaperTradingConfig:
     custom_tickers: list[str] = field(default_factory=lambda: ["AAPL"])
     period: str = "6mo"
     interval: str = "1h"
+    profile_name: str = "Equilibrado"
     ticket_value: float = 100.0
     min_trade_notional: float = 100.0
     max_open_positions: int = 3
@@ -43,6 +46,15 @@ class PaperTradingConfig:
     min_atr_pct: float = 0.003
     max_atr_pct: float = 0.08
     trailing_stop_atr_mult: float = 2.4
+    rsi_entry_min: float = 42.0
+    rsi_entry_max: float = 64.0
+    pullback_min: float = -0.02
+    pullback_max: float = 0.035
+    momentum_min: float = -0.005
+    momentum_8_min: float = -0.02
+    breakout_min: float = -0.04
+    ma20_slope_min: float = -0.003
+    ma50_slope_min: float = -0.004
 
 
 def _utc_now() -> datetime:
@@ -51,6 +63,10 @@ def _utc_now() -> datetime:
 
 def _utc_now_iso() -> str:
     return _utc_now().isoformat()
+
+
+def _new_trade_id(asset: str) -> str:
+    return f"{str(asset).upper()}-{uuid4().hex[:12]}"
 
 
 def _default_state(initial_capital: float) -> dict[str, Any]:
@@ -326,11 +342,20 @@ def _should_buy(latest: pd.Series, config: PaperTradingConfig) -> tuple[bool, fl
     ma20_slope = float(latest.get("ma20_slope", 0.0))
     ma50_slope = float(latest.get("ma50_slope", 0.0))
 
-    trend_ok = price >= ma50 and ma20 >= ma50 and ma20_slope >= -0.003 and ma50_slope >= -0.004
-    rsi_ok = 42.0 <= rsi <= 64.0
+    trend_ok = (
+        price >= ma50
+        and ma20 >= ma50
+        and ma20_slope >= float(config.ma20_slope_min)
+        and ma50_slope >= float(config.ma50_slope_min)
+    )
+    rsi_ok = float(config.rsi_entry_min) <= rsi <= float(config.rsi_entry_max)
     atr_ok = float(config.min_atr_pct) <= atr_pct <= float(config.max_atr_pct)
-    structure_ok = -0.02 <= pullback_to_ma20 <= 0.035
-    momentum_ok = momentum >= -0.005 and momentum_8 >= -0.02 and breakout_20 >= -0.04
+    structure_ok = float(config.pullback_min) <= pullback_to_ma20 <= float(config.pullback_max)
+    momentum_ok = (
+        momentum >= float(config.momentum_min)
+        and momentum_8 >= float(config.momentum_8_min)
+        and breakout_20 >= float(config.breakout_min)
+    )
 
     setup_ok = trend_ok and rsi_ok and atr_ok and structure_ok and momentum_ok
     return bool(setup_ok and score >= float(config.min_signal_score)), score
@@ -495,15 +520,24 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[s
         gross_value = round(quantity * price, 2)
         avg_price = float(position.get("avg_price", price))
         realized = round((price - avg_price) * quantity, 2)
+        peak_price = max(float(position.get("peak_price", avg_price) or avg_price), price)
+        atr_pct = float(latest.get("atr_pct", position.get("atr_pct", 0.0) or 0.0))
+        trailing_stop = max(
+            float(position.get("trailing_stop", 0.0) or 0.0),
+            round(peak_price * (1.0 - _dynamic_stop_pct(atr_pct, multiplier=float(config.trailing_stop_atr_mult))), 6),
+        )
+        closed_at = _utc_now_iso()
         state["cash"] = round(float(state.get("cash", 0.0)) + gross_value, 2)
         state["realized_pnl"] = round(float(state.get("realized_pnl", 0.0)) + realized, 2)
-        state["last_trade_at"] = _utc_now_iso()
+        state["last_trade_at"] = closed_at
         del state["positions"][asset]
 
         trade = {
-            "timestamp": _utc_now_iso(),
+            "timestamp": closed_at,
             "asset": asset,
             "side": "SELL",
+            "trade_id": position.get("trade_id"),
+            "profile": position.get("profile"),
             "quantity": round(quantity, 6),
             "price": round(price, 6),
             "gross_value": gross_value,
@@ -514,6 +548,19 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[s
         }
         trades_executed.append(trade)
         _append_paper_trade(trade)
+        append_trade_report(
+            build_closed_trade_report(
+                position=position,
+                closed_at=closed_at,
+                asset=asset,
+                quantity=quantity,
+                exit_price=price,
+                realized_pnl=realized,
+                exit_reason=reason,
+                exit_snapshot=latest,
+                trailing_stop_final=trailing_stop,
+            )
+        )
 
     slots_left = max(int(config.max_open_positions) - len(state.get("positions", {}) or {}), 0)
     candidates: list[dict[str, Any]] = []
@@ -530,6 +577,11 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[s
             "rsi": round(float(latest.get("rsi", 50.0)), 2),
             "atr_pct": round(float(latest.get("atr_pct", 0.0) or 0.0), 4),
             "pullback_to_ma20": round(float(latest.get("pullback_to_ma20", 0.0) or 0.0), 4),
+            "ma20": round(float(latest.get("ma20", latest["close"])), 6),
+            "ma50": round(float(latest.get("ma50", latest["close"])), 6),
+            "momentum": round(float(latest.get("momentum", 0.0) or 0.0), 6),
+            "momentum_8": round(float(latest.get("momentum_8", 0.0) or 0.0), 6),
+            "breakout_20": round(float(latest.get("breakout_20", 0.0) or 0.0), 6),
             "score": score,
             "buy": should_buy,
         }
@@ -555,27 +607,40 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[s
         if quantity <= 0:
             continue
 
+        trade_id = _new_trade_id(asset)
+        opened_at = _utc_now_iso()
         state["cash"] = round(cash - notional, 2)
         state["positions"][asset] = {
+            "trade_id": trade_id,
+            "profile": str(config.profile_name),
             "quantity": quantity,
+            "entry_price": round(price, 6),
             "avg_price": round(price, 6),
             "last_price": round(price, 6),
             "peak_price": round(price, 6),
             "atr_pct": round(float(candidate.get("atr_pct", 0.0) or 0.0), 6),
+            "atr_pct_entry": round(float(candidate.get("atr_pct", 0.0) or 0.0), 6),
             "trailing_stop": round(
                 price * (1.0 - _dynamic_stop_pct(float(candidate.get("atr_pct", 0.0) or 0.0), multiplier=float(config.trailing_stop_atr_mult))),
                 6,
             ),
+            "gross_entry_value": round(notional, 2),
             "entry_score": round(float(candidate.get("score", 0.0)), 4),
-            "opened_at": _utc_now_iso(),
-            "updated_at": _utc_now_iso(),
+            "rsi_entry": round(float(candidate.get("rsi", 50.0) or 50.0), 2),
+            "ma20_entry": round(float(candidate.get("ma20", price) or price), 6),
+            "ma50_entry": round(float(candidate.get("ma50", price) or price), 6),
+            "holding_minutes_limit": int(config.holding_minutes),
+            "opened_at": opened_at,
+            "updated_at": opened_at,
         }
-        state["last_trade_at"] = _utc_now_iso()
+        state["last_trade_at"] = opened_at
 
         trade = {
-            "timestamp": _utc_now_iso(),
+            "timestamp": opened_at,
             "asset": asset,
             "side": "BUY",
+            "trade_id": trade_id,
+            "profile": str(config.profile_name),
             "quantity": quantity,
             "price": round(price, 6),
             "gross_value": round(notional, 2),

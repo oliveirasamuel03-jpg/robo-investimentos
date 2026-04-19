@@ -27,6 +27,17 @@ from core.config import (
     TRADER_ORDERS_FILE,
 )
 from core.state_store import load_bot_state, read_storage_table, save_bot_state
+from core.trader_profiles import (
+    get_trader_profile_config,
+    list_trader_profiles,
+    normalize_trader_profile,
+)
+from core.trader_reports import (
+    calculate_trade_report_metrics,
+    generate_trade_suggestions,
+    read_trade_reports,
+    summarize_reports_by_profile,
+)
 from engines.quant_bridge import (
     build_paper_report,
     load_paper_state,
@@ -432,6 +443,83 @@ def build_robot_log(signal_text: str, robot_label: str, last_action_text: str, o
     return logs[:4]
 
 
+def build_trade_pnl_chart(reports_df: pd.DataFrame) -> go.Figure:
+    fig = go.Figure()
+    if reports_df is not None and not reports_df.empty:
+        plot_df = reports_df.copy()
+        plot_df["closed_at"] = pd.to_datetime(plot_df["closed_at"], errors="coerce")
+        plot_df["realized_pnl"] = pd.to_numeric(plot_df["realized_pnl"], errors="coerce").fillna(0.0)
+        plot_df = plot_df.dropna(subset=["closed_at"]).sort_values("closed_at")
+        fig.add_trace(
+            go.Bar(
+                x=plot_df["closed_at"],
+                y=plot_df["realized_pnl"],
+                marker_color=[
+                    "#22c55e" if float(v) >= 0 else "#ef4444" for v in plot_df["realized_pnl"].tolist()
+                ],
+                name="PnL por trade",
+            )
+        )
+    fig.update_layout(
+        template="plotly_dark",
+        height=260,
+        margin=dict(l=10, r=10, t=35, b=10),
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        title="PnL por trade fechado",
+        showlegend=False,
+    )
+    return fig
+
+
+def build_profile_distribution_chart(summary_df: pd.DataFrame) -> go.Figure:
+    fig = go.Figure()
+    if summary_df is not None and not summary_df.empty:
+        fig.add_trace(
+            go.Pie(
+                labels=summary_df["profile"],
+                values=summary_df["trades"],
+                hole=0.45,
+                marker=dict(colors=["#38bdf8", "#22c55e", "#f97316", "#eab308"]),
+                textinfo="label+percent",
+            )
+        )
+    fig.update_layout(
+        template="plotly_dark",
+        height=260,
+        margin=dict(l=10, r=10, t=35, b=10),
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        title="Distribuicao por perfil",
+        showlegend=False,
+    )
+    return fig
+
+
+def build_profile_win_rate_chart(summary_df: pd.DataFrame) -> go.Figure:
+    fig = go.Figure()
+    if summary_df is not None and not summary_df.empty:
+        fig.add_trace(
+            go.Bar(
+                x=summary_df["profile"],
+                y=pd.to_numeric(summary_df["win_rate"], errors="coerce").fillna(0.0) * 100.0,
+                marker_color="#22c55e",
+                name="Win rate",
+            )
+        )
+    fig.update_layout(
+        template="plotly_dark",
+        height=260,
+        margin=dict(l=10, r=10, t=35, b=10),
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        title="Win rate por perfil",
+        yaxis_title="%",
+        showlegend=False,
+    )
+    return fig
+
+
 def make_chart_refresh_key(auto_refresh: bool, refresh_seconds: int) -> int | None:
     if not auto_refresh:
         return None
@@ -447,10 +535,22 @@ def build_trader_snapshot(
     sync_platform_positions_from_paper()
     state = load_bot_state()
     security_state = state.get("security", {}) or {}
+    trader_state = state.get("trader", {}) or {}
+    active_profile = normalize_trader_profile(trader_state.get("profile"))
+    active_profile_config = get_trader_profile_config(
+        active_profile,
+        base_ticket_value=float(trader_state.get("ticket_value", MIN_TICKET)),
+        base_holding_minutes=int(trader_state.get("holding_minutes", MIN_HOLDING_MINUTES)),
+        base_max_open_positions=int(trader_state.get("max_open_positions", 1)),
+    )
     paper_state = load_paper_state()
     paper_report = build_paper_report(initial_capital=float(state.get("wallet_value", 10000.0)))
     paper_equity_df = read_paper_equity(limit=300)
     paper_trades = read_paper_trades()[-200:]
+    trade_reports_df = read_trade_reports(limit=300)
+    trade_report_metrics = calculate_trade_report_metrics(trade_reports_df)
+    profile_summary_df = summarize_reports_by_profile(trade_reports_df)
+    trade_suggestions = generate_trade_suggestions(trade_reports_df)
     positions = [p for p in state.get("positions", []) if p.get("module") == "TRADER"]
     open_positions = [p for p in positions if p.get("status") == "OPEN"]
     selected_position = next((p for p in open_positions if p.get("asset") == selected_ticker), None)
@@ -491,6 +591,8 @@ def build_trader_snapshot(
         "paper_trades": paper_trades,
         "positions": positions,
         "open_positions": open_positions,
+        "active_profile": active_profile,
+        "active_profile_config": active_profile_config,
         "selected_position": selected_position,
         "entry_price": entry_price,
         "chart_df": chart_df,
@@ -509,6 +611,10 @@ def build_trader_snapshot(
         "worker_heartbeat": worker_heartbeat,
         "current_max": current_max,
         "current_min": current_min,
+        "trade_reports_df": trade_reports_df,
+        "trade_report_metrics": trade_report_metrics,
+        "profile_summary_df": profile_summary_df,
+        "trade_suggestions": trade_suggestions,
     }
 
 
@@ -868,13 +974,20 @@ page_snapshot = build_trader_snapshot(
 )
 
 state = page_snapshot["state"]
+trader = state["trader"]
 security_state = page_snapshot["security_state"]
 paper_state = page_snapshot["paper_state"]
 paper_report = page_snapshot["paper_report"]
 paper_equity_df = page_snapshot["paper_equity_df"]
 paper_trades = page_snapshot["paper_trades"]
+trade_reports_df = page_snapshot["trade_reports_df"]
+trade_report_metrics = page_snapshot["trade_report_metrics"]
+profile_summary_df = page_snapshot["profile_summary_df"]
+trade_suggestions = page_snapshot["trade_suggestions"]
 positions = page_snapshot["positions"]
 open_positions = page_snapshot["open_positions"]
+active_profile = page_snapshot["active_profile"]
+active_profile_config = page_snapshot["active_profile_config"]
 selected_position = page_snapshot["selected_position"]
 entry_price = page_snapshot["entry_price"]
 chart_df = page_snapshot["chart_df"]
@@ -993,6 +1106,11 @@ st.markdown(
         <div class="section-title">Visão rápida do mercado</div>
         <div class="small-note">Ativo selecionado: <b>{selected_ticker}</b></div>
         <div class="signal-pill" style="background:{signal_color};">{signal_text}</div>
+        <div style="margin-top:10px;">
+            <span class="signal-pill" style="background:{active_profile_config['accent']};">
+                Perfil ativo: {active_profile_config['name']} - {active_profile_config['description']}
+            </span>
+        </div>
         <div class="status-line">
             Preço atual: <b>{last_price:,.2f}</b> &nbsp;&nbsp;|&nbsp;&nbsp;
             Operações abertas: <b>{len(open_positions)}</b> &nbsp;&nbsp;|&nbsp;&nbsp;
@@ -1158,11 +1276,114 @@ with side_col:
 
     st.markdown("</div>", unsafe_allow_html=True)
 
+st.markdown("### Performance e relatorios do Trader")
+st.caption("Trades fechados, distribuicao por perfil e sugestoes analiticas. Nenhum ajuste e aplicado automaticamente nesta etapa.")
+
+perf_m1, perf_m2, perf_m3, perf_m4 = st.columns(4)
+perf_m1.metric("Trades fechados", f"{int(trade_report_metrics['total_trades'])}")
+perf_m2.metric("Win rate", f"{float(trade_report_metrics['win_rate'] or 0.0) * 100:.2f}%")
+perf_m3.metric("Payoff", "-" if trade_report_metrics["payoff"] is None else f"{float(trade_report_metrics['payoff']):.2f}")
+perf_m4.metric("PnL fechado", br_money(float(trade_report_metrics["total_pnl"] or 0.0)))
+
+perf_chart_left, perf_chart_right = st.columns(2)
+with perf_chart_left:
+    if not paper_equity_df.empty:
+        equity_plot = paper_equity_df.copy()
+        if "timestamp" in equity_plot.columns:
+            equity_plot["timestamp"] = pd.to_datetime(equity_plot["timestamp"], errors="coerce")
+        else:
+            equity_plot["timestamp"] = pd.RangeIndex(start=1, stop=len(equity_plot) + 1)
+
+        fig_runtime_equity = go.Figure()
+        fig_runtime_equity.add_trace(
+            go.Scatter(
+                x=equity_plot["timestamp"],
+                y=equity_plot["equity"],
+                mode="lines",
+                name="Equity",
+                line=dict(width=2.2, color="#38bdf8"),
+            )
+        )
+        fig_runtime_equity.update_layout(
+            template="plotly_dark",
+            height=280,
+            margin=dict(l=10, r=10, t=25, b=10),
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            xaxis_title="Tempo",
+            yaxis_title="Equity",
+            showlegend=False,
+        )
+        st.plotly_chart(fig_runtime_equity, use_container_width=True, key="perf_equity_curve")
+    else:
+        st.info("Curva de capital ainda nao disponivel.")
+
+with perf_chart_right:
+    if trade_reports_df.empty:
+        st.info("Os relatorios vao aparecer aqui quando a primeira operacao for fechada.")
+    else:
+        st.plotly_chart(build_trade_pnl_chart(trade_reports_df), use_container_width=True, key="trade_pnl_chart")
+
+perf_chart_bottom_left, perf_chart_bottom_right = st.columns(2)
+with perf_chart_bottom_left:
+    if profile_summary_df.empty:
+        st.info("Ainda nao ha distribuicao por perfil para exibir.")
+    else:
+        st.plotly_chart(
+            build_profile_distribution_chart(profile_summary_df),
+            use_container_width=True,
+            key="trade_profile_distribution",
+        )
+
+with perf_chart_bottom_right:
+    if profile_summary_df.empty:
+        st.info("Win rate por perfil sera exibido quando houver trades fechados.")
+    else:
+        st.plotly_chart(
+            build_profile_win_rate_chart(profile_summary_df),
+            use_container_width=True,
+            key="trade_profile_win_rate",
+        )
+
+latest_reports_col, suggestions_col = st.columns([1.6, 1.0])
+with latest_reports_col:
+    st.markdown("#### Ultimos trades fechados")
+    if trade_reports_df.empty:
+        st.info("Sem trades fechados ainda.")
+    else:
+        latest_reports = trade_reports_df.sort_values("closed_at", ascending=False).head(10)
+        st.dataframe(latest_reports, use_container_width=True)
+
+with suggestions_col:
+    st.markdown("#### Sugestoes analiticas")
+    if not trade_suggestions:
+        st.info("Ainda nao ha sugestoes suficientes. Continue operando para gerar amostra.")
+    else:
+        for suggestion in trade_suggestions:
+            severity = str(suggestion.get("severity", "info"))
+            message = str(suggestion.get("message", "") or "")
+            if severity == "warning":
+                st.warning(message)
+            elif severity == "success":
+                st.success(message)
+            else:
+                st.info(message)
+
 with st.expander("Modo avançado"):
     st.markdown("### Configuração avançada")
 
-    a1, a2, a3 = st.columns(3)
+    profile_options = list_trader_profiles()
+    profile_names = [item["name"] for item in profile_options]
+    current_profile = normalize_trader_profile(trader.get("profile"))
+
+    a1, a2, a3, a4 = st.columns(4)
     with a1:
+        selected_profile_name = st.selectbox(
+            "Perfil operacional",
+            options=profile_names,
+            index=profile_names.index(current_profile) if current_profile in profile_names else 1,
+        )
+    with a2:
         ticket = st.number_input(
             "Valor por operação (R$)",
             min_value=MIN_TICKET,
@@ -1170,7 +1391,7 @@ with st.expander("Modo avançado"):
             value=float(trader["ticket_value"]),
             step=10.0,
         )
-    with a2:
+    with a3:
         holding = st.slider(
             "Tempo máximo da operação (min)",
             min_value=MIN_HOLDING_MINUTES,
@@ -1178,7 +1399,7 @@ with st.expander("Modo avançado"):
             value=int(trader["holding_minutes"]),
             step=1,
         )
-    with a3:
+    with a4:
         max_open = st.slider(
             "Máx. operações abertas",
             min_value=1,
@@ -1186,6 +1407,20 @@ with st.expander("Modo avançado"):
             value=int(trader["max_open_positions"]),
             step=1,
         )
+
+    selected_profile_preview = get_trader_profile_config(
+        selected_profile_name,
+        base_ticket_value=float(ticket),
+        base_holding_minutes=int(holding),
+        base_max_open_positions=int(max_open),
+    )
+    st.caption(selected_profile_preview["description"])
+
+    preview_c1, preview_c2, preview_c3, preview_c4 = st.columns(4)
+    preview_c1.metric("Ticket efetivo", br_money(float(selected_profile_preview["ticket_value"])))
+    preview_c2.metric("Holding efetivo", f"{int(selected_profile_preview['holding_minutes'])} min")
+    preview_c3.metric("Posicoes efetivas", f"{int(selected_profile_preview['max_open_positions'])}")
+    preview_c4.metric("Score minimo", f"{float(selected_profile_preview['min_signal_score']):.2f}")
 
     watchlist_text = st.text_input(
         "Lista de ativos",
@@ -1198,6 +1433,7 @@ with st.expander("Modo avançado"):
     with ac1:
         if st.button("Salvar configuração avançada", use_container_width=True, disabled=not admin_mode):
             state = load_bot_state()
+            state["trader"]["profile"] = str(selected_profile_name)
             state["trader"]["ticket_value"] = float(ticket)
             state["trader"]["holding_minutes"] = int(holding)
             state["trader"]["max_open_positions"] = int(max_open)
