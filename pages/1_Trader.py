@@ -817,7 +817,4 @@ with st.expander("Modo avançado"):
         k3.metric("Execuções", f"{paper_state.get('run_count', 0)}")
         k4.metric("Trades", f"{paper_report.get('trades_count', 0)}")
 
-        if not paper_equity_df.empty:
-            st.line_chart(paper_equity_df.set_index("timestamp")["equity_after"])
-        else:
-            st.info("Ainda não há curva de patrimônio para mostrar.")
+      if not paper_equity_df.empty:
