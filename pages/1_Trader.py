@@ -516,7 +516,7 @@ paper_report = {
     "signals": 0,
     "status": "running",
 }
-paper_equity_df = read_paper_equity(limit=300)
+paper_equity_df = read_paper_equity()[-300:]
 paper_trades = read_paper_trades(limit=200)
 positions = [p for p in state.get("positions", []) if p.get("module") == "TRADER"]
 open_positions = [p for p in positions if p.get("status") == "OPEN"]
