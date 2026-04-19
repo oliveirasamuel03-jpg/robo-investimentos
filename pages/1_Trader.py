@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import pandas as pd
 import plotly.graph_objects as go
@@ -331,6 +331,50 @@ def get_next_execution_text(robot_status: str) -> str:
     if robot_status != "RUNNING":
         return "Pausado"
     return "Em breve"
+
+
+def parse_iso_datetime(value: str | None) -> datetime | None:
+    if not value:
+        return None
+
+    try:
+        parsed = datetime.fromisoformat(str(value))
+    except ValueError:
+        return None
+
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def resolve_worker_status(state_runtime: dict) -> str:
+    heartbeat = parse_iso_datetime(state_runtime.get("worker_heartbeat"))
+    raw_status = str(state_runtime.get("worker_status", "offline") or "offline").lower()
+
+    if heartbeat is None:
+        return raw_status
+
+    age_seconds = (datetime.now(timezone.utc) - heartbeat).total_seconds()
+    if age_seconds <= 150:
+        return "error" if raw_status == "error" else "online"
+
+    return "offline" if raw_status == "online" else raw_status
+
+
+def resolve_last_action(state_runtime: dict, paper_trades: list[dict]) -> str:
+    last_action = str(state_runtime.get("last_action", "") or "").strip()
+    if last_action and last_action != "Nenhuma ação recente":
+        return last_action
+    return get_last_action_text(paper_trades)
+
+
+def resolve_last_execution(state_runtime: dict, paper_state: dict) -> str:
+    return str(
+        state_runtime.get("last_run_at")
+        or paper_state.get("updated_at")
+        or paper_state.get("last_trade_at")
+        or ""
+    )
 
 
 def build_robot_log(signal_text: str, robot_label: str, paper_trades: list[dict], open_positions: list[dict]) -> list[str]:
@@ -699,10 +743,10 @@ with side_col:
 
     state_runtime = load_bot_state()
 
-    last_action = state_runtime.get("last_action", get_last_action_text(paper_trades))
-    last_execution = state_runtime.get("last_run_at", "")
+    last_action = resolve_last_action(state_runtime, paper_trades)
+    last_execution = resolve_last_execution(state_runtime, paper_state)
     next_execution = state_runtime.get("next_run_at", "")
-    worker_status = state_runtime.get("worker_status", "offline")
+    worker_status = resolve_worker_status(state_runtime)
     worker_heartbeat = state_runtime.get("worker_heartbeat", "")
 
     st.write(f"**Status do worker:** {worker_status}")
