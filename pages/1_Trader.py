@@ -615,10 +615,15 @@ def render_trader_snapshot(snapshot: dict, selected_ticker: str) -> None:
                     aligned_orders=aligned_orders,
                 ),
                 use_container_width=True,
+                key=f"snapshot_chart_{selected_ticker}",
             )
 
             with st.expander("Mostrar volume"):
-                st.plotly_chart(build_volume_chart(chart_df, selected_ticker), use_container_width=True)
+                st.plotly_chart(
+                    build_volume_chart(chart_df, selected_ticker),
+                    use_container_width=True,
+                    key=f"snapshot_volume_{selected_ticker}",
+                )
 
     with side_col:
         st.metric("Preco atual", f"{last_price:,.2f}")
@@ -1070,6 +1075,7 @@ if auto_refresh_fragment_supported:
                     aligned_orders=aligned_orders,
                 ),
                 use_container_width=True,
+                key=f"live_chart_{selected_ticker}",
             )
         else:
             st.info("Sem dados recentes para o painel ao vivo neste momento.")
@@ -1093,10 +1099,15 @@ with chart_col:
                 aligned_orders=aligned_orders,
             ),
             use_container_width=True,
+            key=f"main_chart_{selected_ticker}",
         )
 
         with st.expander("Mostrar volume"):
-            st.plotly_chart(build_volume_chart(chart_df, selected_ticker), use_container_width=True)
+            st.plotly_chart(
+                build_volume_chart(chart_df, selected_ticker),
+                use_container_width=True,
+                key=f"main_volume_{selected_ticker}",
+            )
 
 with side_col:
     if not chart_df.empty:
@@ -1275,7 +1286,7 @@ with st.expander("Modo avançado"):
                 yaxis_title="Equity",
                 showlegend=False,
             )
-            st.plotly_chart(fig_equity, use_container_width=True)
+            st.plotly_chart(fig_equity, use_container_width=True, key="main_equity_curve")
         else:
             st.info("Curva de equity ainda nao disponivel.")
 
