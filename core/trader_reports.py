@@ -62,6 +62,13 @@ def empty_trade_reports_df() -> pd.DataFrame:
     return pd.DataFrame(columns=TRADER_REPORTS_COLUMNS)
 
 
+def _profile_display_series(series: pd.Series) -> pd.Series:
+    normalized = series.astype("string").fillna("Sem perfil")
+    normalized = normalized.str.strip()
+    normalized = normalized.replace({"": "Sem perfil", "<NA>": "Sem perfil", "nan": "Sem perfil"})
+    return normalized
+
+
 def normalize_trade_reports_frame(df: pd.DataFrame | None) -> pd.DataFrame:
     if df is None or df.empty:
         return empty_trade_reports_df()
@@ -251,7 +258,7 @@ def summarize_reports_by_profile(reports_df: pd.DataFrame) -> pd.DataFrame:
         return pd.DataFrame(columns=["profile", "trades", "pnl", "win_rate", "avg_pnl", "avg_duration"])
 
     working = df.copy()
-    working["profile"] = working["profile"].fillna("Sem perfil")
+    working["profile"] = _profile_display_series(working["profile"])
     grouped = (
         working.groupby("profile", dropna=False)
         .agg(
@@ -277,7 +284,7 @@ def generate_trade_suggestions(reports_df: pd.DataFrame) -> list[dict[str, Any]]
     profile_summary = summarize_reports_by_profile(df)
 
     for row in profile_summary.to_dict(orient="records"):
-        profile = str(row.get("profile") or "Sem perfil")
+        profile = str(row.get("profile") or "Sem perfil").strip() or "Sem perfil"
         if profile == "Sem perfil":
             continue
         trades = int(row.get("trades", 0) or 0)
