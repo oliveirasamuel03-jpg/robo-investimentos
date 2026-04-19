@@ -8,3 +8,4 @@ yfinance
 matplotlib
 ccxt
 psycopg[binary]
+bcrypt
