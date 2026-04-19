@@ -1,12 +1,28 @@
 from __future__ import annotations
 
-import json
 from copy import deepcopy
 from datetime import datetime
 
 import pandas as pd
 
-from core.config import BOT_LOG_FILE, BOT_STATE_FILE, INVESTOR_ORDERS_FILE, STORAGE_DIR, TRADER_ORDERS_FILE
+from core.config import (
+    BOT_LOG_COLUMNS,
+    BOT_LOG_FILE,
+    BOT_STATE_FILE,
+    INVESTOR_ORDERS_COLUMNS,
+    INVESTOR_ORDERS_FILE,
+    STORAGE_DIR,
+    TRADER_ORDERS_COLUMNS,
+    TRADER_ORDERS_FILE,
+)
+from core.persistence import (
+    append_table_row,
+    database_enabled,
+    load_json_state,
+    read_table,
+    replace_table,
+    save_json_state,
+)
 
 DEFAULT_STATE = {
     "wallet_value": 10000.0,
@@ -60,22 +76,16 @@ def _ensure_csv(file_path, columns: list[str]) -> None:
 
 
 def ensure_storage() -> None:
+    if database_enabled():
+        return
+
     STORAGE_DIR.mkdir(parents=True, exist_ok=True)
     if not BOT_STATE_FILE.exists():
         save_bot_state(deepcopy(DEFAULT_STATE))
 
-    _ensure_csv(
-        TRADER_ORDERS_FILE,
-        ["timestamp", "asset", "side", "quantity", "price", "gross_value", "cost", "cash_after", "source"],
-    )
-    _ensure_csv(
-        INVESTOR_ORDERS_FILE,
-        ["timestamp", "metric", "value", "notes"],
-    )
-    _ensure_csv(
-        BOT_LOG_FILE,
-        ["timestamp", "level", "message"],
-    )
+    _ensure_csv(TRADER_ORDERS_FILE, TRADER_ORDERS_COLUMNS)
+    _ensure_csv(INVESTOR_ORDERS_FILE, INVESTOR_ORDERS_COLUMNS)
+    _ensure_csv(BOT_LOG_FILE, BOT_LOG_COLUMNS)
 
 
 def _merge_missing_keys(current: dict, default: dict) -> dict:
@@ -89,17 +99,14 @@ def _merge_missing_keys(current: dict, default: dict) -> dict:
 
 def load_bot_state() -> dict:
     ensure_storage()
-    with open(BOT_STATE_FILE, "r", encoding="utf-8") as f:
-        state = json.load(f)
-
+    state = load_json_state("bot_state", lambda: deepcopy(DEFAULT_STATE), BOT_STATE_FILE)
     state = _merge_missing_keys(state, deepcopy(DEFAULT_STATE))
     return state
 
 
 def save_bot_state(state: dict) -> None:
     STORAGE_DIR.mkdir(parents=True, exist_ok=True)
-    with open(BOT_STATE_FILE, "w", encoding="utf-8") as f:
-        json.dump(state, f, ensure_ascii=False, indent=2)
+    save_json_state("bot_state", state, BOT_STATE_FILE)
 
 
 def reset_state() -> dict:
@@ -110,9 +117,22 @@ def reset_state() -> dict:
 
 def append_csv_row(file_path, row: dict) -> None:
     ensure_storage()
-    df = pd.read_csv(file_path)
-    df = pd.concat([df, pd.DataFrame([row])], ignore_index=True)
-    df.to_csv(file_path, index=False)
+    columns_map = {
+        str(TRADER_ORDERS_FILE): TRADER_ORDERS_COLUMNS,
+        str(INVESTOR_ORDERS_FILE): INVESTOR_ORDERS_COLUMNS,
+        str(BOT_LOG_FILE): BOT_LOG_COLUMNS,
+    }
+    append_table_row(file_path, row, columns=columns_map.get(str(file_path)))
+
+
+def read_storage_table(file_path, columns: list[str] | None = None) -> pd.DataFrame:
+    ensure_storage()
+    return read_table(file_path, columns=columns)
+
+
+def replace_storage_table(file_path, rows: list[dict], columns: list[str] | None = None) -> None:
+    ensure_storage()
+    replace_table(file_path, rows, columns=columns)
 
 
 def log_event(level: str, message: str) -> None:
