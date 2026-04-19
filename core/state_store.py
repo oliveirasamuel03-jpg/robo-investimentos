@@ -28,7 +28,7 @@ DEFAULT_STATE = {
     "wallet_value": 10000.0,
     "cash": 10000.0,
     "bot_status": "PAUSED",
-    "bot_mode": "Automático",
+    "bot_mode": "AutomÃ¡tico",
     "reserve_cash_pct": 0.10,
     "start_date": "2019-01-01",
     "probability_threshold": 0.60,
@@ -47,11 +47,16 @@ DEFAULT_STATE = {
     "custom_tickers": [],
     "realized_pnl": 0.0,
     "positions": [],
-    "last_action": "Nenhuma ação recente",
+    "last_action": "Nenhuma aÃ§Ã£o recente",
     "last_run_at": "",
     "next_run_at": "",
     "worker_status": "offline",
     "worker_heartbeat": "",
+    "security": {
+        "real_mode_enabled": False,
+        "real_mode_enabled_by": "",
+        "real_mode_enabled_at": "",
+    },
     "trader": {
         "enabled": True,
         "ticket_value": 100.0,
@@ -66,6 +71,7 @@ DEFAULT_STATE = {
         "max_positions": 5,
         "watchlist": ["SPY", "QQQ", "WEGE3.SA", "HGLG11.SA", "IVVB11.SA"],
         "last_report": {},
+        "last_dashboard": {},
     },
 }
 
