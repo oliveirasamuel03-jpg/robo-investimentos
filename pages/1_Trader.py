@@ -160,7 +160,7 @@ def add_trade_markers(fig: go.Figure, aligned_orders: pd.DataFrame) -> None:
                 mode="markers",
                 name="Compra",
                 marker=dict(symbol="triangle-up", size=13, color="#22c55e"),
-                hovertemplate="Compra<br>Tempo: %{x}<br>Preço: %{y:.2f}<extra></extra>",
+                hovertemplate="Compra<br>Tempo: %{x}<br>PreÃ§o: %{y:.2f}<extra></extra>",
             )
         )
 
@@ -172,7 +172,7 @@ def add_trade_markers(fig: go.Figure, aligned_orders: pd.DataFrame) -> None:
                 mode="markers",
                 name="Venda",
                 marker=dict(symbol="triangle-down", size=13, color="#ef4444"),
-                hovertemplate="Venda<br>Tempo: %{x}<br>Preço: %{y:.2f}<extra></extra>",
+                hovertemplate="Venda<br>Tempo: %{x}<br>PreÃ§o: %{y:.2f}<extra></extra>",
             )
         )
 
@@ -192,7 +192,7 @@ def build_candle_chart(
             high=df["high"],
             low=df["low"],
             close=df["close"],
-            name="Preço",
+            name="PreÃ§o",
         )
     )
 
@@ -201,7 +201,7 @@ def build_candle_chart(
             x=df.index,
             y=df["ma9"],
             mode="lines",
-            name="Média 9",
+            name="MÃ©dia 9",
             line=dict(width=1.6, color="#8b5cf6"),
         )
     )
@@ -211,7 +211,7 @@ def build_candle_chart(
             x=df.index,
             y=df["ma21"],
             mode="lines",
-            name="Média 21",
+            name="MÃ©dia 21",
             line=dict(width=1.6, color="#facc15"),
         )
     )
@@ -233,7 +233,7 @@ def build_candle_chart(
         height=560,
         title=f"{ticker}",
         xaxis_title="Tempo",
-        yaxis_title="Preço",
+        yaxis_title="PreÃ§o",
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
         xaxis_rangeslider_visible=False,
@@ -284,15 +284,15 @@ def simple_signal_text(chart_df: pd.DataFrame) -> str:
 
     if pd.notna(ma9) and pd.notna(ma21) and pd.notna(prev_ma9) and pd.notna(prev_ma21):
         if ma9 > ma21 and prev_ma9 <= prev_ma21:
-            return "Robô encontrou sinal de compra"
+            return "RobÃ´ encontrou sinal de compra"
         if ma9 < ma21 and prev_ma9 >= prev_ma21:
-            return "Robô encontrou sinal de venda"
+            return "RobÃ´ encontrou sinal de venda"
         if ma9 > ma21:
-            return "Mercado em tendência de alta"
+            return "Mercado em tendÃªncia de alta"
         if ma9 < ma21:
-            return "Mercado em tendência de baixa"
+            return "Mercado em tendÃªncia de baixa"
 
-    return "Robô aguardando oportunidade"
+    return "RobÃ´ aguardando oportunidade"
 
 
 def signal_badge_color(signal_text: str) -> str:
@@ -306,7 +306,7 @@ def signal_badge_color(signal_text: str) -> str:
 
 def get_last_action_text(paper_trades: list[dict]) -> str:
     if not paper_trades:
-        return "Nenhuma operação recente"
+        return "Nenhuma operaÃ§Ã£o recente"
 
     last = paper_trades[-1]
     side = str(last.get("side", "")).upper()
@@ -317,13 +317,13 @@ def get_last_action_text(paper_trades: list[dict]) -> str:
         return f"Comprou {asset} a {price:,.2f}"
     if side == "SELL":
         return f"Vendeu {asset} a {price:,.2f}"
-    return f"Última ação em {asset}"
+    return f"Ãšltima aÃ§Ã£o em {asset}"
 
 
 def get_last_execution_text(paper_state: dict) -> str:
     updated_at = paper_state.get("updated_at") or paper_state.get("last_run_at")
     if not updated_at:
-        return "Ainda não executado"
+        return "Ainda nÃ£o executado"
     return str(updated_at)
 
 
@@ -337,21 +337,21 @@ def build_robot_log(signal_text: str, robot_label: str, paper_trades: list[dict]
     logs = []
 
     if robot_label == "Ligado":
-        logs.append("Robô ativo e monitorando o mercado.")
+        logs.append("RobÃ´ ativo e monitorando o mercado.")
     elif robot_label == "Pausado":
-        logs.append("Robô pausado. Não fará novas entradas.")
+        logs.append("RobÃ´ pausado. NÃ£o farÃ¡ novas entradas.")
     else:
-        logs.append("Robô desligado.")
+        logs.append("RobÃ´ desligado.")
 
     logs.append(signal_text)
 
     if paper_trades:
-        logs.append(f"Última ação: {get_last_action_text(paper_trades)}")
+        logs.append(f"Ãšltima aÃ§Ã£o: {get_last_action_text(paper_trades)}")
 
     if open_positions:
-        logs.append(f"Operações abertas agora: {len(open_positions)}")
+        logs.append(f"OperaÃ§Ãµes abertas agora: {len(open_positions)}")
     else:
-        logs.append("Nenhuma operação aberta no momento.")
+        logs.append("Nenhuma operaÃ§Ã£o aberta no momento.")
 
     return logs[:4]
 
@@ -498,9 +498,9 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-st.markdown("<div class='main-title'>💎 Trader Premium Max</div>", unsafe_allow_html=True)
+st.markdown("<div class='main-title'>ðŸ’Ž Trader Premium Max</div>", unsafe_allow_html=True)
 st.markdown(
-    "<div class='subtitle'>Visual premium, leitura simples e um robô com status mais inteligente e vivo.</div>",
+    "<div class='subtitle'>Visual premium, leitura simples e um robÃ´ com status mais inteligente e vivo.</div>",
     unsafe_allow_html=True,
 )
 
@@ -510,13 +510,8 @@ trader = state["trader"]
 sync_platform_positions_from_paper()
 state = load_bot_state()
 paper_state = load_paper_state()
-paper_report = {
-    "total_return": 0.0,
-    "trades": 0,
-    "signals": 0,
-    "status": "running",
-}
-paper_equity_df = read_paper_equity()[-300:]
+paper_report = build_paper_report(initial_capital=float(state.get("wallet_value", 10000.0)))
+paper_equity_df = read_paper_equity(limit=300)
 paper_trades = read_paper_trades()[-200:]
 positions = [p for p in state.get("positions", []) if p.get("module") == "TRADER"]
 open_positions = [p for p in positions if p.get("status") == "OPEN"]
@@ -531,7 +526,7 @@ with top_left:
 with top_right:
     tf1, tf2 = st.columns(2)
     with tf1:
-        period = st.selectbox("Período", options=["1d", "5d", "1mo", "3mo", "6mo"], index=2)
+        period = st.selectbox("PerÃ­odo", options=["1d", "5d", "1mo", "3mo", "6mo"], index=2)
     with tf2:
         interval = st.selectbox("Intervalo", options=["1m", "5m", "15m", "30m", "60m", "1d"], index=2)
 
@@ -542,10 +537,10 @@ chart_df = pd.DataFrame()
 orders_df = load_trader_orders()
 
 try:
-    with st.spinner("Carregando gráfico..."):
+    with st.spinner("Carregando grÃ¡fico..."):
         chart_df = load_chart_data(selected_ticker, period, interval)
 except Exception as e:
-    st.error(f"Erro ao carregar gráfico: {e}")
+    st.error(f"Erro ao carregar grÃ¡fico: {e}")
 
 last_price = float(chart_df["close"].iloc[-1]) if not chart_df.empty else 0.0
 signal_text = simple_signal_text(chart_df)
@@ -561,7 +556,7 @@ with m1:
     st.markdown(
         f"""
         <div class="glass-card">
-            <div class="metric-label">Saldo disponível</div>
+            <div class="metric-label">Saldo disponÃ­vel</div>
             <div class="metric-value metric-neutral">{br_money(float(paper_state.get('cash', 0.0)))}</div>
         </div>
         """,
@@ -574,7 +569,7 @@ with m2:
     st.markdown(
         f"""
         <div class="glass-card">
-            <div class="metric-label">Lucro / prejuízo</div>
+            <div class="metric-label">Lucro / prejuÃ­zo</div>
             <div class="metric-value {pnl_class}">{br_money(pnl_value)}</div>
         </div>
         """,
@@ -585,7 +580,7 @@ with m3:
     st.markdown(
         f"""
         <div class="glass-card">
-            <div class="metric-label">Status do robô</div>
+            <div class="metric-label">Status do robÃ´</div>
             <div class="metric-value {robot_class}">{robot_label}</div>
         </div>
         """,
@@ -611,13 +606,13 @@ with m4:
 st.markdown(
     f"""
     <div class="hero-box">
-        <div class="section-title">Visão rápida do mercado</div>
+        <div class="section-title">VisÃ£o rÃ¡pida do mercado</div>
         <div class="small-note">Ativo selecionado: <b>{selected_ticker}</b></div>
         <div class="signal-pill" style="background:{signal_color};">{signal_text}</div>
         <div class="status-line">
-            Preço atual: <b>{last_price:,.2f}</b> &nbsp;&nbsp;|&nbsp;&nbsp;
-            Operações abertas: <b>{len(open_positions)}</b> &nbsp;&nbsp;|&nbsp;&nbsp;
-            Robô: <b>{robot_label}</b>
+            PreÃ§o atual: <b>{last_price:,.2f}</b> &nbsp;&nbsp;|&nbsp;&nbsp;
+            OperaÃ§Ãµes abertas: <b>{len(open_positions)}</b> &nbsp;&nbsp;|&nbsp;&nbsp;
+            RobÃ´: <b>{robot_label}</b>
         </div>
     </div>
     """,
@@ -627,25 +622,25 @@ st.markdown(
 b1, b2, b3 = st.columns(3)
 
 with b1:
-    if st.button("▶ Iniciar robô", use_container_width=True):
+    if st.button("â–¶ Iniciar robÃ´", use_container_width=True):
         state = load_bot_state()
         state["bot_status"] = "RUNNING"
         save_bot_state(state)
-        st.success("Robô ligado.")
+        st.success("RobÃ´ ligado.")
         st.rerun()
 
 with b2:
-    if st.button("⏸ Pausar robô", use_container_width=True):
+    if st.button("â¸ Pausar robÃ´", use_container_width=True):
         state = load_bot_state()
         state["bot_status"] = "PAUSED"
         save_bot_state(state)
-        st.warning("Robô pausado.")
+        st.warning("RobÃ´ pausado.")
         st.rerun()
 
 with b3:
-    if st.button("🔁 Rodar agora", use_container_width=True):
+    if st.button("ðŸ” Rodar agora", use_container_width=True):
         try:
-            with st.spinner("Executando ciclo do robô..."):
+            with st.spinner("Executando ciclo do robÃ´..."):
                 result = run_trader_cycle()
             st.success(f"Ciclo executado. Trades feitos: {result.get('cycle_result', {}).get('trades_executed', 0)}")
             st.rerun()
@@ -656,7 +651,7 @@ chart_col, side_col = st.columns([2.3, 0.95])
 
 with chart_col:
     if chart_df.empty:
-        st.warning("Não foi possível carregar dados desse ativo agora.")
+        st.warning("NÃ£o foi possÃ­vel carregar dados desse ativo agora.")
     else:
         aligned_orders = align_orders_to_chart(orders_df, chart_df, selected_ticker)
         st.plotly_chart(
@@ -680,9 +675,9 @@ with side_col:
         current_max = 0.0
         current_min = 0.0
 
-    st.metric("Preço atual", f"{last_price:,.2f}")
-    st.metric("Máxima", f"{current_max:,.2f}")
-    st.metric("Mínima", f"{current_min:,.2f}")
+    st.metric("PreÃ§o atual", f"{last_price:,.2f}")
+    st.metric("MÃ¡xima", f"{current_max:,.2f}")
+    st.metric("MÃ­nima", f"{current_min:,.2f}")
 
     if selected_position:
         qty = float(selected_position.get("qty", 0.0))
@@ -690,17 +685,17 @@ with side_col:
         market_value = qty * last_price if last_price else 0.0
         unrealized = (last_price - avg_price) * qty if last_price else 0.0
 
-        st.markdown("### Operação aberta")
+        st.markdown("### OperaÃ§Ã£o aberta")
         st.write(f"**Quantidade:** {qty:,.6f}")
-        st.write(f"**Preço médio:** {avg_price:,.2f}")
+        st.write(f"**PreÃ§o mÃ©dio:** {avg_price:,.2f}")
         st.write(f"**Valor atual:** {br_money(market_value)}")
         st.write(f"**Resultado atual:** {br_money(unrealized)}")
     else:
-        st.info("Nenhuma operação aberta nesse ativo.")
+        st.info("Nenhuma operaÃ§Ã£o aberta nesse ativo.")
 
     st.markdown("<div class='log-card'>", unsafe_allow_html=True)
-    st.markdown("### Robô em tempo real")
-    st.caption("Resumo vivo do comportamento do robô")
+    st.markdown("### RobÃ´ em tempo real")
+    st.caption("Resumo vivo do comportamento do robÃ´")
 
     state_runtime = load_bot_state()
 
@@ -711,9 +706,9 @@ with side_col:
     worker_heartbeat = state_runtime.get("worker_heartbeat", "")
 
     st.write(f"**Status do worker:** {worker_status}")
-    st.write(f"**Última ação:** {last_action}")
-    st.write(f"**Última execução:** {last_execution or 'Ainda não executado'}")
-    st.write(f"**Próxima análise:** {next_execution or 'Aguardando'}")
+    st.write(f"**Ãšltima aÃ§Ã£o:** {last_action}")
+    st.write(f"**Ãšltima execuÃ§Ã£o:** {last_execution or 'Ainda nÃ£o executado'}")
+    st.write(f"**PrÃ³xima anÃ¡lise:** {next_execution or 'Aguardando'}")
     st.write(f"**Heartbeat:** {worker_heartbeat or 'Sem sinal'}")
 
     for item in build_robot_log(signal_text, robot_label, paper_trades, open_positions):
@@ -721,13 +716,13 @@ with side_col:
 
     st.markdown("</div>", unsafe_allow_html=True)
 
-with st.expander("Modo avançado"):
-    st.markdown("### Configuração avançada")
+with st.expander("Modo avanÃ§ado"):
+    st.markdown("### ConfiguraÃ§Ã£o avanÃ§ada")
 
     a1, a2, a3 = st.columns(3)
     with a1:
         ticket = st.number_input(
-            "Valor por operação (R$)",
+            "Valor por operaÃ§Ã£o (R$)",
             min_value=MIN_TICKET,
             max_value=MAX_TICKET,
             value=float(trader["ticket_value"]),
@@ -735,7 +730,7 @@ with st.expander("Modo avançado"):
         )
     with a2:
         holding = st.slider(
-            "Tempo máximo da operação (min)",
+            "Tempo mÃ¡ximo da operaÃ§Ã£o (min)",
             min_value=MIN_HOLDING_MINUTES,
             max_value=MAX_HOLDING_MINUTES,
             value=int(trader["holding_minutes"]),
@@ -743,7 +738,7 @@ with st.expander("Modo avançado"):
         )
     with a3:
         max_open = st.slider(
-            "Máx. operações abertas",
+            "MÃ¡x. operaÃ§Ãµes abertas",
             min_value=1,
             max_value=20,
             value=int(trader["max_open_positions"]),
@@ -759,18 +754,18 @@ with st.expander("Modo avançado"):
     ac1, ac2 = st.columns(2)
 
     with ac1:
-        if st.button("Salvar configuração avançada", use_container_width=True):
+        if st.button("Salvar configuraÃ§Ã£o avanÃ§ada", use_container_width=True):
             state = load_bot_state()
             state["trader"]["ticket_value"] = float(ticket)
             state["trader"]["holding_minutes"] = int(holding)
             state["trader"]["max_open_positions"] = int(max_open)
             state["trader"]["watchlist"] = [x.strip().upper() for x in watchlist_text.split(",") if x.strip()]
             save_bot_state(state)
-            st.success("Configuração salva.")
+            st.success("ConfiguraÃ§Ã£o salva.")
             st.rerun()
 
     with ac2:
-        if st.button("Resetar módulo trader", use_container_width=True):
+        if st.button("Resetar mÃ³dulo trader", use_container_width=True):
             try:
                 with st.spinner("Resetando trader..."):
                     reset_trader_module()
@@ -781,10 +776,10 @@ with st.expander("Modo avançado"):
 
     tab1, tab2, tab3, tab4 = st.tabs(
         [
-            "📊 Operações em andamento",
-            "📄 Histórico de ordens",
-            "⚡ Últimos trades",
-            "📈 Métricas",
+            "ðŸ“Š OperaÃ§Ãµes em andamento",
+            "ðŸ“„ HistÃ³rico de ordens",
+            "âš¡ Ãšltimos trades",
+            "ðŸ“ˆ MÃ©tricas",
         ]
     )
 
@@ -792,7 +787,7 @@ with st.expander("Modo avançado"):
         if positions:
             st.dataframe(pd.DataFrame(positions), use_container_width=True)
         else:
-            st.info("Sem operações abertas no trader.")
+            st.info("Sem operaÃ§Ãµes abertas no trader.")
 
     with tab2:
         try:
@@ -814,7 +809,38 @@ with st.expander("Modo avançado"):
         k1, k2, k3, k4 = st.columns(4)
         k1.metric("Cash", br_money(float(paper_state.get("cash", 0.0))))
         k2.metric("Equity", br_money(float(paper_state.get("equity", 0.0))))
-        k3.metric("Execuções", f"{paper_state.get('run_count', 0)}")
+        k3.metric("ExecuÃ§Ãµes", f"{paper_state.get('run_count', 0)}")
         k4.metric("Trades", f"{paper_report.get('trades_count', 0)}")
 
-      if not paper_equity_df.empty:
+        st.metric("P&L", br_money(float(paper_report.get("net_profit", 0.0))))
+
+        if not paper_equity_df.empty:
+            equity_plot = paper_equity_df.copy()
+            if "timestamp" in equity_plot.columns:
+                equity_plot["timestamp"] = pd.to_datetime(equity_plot["timestamp"], errors="coerce")
+            else:
+                equity_plot["timestamp"] = pd.RangeIndex(start=1, stop=len(equity_plot) + 1)
+
+            fig_equity = go.Figure()
+            fig_equity.add_trace(
+                go.Scatter(
+                    x=equity_plot["timestamp"],
+                    y=equity_plot["equity"],
+                    mode="lines",
+                    name="Equity",
+                    line=dict(width=2.2, color="#38bdf8"),
+                )
+            )
+            fig_equity.update_layout(
+                template="plotly_dark",
+                height=280,
+                margin=dict(l=10, r=10, t=25, b=10),
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
+                xaxis_title="Tempo",
+                yaxis_title="Equity",
+                showlegend=False,
+            )
+            st.plotly_chart(fig_equity, use_container_width=True)
+        else:
+            st.info("Curva de equity ainda nÃƒÂ£o disponÃƒÂ­vel.")

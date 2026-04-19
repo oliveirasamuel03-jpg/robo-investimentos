@@ -359,3 +359,13 @@ def run_forever(sleep_seconds: int | None = None) -> None:
 
         wait_seconds = sleep_seconds or int(runtime.get("interval_minutes", 5)) * 60
         time.sleep(max(wait_seconds, 30))
+
+
+## Deploy no Railway
+
+Para rodar 24h no Railway, use dois services separados apontando para o mesmo repositório:
+
+- `web`: `streamlit run app.py --server.address 0.0.0.0 --server.port $PORT`
+- `worker`: `python -m workers.trader_worker`
+
+O guia completo está em [DEPLOY_RAILWAY.md](DEPLOY_RAILWAY.md).
