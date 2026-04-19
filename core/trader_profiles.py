@@ -31,6 +31,12 @@ PROFILE_DEFINITIONS: dict[str, dict] = {
         "breakout_min": -0.02,
         "ma20_slope_min": -0.0015,
         "ma50_slope_min": -0.0025,
+        "reentry_cooldown_minutes": 45,
+        "min_position_age_minutes": 12,
+        "take_profit_rsi": 71.0,
+        "weak_momentum_exit_threshold": -0.001,
+        "trend_break_buffer_pct": 0.995,
+        "hard_stop_loss_pct": 0.028,
     },
     "Equilibrado": {
         "name": "Equilibrado",
@@ -53,6 +59,12 @@ PROFILE_DEFINITIONS: dict[str, dict] = {
         "breakout_min": -0.04,
         "ma20_slope_min": -0.003,
         "ma50_slope_min": -0.004,
+        "reentry_cooldown_minutes": 20,
+        "min_position_age_minutes": 5,
+        "take_profit_rsi": 74.0,
+        "weak_momentum_exit_threshold": -0.002,
+        "trend_break_buffer_pct": 0.99,
+        "hard_stop_loss_pct": 0.04,
     },
     "Agressivo": {
         "name": "Agressivo",
@@ -75,6 +87,12 @@ PROFILE_DEFINITIONS: dict[str, dict] = {
         "breakout_min": -0.06,
         "ma20_slope_min": -0.005,
         "ma50_slope_min": -0.006,
+        "reentry_cooldown_minutes": 8,
+        "min_position_age_minutes": 2,
+        "take_profit_rsi": 78.0,
+        "weak_momentum_exit_threshold": -0.004,
+        "trend_break_buffer_pct": 0.985,
+        "hard_stop_loss_pct": 0.055,
     },
 }
 

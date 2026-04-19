@@ -55,6 +55,12 @@ class PaperTradingConfig:
     breakout_min: float = -0.04
     ma20_slope_min: float = -0.003
     ma50_slope_min: float = -0.004
+    reentry_cooldown_minutes: int = 20
+    min_position_age_minutes: int = 5
+    take_profit_rsi: float = 74.0
+    weak_momentum_exit_threshold: float = -0.002
+    trend_break_buffer_pct: float = 0.99
+    hard_stop_loss_pct: float = 0.04
 
 
 def _utc_now() -> datetime:
@@ -77,6 +83,7 @@ def _default_state(initial_capital: float) -> dict[str, Any]:
         "equity": capital,
         "realized_pnl": 0.0,
         "positions": {},
+        "asset_cooldowns": {},
         "last_prices": {},
         "history": [],
         "run_count": 0,
@@ -111,6 +118,7 @@ def load_paper_state(config: PaperTradingConfig | None = None) -> dict[str, Any]
     merged = _default_state(float(config.initial_capital) if config else state.get("initial_capital", 10000.0))
     merged.update(state)
     merged["positions"] = merged.get("positions", {}) or {}
+    merged["asset_cooldowns"] = merged.get("asset_cooldowns", {}) or {}
     merged["last_prices"] = merged.get("last_prices", {}) or {}
     merged["history"] = merged.get("history", []) or []
     return merged
@@ -268,6 +276,18 @@ def _dynamic_stop_pct(atr_pct: float, multiplier: float = 2.4) -> float:
     return float(min(max(atr_pct * multiplier, 0.018), 0.055))
 
 
+def _parse_iso_datetime(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(str(value))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
 def _enrich_indicators(df: pd.DataFrame) -> pd.DataFrame:
     data = df.copy()
     data["open"] = pd.to_numeric(data.get("open"), errors="coerce")
@@ -362,37 +382,59 @@ def _should_buy(latest: pd.Series, config: PaperTradingConfig) -> tuple[bool, fl
 
 
 def _is_position_expired(opened_at: str | None, holding_minutes: int) -> bool:
-    if not opened_at:
-        return False
-    try:
-        opened = datetime.fromisoformat(opened_at)
-    except ValueError:
+    opened = _parse_iso_datetime(opened_at)
+    if opened is None:
         return False
     return _utc_now() >= opened + timedelta(minutes=int(holding_minutes))
 
 
+def _position_age_minutes(opened_at: str | None) -> float | None:
+    opened = _parse_iso_datetime(opened_at)
+    if opened is None:
+        return None
+    return max((_utc_now() - opened).total_seconds() / 60.0, 0.0)
+
+
+def _asset_in_cooldown(state: dict[str, Any], asset: str, cooldown_minutes: int) -> bool:
+    if cooldown_minutes <= 0:
+        return False
+    normalized_asset = str(asset).upper()
+    cooldown_map = state.get("asset_cooldowns", {}) or {}
+    closed_at = _parse_iso_datetime(cooldown_map.get(normalized_asset) or cooldown_map.get(str(asset)))
+    if closed_at is None:
+        return False
+    return _utc_now() < closed_at + timedelta(minutes=int(cooldown_minutes))
+
+
 def _should_sell(position: dict[str, Any], latest: pd.Series, holding_minutes: int, config: PaperTradingConfig) -> tuple[bool, str]:
     price = float(latest["close"])
+    holding_limit = int(position.get("holding_minutes_limit", holding_minutes) or holding_minutes)
     ma20 = float(latest.get("ma20", price))
     ma50 = float(latest.get("ma50", price))
     rsi = float(latest.get("rsi", 50.0))
     momentum = float(latest.get("momentum", 0.0))
     atr_pct = float(latest.get("atr_pct", position.get("atr_pct", 0.0) or 0.0))
+    avg_price = float(position.get("avg_price", price) or price)
     peak_price = max(float(position.get("peak_price", position.get("avg_price", price) or price)), price)
+    age_minutes = _position_age_minutes(position.get("opened_at"))
+    allow_soft_exit = age_minutes is None or age_minutes >= float(config.min_position_age_minutes)
     trailing_stop = max(
         float(position.get("trailing_stop", 0.0) or 0.0),
         round(peak_price * (1.0 - _dynamic_stop_pct(atr_pct, multiplier=float(config.trailing_stop_atr_mult))), 6),
     )
+    hard_stop = round(avg_price * (1.0 - float(config.hard_stop_loss_pct)), 6)
 
+    if hard_stop > 0 and price <= hard_stop:
+        return True, "stop loss"
     if trailing_stop > 0 and price <= trailing_stop:
         return True, "trailing stop"
-    if rsi >= 74.0 and momentum <= 0.04:
+    if allow_soft_exit and rsi >= float(config.take_profit_rsi) and momentum <= 0.04:
         return True, "rsi esticado"
-    if price < ma20 and momentum < -0.002:
+    if allow_soft_exit and price < ma20 and momentum < float(config.weak_momentum_exit_threshold):
         return True, "perdeu media curta"
-    if price < ma50 * 0.99:
+    if allow_soft_exit and price < ma50 * float(config.trend_break_buffer_pct):
         return True, "perdeu tendencia"
-    if _is_position_expired(position.get("opened_at"), holding_minutes):
+    if _is_position_expired(position.get("opened_at"), holding_limit):
         return True, "holding expirado"
     return False, ""
 
@@ -530,6 +572,8 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[s
         state["cash"] = round(float(state.get("cash", 0.0)) + gross_value, 2)
         state["realized_pnl"] = round(float(state.get("realized_pnl", 0.0)) + realized, 2)
         state["last_trade_at"] = closed_at
+        state.setdefault("asset_cooldowns", {})
+        state["asset_cooldowns"][str(asset).upper()] = closed_at
         del state["positions"][asset]
 
         trade = {
@@ -567,6 +611,8 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[s
 
     for asset, data in market_data.items():
         if asset in state.get("positions", {}):
+            continue
+        if _asset_in_cooldown(state, asset, int(config.reentry_cooldown_minutes)):
             continue
 
         latest = data.iloc[-1]
@@ -683,3 +729,4 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[s
         "signals": signals,
         "trades_executed": len(trades_executed),
     }
+    holding_limit = int(position.get("holding_minutes_limit", holding_minutes) or holding_minutes)

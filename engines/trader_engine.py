@@ -70,6 +70,12 @@ def build_paper_cfg_from_platform_state(state: dict) -> PaperTradingConfig:
         breakout_min=float(profile_config["breakout_min"]),
         ma20_slope_min=float(profile_config["ma20_slope_min"]),
         ma50_slope_min=float(profile_config["ma50_slope_min"]),
+        reentry_cooldown_minutes=int(profile_config["reentry_cooldown_minutes"]),
+        min_position_age_minutes=int(profile_config["min_position_age_minutes"]),
+        take_profit_rsi=float(profile_config["take_profit_rsi"]),
+        weak_momentum_exit_threshold=float(profile_config["weak_momentum_exit_threshold"]),
+        trend_break_buffer_pct=float(profile_config["trend_break_buffer_pct"]),
+        hard_stop_loss_pct=float(profile_config["hard_stop_loss_pct"]),
     )
 
 
