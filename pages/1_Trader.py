@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from datetime import datetime, timedelta, timezone
 
 import pandas as pd
@@ -39,7 +40,7 @@ from engines.trader_engine import (
 
 
 @st.cache_data(ttl=60, show_spinner=False)
-def load_chart_data(ticker: str, period: str, interval: str) -> pd.DataFrame:
+def load_chart_data(ticker: str, period: str, interval: str, refresh_key: int | None = None) -> pd.DataFrame:
     df = yf.download(
         tickers=ticker,
         period=period,
@@ -417,6 +418,229 @@ def build_robot_log(signal_text: str, robot_label: str, last_action_text: str, o
     return logs[:4]
 
 
+def make_chart_refresh_key(auto_refresh: bool, refresh_seconds: int) -> int | None:
+    if not auto_refresh:
+        return None
+    return int(time.time() // max(int(refresh_seconds), 30))
+
+
+def build_trader_snapshot(
+    selected_ticker: str,
+    period: str,
+    interval: str,
+    refresh_key: int | None = None,
+) -> dict:
+    sync_platform_positions_from_paper()
+    state = load_bot_state()
+    security_state = state.get("security", {}) or {}
+    paper_state = load_paper_state()
+    paper_report = build_paper_report(initial_capital=float(state.get("wallet_value", 10000.0)))
+    paper_equity_df = read_paper_equity(limit=300)
+    paper_trades = read_paper_trades()[-200:]
+    positions = [p for p in state.get("positions", []) if p.get("module") == "TRADER"]
+    open_positions = [p for p in positions if p.get("status") == "OPEN"]
+    selected_position = next((p for p in open_positions if p.get("asset") == selected_ticker), None)
+    entry_price = float(selected_position.get("entry_price", 0.0)) if selected_position else None
+
+    chart_df = pd.DataFrame()
+    chart_error = ""
+    orders_df = load_trader_orders()
+
+    try:
+        chart_df = load_chart_data(selected_ticker, period, interval, refresh_key=refresh_key)
+    except Exception as exc:
+        chart_error = str(exc)
+
+    last_price = float(chart_df["close"].iloc[-1]) if not chart_df.empty else 0.0
+    signal_text = simple_signal_text(chart_df)
+    signal_color = signal_badge_color(signal_text)
+
+    robot_status = state.get("bot_status", "PAUSED")
+    robot_label = "Ligado" if robot_status == "RUNNING" else "Pausado" if robot_status == "PAUSED" else "Desligado"
+    robot_class = "metric-good" if robot_label == "Ligado" else "metric-bad" if robot_label == "Desligado" else "metric-neutral"
+
+    last_action = resolve_last_action(state, paper_trades, open_positions)
+    last_execution = resolve_last_execution(state, paper_state)
+    next_execution = state.get("next_run_at", "")
+    worker_status = resolve_worker_status(state)
+    worker_heartbeat = state.get("worker_heartbeat", "")
+
+    current_max = float(chart_df["high"].max()) if not chart_df.empty else 0.0
+    current_min = float(chart_df["low"].min()) if not chart_df.empty else 0.0
+
+    return {
+        "state": state,
+        "security_state": security_state,
+        "paper_state": paper_state,
+        "paper_report": paper_report,
+        "paper_equity_df": paper_equity_df,
+        "paper_trades": paper_trades,
+        "positions": positions,
+        "open_positions": open_positions,
+        "selected_position": selected_position,
+        "entry_price": entry_price,
+        "chart_df": chart_df,
+        "chart_error": chart_error,
+        "orders_df": orders_df,
+        "last_price": last_price,
+        "signal_text": signal_text,
+        "signal_color": signal_color,
+        "robot_status": robot_status,
+        "robot_label": robot_label,
+        "robot_class": robot_class,
+        "last_action": last_action,
+        "last_execution": last_execution,
+        "next_execution": next_execution,
+        "worker_status": worker_status,
+        "worker_heartbeat": worker_heartbeat,
+        "current_max": current_max,
+        "current_min": current_min,
+    }
+
+
+def render_trader_snapshot(snapshot: dict, selected_ticker: str) -> None:
+    chart_df = snapshot["chart_df"]
+    paper_state = snapshot["paper_state"]
+    paper_report = snapshot["paper_report"]
+    open_positions = snapshot["open_positions"]
+    selected_position = snapshot["selected_position"]
+    last_price = float(snapshot["last_price"])
+    signal_text = snapshot["signal_text"]
+    signal_color = snapshot["signal_color"]
+    robot_label = snapshot["robot_label"]
+    robot_class = snapshot["robot_class"]
+    chart_error = snapshot["chart_error"]
+
+    m1, m2, m3, m4 = st.columns(4)
+
+    with m1:
+        st.markdown(
+            f"""
+            <div class="glass-card">
+                <div class="metric-label">Saldo disponivel</div>
+                <div class="metric-value metric-neutral">{br_money(float(paper_state.get('cash', 0.0)))}</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    with m2:
+        pnl_value = float(paper_report.get("net_profit", 0.0))
+        pnl_class = "metric-good" if pnl_value >= 0 else "metric-bad"
+        st.markdown(
+            f"""
+            <div class="glass-card">
+                <div class="metric-label">Lucro / prejuizo</div>
+                <div class="metric-value {pnl_class}">{br_money(pnl_value)}</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    with m3:
+        st.markdown(
+            f"""
+            <div class="glass-card">
+                <div class="metric-label">Status do robo</div>
+                <div class="metric-value {robot_class}">{robot_label}</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    with m4:
+        equity_value = float(paper_state.get("equity", 0.0))
+        return_pct = 0.0
+        initial_capital = float(snapshot["state"].get("wallet_value", 0.0))
+        if initial_capital > 0:
+            return_pct = (equity_value - initial_capital) / initial_capital
+        st.markdown(
+            f"""
+            <div class="glass-card">
+                <div class="metric-label">Resultado %</div>
+                <div class="metric-value metric-neutral">{br_pct(return_pct)}</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    st.markdown(
+        f"""
+        <div class="hero-box">
+            <div class="section-title">Visao rapida do mercado</div>
+            <div class="small-note">Ativo selecionado: <b>{selected_ticker}</b></div>
+            <div class="signal-pill" style="background:{signal_color};">{signal_text}</div>
+            <div class="status-line">
+                Preco atual: <b>{last_price:,.2f}</b> &nbsp;&nbsp;|&nbsp;&nbsp;
+                Operacoes abertas: <b>{len(open_positions)}</b> &nbsp;&nbsp;|&nbsp;&nbsp;
+                Robo: <b>{robot_label}</b>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    if bool(snapshot["security_state"].get("real_mode_enabled", False)):
+        st.warning("Real trading enabled")
+
+    chart_col, side_col = st.columns([2.3, 0.95])
+
+    with chart_col:
+        if chart_error:
+            st.error(f"Erro ao carregar grafico: {chart_error}")
+
+        if chart_df.empty:
+            st.warning("Nao foi possivel carregar dados desse ativo agora.")
+        else:
+            aligned_orders = align_orders_to_chart(snapshot["orders_df"], chart_df, selected_ticker)
+            st.plotly_chart(
+                build_candle_chart(
+                    chart_df,
+                    selected_ticker,
+                    entry_price=snapshot["entry_price"],
+                    aligned_orders=aligned_orders,
+                ),
+                use_container_width=True,
+            )
+
+            with st.expander("Mostrar volume"):
+                st.plotly_chart(build_volume_chart(chart_df, selected_ticker), use_container_width=True)
+
+    with side_col:
+        st.metric("Preco atual", f"{last_price:,.2f}")
+        st.metric("Maxima", f"{float(snapshot['current_max']):,.2f}")
+        st.metric("Minima", f"{float(snapshot['current_min']):,.2f}")
+
+        if selected_position:
+            qty = float(selected_position.get("qty", 0.0))
+            avg_price = float(selected_position.get("entry_price", 0.0))
+            market_value = qty * last_price if last_price else 0.0
+            unrealized = (last_price - avg_price) * qty if last_price else 0.0
+
+            st.markdown("### Operacao aberta")
+            st.write(f"**Quantidade:** {qty:,.6f}")
+            st.write(f"**Preco medio:** {avg_price:,.2f}")
+            st.write(f"**Valor atual:** {br_money(market_value)}")
+            st.write(f"**Resultado atual:** {br_money(unrealized)}")
+        else:
+            st.info("Nenhuma operacao aberta nesse ativo.")
+
+        st.markdown("<div class='log-card'>", unsafe_allow_html=True)
+        st.markdown("### Robo em tempo real")
+        st.caption("Resumo vivo do comportamento do robo")
+
+        st.write(f"**Status do worker:** {snapshot['worker_status']}")
+        st.write(f"**Ultima acao:** {snapshot['last_action']}")
+        st.write(f"**Ultima execucao:** {snapshot['last_execution'] or 'Ainda nao executado'}")
+        st.write(f"**Proxima analise:** {snapshot['next_execution'] or 'Aguardando'}")
+        st.write(f"**Heartbeat:** {snapshot['worker_heartbeat'] or 'Sem sinal'}")
+
+        for item in build_robot_log(signal_text, robot_label, snapshot["last_action"], open_positions):
+            st.markdown(f"<div class='log-item'>{item}</div>", unsafe_allow_html=True)
+
+        st.markdown("</div>", unsafe_allow_html=True)
+
+
 st.set_page_config(page_title="Trader Premium Max", layout="wide")
 
 current_user = require_auth()
@@ -570,7 +794,6 @@ st.markdown(
 
 state = load_bot_state()
 trader = state["trader"]
-security_state = state.get("security", {}) or {}
 admin_mode = is_admin(current_user)
 
 sync_platform_positions_from_paper()
@@ -597,6 +820,27 @@ with top_right:
     with tf2:
         interval = st.selectbox("Intervalo", options=["1m", "5m", "15m", "30m", "60m", "1d"], index=2)
 
+live_c1, live_c2 = st.columns([1.1, 0.9])
+with live_c1:
+    auto_refresh_enabled = st.toggle(
+        "Atualizacao automatica do painel",
+        value=True,
+        help="Atualiza o painel do Trader sem mudar a frequencia do worker.",
+    )
+with live_c2:
+    live_refresh_seconds = st.selectbox(
+        "Atualizar painel a cada",
+        options=[15, 30, 60, 120],
+        index=1,
+        disabled=not auto_refresh_enabled,
+    )
+
+st.caption(
+    "Periodo e intervalo mudam apenas o grafico. O worker continua no proprio ciclo em segundo plano, hoje cerca de 60 segundos quando ligado."
+)
+
+auto_refresh_fragment_supported = bool(auto_refresh_enabled and hasattr(st, "fragment"))
+
 selected_position = next((p for p in open_positions if p.get("asset") == selected_ticker), None)
 entry_price = float(selected_position.get("entry_price", 0.0)) if selected_position else None
 
@@ -605,7 +849,12 @@ orders_df = load_trader_orders()
 
 try:
     with st.spinner("Carregando gráfico..."):
-        chart_df = load_chart_data(selected_ticker, period, interval)
+        chart_df = load_chart_data(
+            selected_ticker,
+            period,
+            interval,
+            refresh_key=make_chart_refresh_key(auto_refresh_fragment_supported, int(live_refresh_seconds)),
+        )
 except Exception as e:
     st.error(f"Erro ao carregar gráfico: {e}")
 
@@ -719,6 +968,50 @@ with b3:
 
 if not admin_mode:
     st.info("Somente administradores podem iniciar, pausar ou executar ciclos do robô.")
+
+if auto_refresh_fragment_supported:
+    st.markdown("### Painel ao vivo")
+    st.caption(
+        f"Atualizacao automatica ligada a cada {int(live_refresh_seconds)}s. O bloco abaixo acompanha o worker sem mudar a frequencia de execucao do robo."
+    )
+
+    @st.fragment(run_every=f"{int(live_refresh_seconds)}s")
+    def render_live_monitor() -> None:
+        live_snapshot = build_trader_snapshot(
+            selected_ticker,
+            period,
+            interval,
+            refresh_key=make_chart_refresh_key(True, int(live_refresh_seconds)),
+        )
+
+        lm1, lm2, lm3, lm4 = st.columns(4)
+        lm1.metric("Preco ao vivo", f"{float(live_snapshot['last_price']):,.2f}")
+        lm2.metric("Worker", str(live_snapshot["worker_status"]))
+        lm3.metric("Posicoes", f"{len(live_snapshot['open_positions'])}")
+        lm4.metric("Bot", str(live_snapshot["robot_label"]))
+
+        st.caption(
+            f"Ultima acao: {live_snapshot['last_action']} | "
+            f"Ultima execucao: {live_snapshot['last_execution'] or 'Aguardando'} | "
+            f"Heartbeat: {live_snapshot['worker_heartbeat'] or 'Sem sinal'}"
+        )
+
+        live_chart_df = live_snapshot["chart_df"]
+        if not live_chart_df.empty:
+            aligned_orders = align_orders_to_chart(live_snapshot["orders_df"], live_chart_df, selected_ticker)
+            st.plotly_chart(
+                build_candle_chart(
+                    live_chart_df,
+                    selected_ticker,
+                    entry_price=live_snapshot["entry_price"],
+                    aligned_orders=aligned_orders,
+                ),
+                use_container_width=True,
+            )
+        else:
+            st.info("Sem dados recentes para o painel ao vivo neste momento.")
+
+    render_live_monitor()
 
 chart_col, side_col = st.columns([2.3, 0.95])
 
