@@ -62,6 +62,13 @@ def empty_trade_reports_df() -> pd.DataFrame:
     return pd.DataFrame(columns=TRADER_REPORTS_COLUMNS)
 
 
+def _profile_display_series(series: pd.Series) -> pd.Series:
+    normalized = series.astype("string").fillna("Sem perfil")
+    normalized = normalized.str.strip()
+    normalized = normalized.replace({"": "Sem perfil", "<NA>": "Sem perfil", "nan": "Sem perfil"})
+    return normalized
+
+
 def normalize_trade_reports_frame(df: pd.DataFrame | None) -> pd.DataFrame:
     if df is None or df.empty:
         return empty_trade_reports_df()
@@ -250,10 +257,11 @@ def summarize_reports_by_profile(reports_df: pd.DataFrame) -> pd.DataFrame:
     if df.empty:
         return pd.DataFrame(columns=["profile", "trades", "pnl", "win_rate", "avg_pnl", "avg_duration"])
 
+    working = df.copy()
+    working["profile"] = _profile_display_series(working["profile"])
     grouped = (
-        df.groupby("profile", dropna=False)
+        working.groupby("profile", dropna=False)
         .agg(
-            trades=("trade_id", "count"),
             pnl=("realized_pnl", "sum"),
             win_rate=("realized_pnl", lambda s: (pd.to_numeric(s, errors="coerce") > 0).mean()),
             avg_pnl=("realized_pnl", "mean"),
@@ -261,6 +269,9 @@ def summarize_reports_by_profile(reports_df: pd.DataFrame) -> pd.DataFrame:
         )
         .reset_index()
     )
+    trades = working.groupby("profile", dropna=False).size().reset_index(name="trades")
+    grouped = grouped.merge(trades, on="profile", how="left")
+    grouped = grouped[grouped["trades"] > 0].copy()
     return grouped.sort_values("pnl", ascending=False).reset_index(drop=True)
 
 
@@ -273,7 +284,9 @@ def generate_trade_suggestions(reports_df: pd.DataFrame) -> list[dict[str, Any]]
     profile_summary = summarize_reports_by_profile(df)
 
     for row in profile_summary.to_dict(orient="records"):
-        profile = str(row.get("profile") or "Sem perfil")
+        profile = str(row.get("profile") or "Sem perfil").strip() or "Sem perfil"
+        if profile == "Sem perfil":
+            continue
         trades = int(row.get("trades", 0) or 0)
         win_rate = float(row.get("win_rate", 0.0) or 0.0)
         avg_pnl = float(row.get("avg_pnl", 0.0) or 0.0)
@@ -304,6 +317,7 @@ def generate_trade_suggestions(reports_df: pd.DataFrame) -> list[dict[str, Any]]
             )
 
     positive_profiles = profile_summary[profile_summary["pnl"] > 0].copy()
+    positive_profiles = positive_profiles[positive_profiles["profile"] != "Sem perfil"].copy()
     if not positive_profiles.empty:
         best = positive_profiles.sort_values(["win_rate", "pnl"], ascending=False).iloc[0]
         suggestions.append(
