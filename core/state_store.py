@@ -11,9 +11,9 @@ from core.config import (
     BOT_STATE_FILE,
     INVESTOR_ORDERS_COLUMNS,
     INVESTOR_ORDERS_FILE,
-    STORAGE_DIR,
     TRADER_ORDERS_COLUMNS,
     TRADER_ORDERS_FILE,
+    ensure_app_directories,
 )
 from core.persistence import (
     append_table_row,
@@ -77,15 +77,13 @@ DEFAULT_STATE = {
 
 
 def _ensure_csv(file_path, columns: list[str]) -> None:
+    file_path.parent.mkdir(parents=True, exist_ok=True)
     if not file_path.exists():
         pd.DataFrame(columns=columns).to_csv(file_path, index=False)
 
 
 def ensure_storage() -> None:
-    if database_enabled():
-        return
-
-    STORAGE_DIR.mkdir(parents=True, exist_ok=True)
+    ensure_app_directories()
     if not BOT_STATE_FILE.exists():
         save_bot_state(deepcopy(DEFAULT_STATE))
 
@@ -111,7 +109,7 @@ def load_bot_state() -> dict:
 
 
 def save_bot_state(state: dict) -> None:
-    STORAGE_DIR.mkdir(parents=True, exist_ok=True)
+    ensure_app_directories()
     save_json_state("bot_state", state, BOT_STATE_FILE)
 
 

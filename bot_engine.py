@@ -9,11 +9,16 @@ from typing import Any
 import pandas as pd
 import yfinance as yf
 
+from core.config import (
+    LEGACY_BOT_LOG_FILE,
+    LEGACY_BOT_STATE_FILE,
+    LEGACY_RUNTIME_CONFIG_FILE,
+    ensure_app_directories,
+)
 
-APP_DIR = Path(__file__).resolve().parent
-CONFIG_PATH = APP_DIR / "runtime_config.json"
-STATE_PATH = APP_DIR / "bot_state.json"
-LOG_PATH = APP_DIR / "bot_logs.jsonl"
+CONFIG_PATH = LEGACY_RUNTIME_CONFIG_FILE
+STATE_PATH = LEGACY_BOT_STATE_FILE
+LOG_PATH = LEGACY_BOT_LOG_FILE
 
 DEFAULT_TICKERS = [
     "VALE3.SA",
@@ -67,6 +72,7 @@ def now_iso() -> str:
 
 
 def ensure_runtime_files() -> None:
+    ensure_app_directories()
     if not CONFIG_PATH.exists():
         CONFIG_PATH.write_text(json.dumps(DEFAULT_RUNTIME, indent=2), encoding="utf-8")
     if not STATE_PATH.exists():
@@ -78,10 +84,15 @@ def ensure_runtime_files() -> None:
 def load_json(path: Path, fallback: dict) -> dict:
     if not path.exists():
         return fallback.copy()
-    return json.loads(path.read_text(encoding="utf-8"))
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return fallback.copy()
+    return payload if isinstance(payload, dict) else fallback.copy()
 
 
 def save_json(path: Path, data: dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(data, indent=2, ensure_ascii=True), encoding="utf-8")
 
 
@@ -140,7 +151,17 @@ def append_log(level: str, message: str, context: dict | None = None) -> None:
 def read_logs(limit: int = 50) -> list[dict]:
     ensure_runtime_files()
     lines = LOG_PATH.read_text(encoding="utf-8").splitlines()
-    return [json.loads(line) for line in lines[-limit:] if line.strip()]
+    rows: list[dict] = []
+    for line in lines[-limit:]:
+        if not line.strip():
+            continue
+        try:
+            payload = json.loads(line)
+        except Exception:
+            continue
+        if isinstance(payload, dict):
+            rows.append(payload)
+    return rows
 
 
 def normalize_columns(df: pd.DataFrame) -> pd.DataFrame:

@@ -10,7 +10,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import yfinance as yf
 
-from core.config import STORAGE_DIR
+from core.config import RUNTIME_DIR, ensure_app_directories
 from core.persistence import (
     append_json_row,
     load_json_rows,
@@ -20,8 +20,8 @@ from core.persistence import (
 )
 
 
-PAPER_STATE_FILE = STORAGE_DIR / "paper_state.json"
-PAPER_TRADES_FILE = STORAGE_DIR / "paper_trades.json"
+PAPER_STATE_FILE = RUNTIME_DIR / "paper_state.json"
+PAPER_TRADES_FILE = RUNTIME_DIR / "paper_trades.json"
 PAPER_STATE_NAMESPACE = "paper_state"
 PAPER_TRADES_NAMESPACE = "paper_trades"
 
@@ -65,7 +65,7 @@ def _default_state(initial_capital: float) -> dict[str, Any]:
 
 
 def ensure_paper_files(config: PaperTradingConfig | None = None) -> None:
-    STORAGE_DIR.mkdir(parents=True, exist_ok=True)
+    ensure_app_directories()
 
     initial_capital = float(config.initial_capital) if config else 10000.0
 
@@ -92,7 +92,7 @@ def load_paper_state(config: PaperTradingConfig | None = None) -> dict[str, Any]
 
 
 def save_paper_state(state: dict[str, Any]) -> None:
-    STORAGE_DIR.mkdir(parents=True, exist_ok=True)
+    ensure_app_directories()
     save_json_state(PAPER_STATE_NAMESPACE, state, PAPER_STATE_FILE)
 
 

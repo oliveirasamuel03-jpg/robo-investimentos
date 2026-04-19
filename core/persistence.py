@@ -7,8 +7,6 @@ from typing import Any, Callable
 
 import pandas as pd
 
-DATABASE_URL = str(os.getenv("DATABASE_URL", "") or "").strip()
-
 try:
     import psycopg
 except Exception:
@@ -18,18 +16,22 @@ except Exception:
 _DB_SCHEMA_READY = False
 
 
+def get_database_url() -> str:
+    return str(os.getenv("DATABASE_URL", "") or "").strip()
+
+
 def database_enabled() -> bool:
-    return bool(DATABASE_URL)
+    return bool(get_database_url())
 
 
 def _require_psycopg() -> None:
     if psycopg is None:
-        raise RuntimeError("DATABASE_URL está definido, mas a dependência 'psycopg[binary]' não está instalada.")
+        raise RuntimeError("DATABASE_URL is set, but the 'psycopg[binary]' dependency is not installed.")
 
 
 def _connect():
     _require_psycopg()
-    return psycopg.connect(DATABASE_URL, autocommit=True)
+    return psycopg.connect(get_database_url(), autocommit=True)
 
 
 def _ensure_db_schema() -> None:

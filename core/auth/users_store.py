@@ -3,12 +3,11 @@ from __future__ import annotations
 import os
 from datetime import datetime, timezone
 
-from core.config import STORAGE_DIR
+from core.config import AUTH_USERS_FILE
 from core.persistence import load_json_state, save_json_state
 
 from .security import hash_password
 
-AUTH_USERS_FILE = STORAGE_DIR / "auth_users.json"
 AUTH_USERS_NAMESPACE = "auth_users_store"
 VALID_ROLES = {"admin", "user"}
 
