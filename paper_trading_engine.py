@@ -39,6 +39,10 @@ class PaperTradingConfig:
     holding_minutes: int = 60
     history_limit: int = 500
     allow_new_entries: bool = True
+    min_signal_score: float = 0.62
+    min_atr_pct: float = 0.003
+    max_atr_pct: float = 0.08
+    trailing_stop_atr_mult: float = 2.4
 
 
 def _utc_now() -> datetime:
@@ -220,14 +224,54 @@ def _calculate_rsi(series: pd.Series, period: int = 14) -> pd.Series:
     return (100 - (100 / (1 + rs))).fillna(50.0)
 
 
+def _calculate_atr(data: pd.DataFrame, period: int = 14) -> pd.Series:
+    high = pd.to_numeric(data.get("high"), errors="coerce")
+    low = pd.to_numeric(data.get("low"), errors="coerce")
+    close = pd.to_numeric(data.get("close"), errors="coerce")
+    prev_close = close.shift(1)
+
+    true_range = pd.concat(
+        [
+            (high - low).abs(),
+            (high - prev_close).abs(),
+            (low - prev_close).abs(),
+        ],
+        axis=1,
+    ).max(axis=1)
+
+    return true_range.rolling(period).mean()
+
+
+def _clip_score(value: float, floor: float = 0.0, ceil: float = 1.0) -> float:
+    return float(min(max(value, floor), ceil))
+
+
+def _dynamic_stop_pct(atr_pct: float, multiplier: float = 2.4) -> float:
+    if atr_pct <= 0:
+        return 0.03
+    return float(min(max(atr_pct * multiplier, 0.018), 0.055))
+
+
 def _enrich_indicators(df: pd.DataFrame) -> pd.DataFrame:
     data = df.copy()
+    data["open"] = pd.to_numeric(data.get("open"), errors="coerce")
+    data["high"] = pd.to_numeric(data.get("high"), errors="coerce")
+    data["low"] = pd.to_numeric(data.get("low"), errors="coerce")
     data["close"] = pd.to_numeric(data["close"], errors="coerce")
+    data["returns"] = data["close"].pct_change()
+    data["ma20"] = data["close"].rolling(20).mean()
     data["ma50"] = data["close"].rolling(50).mean()
+    data["ma20_slope"] = data["ma20"].pct_change(5).fillna(0.0)
+    data["ma50_slope"] = data["ma50"].pct_change(5).fillna(0.0)
     data["rsi"] = _calculate_rsi(data["close"])
-    data["volatility"] = data["close"].pct_change().rolling(12).std().fillna(0.0)
+    data["atr"] = _calculate_atr(data)
+    data["atr_pct"] = (data["atr"] / data["close"]).replace([np.inf, -np.inf], np.nan)
+    data["volatility"] = data["returns"].rolling(12).std().fillna(0.0)
     data["momentum"] = data["close"].pct_change(3).fillna(0.0)
-    return data.dropna(subset=["close"]).reset_index(drop=True)
+    data["momentum_8"] = data["close"].pct_change(8).fillna(0.0)
+    data["breakout_20"] = (data["close"] / data["close"].rolling(20).max()) - 1.0
+    data["pullback_to_ma20"] = (data["close"] / data["ma20"]) - 1.0
+    return data.dropna(subset=["close", "ma20", "ma50", "atr_pct"]).reset_index(drop=True)
 
 
 def _normalize_symbol_list(config: PaperTradingConfig) -> list[str]:
@@ -237,31 +281,59 @@ def _normalize_symbol_list(config: PaperTradingConfig) -> list[str]:
 
 def _compute_buy_score(latest: pd.Series) -> float:
     price = float(latest["close"])
+    ma20 = float(latest.get("ma20", price))
     ma50 = float(latest.get("ma50", price))
     rsi = float(latest.get("rsi", 50.0))
-    vol = float(latest.get("volatility", 0.0))
+    atr_pct = float(latest.get("atr_pct", 0.0))
     momentum = float(latest.get("momentum", 0.0))
+    momentum_8 = float(latest.get("momentum_8", 0.0))
+    breakout_20 = float(latest.get("breakout_20", 0.0))
+    pullback_to_ma20 = float(latest.get("pullback_to_ma20", 0.0))
+    ma20_slope = float(latest.get("ma20_slope", 0.0))
+    ma50_slope = float(latest.get("ma50_slope", 0.0))
 
-    trend_score = 1.0 if price >= ma50 else max(0.0, 1.0 - ((ma50 - price) / max(ma50, 1e-9)) * 8)
-    rsi_score = max(0.0, 1.0 - abs(rsi - 52.0) / 30.0)
-    vol_score = min(max(vol / 0.015, 0.0), 1.0)
-    momentum_score = min(max((momentum + 0.03) / 0.06, 0.0), 1.0)
+    trend_score = 1.0 if price >= ma20 >= ma50 else 0.55 if price >= ma50 else 0.0
+    rsi_score = _clip_score(1.0 - abs(rsi - 54.0) / 16.0)
+    atr_score = _clip_score(1.0 - abs(atr_pct - 0.018) / 0.03)
+    slope_score = _clip_score((ma20_slope + 0.01) / 0.02) * 0.65 + _clip_score((ma50_slope + 0.01) / 0.02) * 0.35
+    breakout_score = _clip_score((breakout_20 + 0.04) / 0.08)
+    pullback_score = _clip_score(1.0 - abs(pullback_to_ma20) / 0.035)
+    momentum_score = 0.55 * _clip_score((momentum + 0.01) / 0.04) + 0.45 * _clip_score((momentum_8 + 0.02) / 0.06)
 
-    return round(0.45 * trend_score + 0.30 * rsi_score + 0.15 * vol_score + 0.10 * momentum_score, 4)
+    return round(
+        0.28 * trend_score
+        + 0.20 * rsi_score
+        + 0.12 * atr_score
+        + 0.16 * slope_score
+        + 0.10 * breakout_score
+        + 0.08 * pullback_score
+        + 0.06 * momentum_score,
+        4,
+    )
 
 
-def _should_buy(latest: pd.Series) -> tuple[bool, float]:
+def _should_buy(latest: pd.Series, config: PaperTradingConfig) -> tuple[bool, float]:
     score = _compute_buy_score(latest)
     price = float(latest["close"])
+    ma20 = float(latest.get("ma20", price))
     ma50 = float(latest.get("ma50", price))
     rsi = float(latest.get("rsi", 50.0))
-    vol = float(latest.get("volatility", 0.0))
+    atr_pct = float(latest.get("atr_pct", 0.0))
+    momentum = float(latest.get("momentum", 0.0))
+    momentum_8 = float(latest.get("momentum_8", 0.0))
+    breakout_20 = float(latest.get("breakout_20", 0.0))
+    pullback_to_ma20 = float(latest.get("pullback_to_ma20", 0.0))
+    ma20_slope = float(latest.get("ma20_slope", 0.0))
+    ma50_slope = float(latest.get("ma50_slope", 0.0))
 
-    setup_ok = (
-        (price >= ma50 * 0.99 and 35.0 <= rsi <= 67.0)
-        or (price >= ma50 and 30.0 <= rsi <= 72.0 and vol >= 0.001)
-    )
-    return bool(setup_ok and score >= 0.55), score
+    trend_ok = price >= ma50 and ma20 >= ma50 and ma20_slope >= -0.003 and ma50_slope >= -0.004
+    rsi_ok = 42.0 <= rsi <= 64.0
+    atr_ok = float(config.min_atr_pct) <= atr_pct <= float(config.max_atr_pct)
+    structure_ok = -0.02 <= pullback_to_ma20 <= 0.035
+    momentum_ok = momentum >= -0.005 and momentum_8 >= -0.02 and breakout_20 >= -0.04
+
+    setup_ok = trend_ok and rsi_ok and atr_ok and structure_ok and momentum_ok
+    return bool(setup_ok and score >= float(config.min_signal_score)), score
 
 
 def _is_position_expired(opened_at: str | None, holding_minutes: int) -> bool:
@@ -274,18 +346,47 @@ def _is_position_expired(opened_at: str | None, holding_minutes: int) -> bool:
     return _utc_now() >= opened + timedelta(minutes=int(holding_minutes))
 
 
-def _should_sell(position: dict[str, Any], latest: pd.Series, holding_minutes: int) -> tuple[bool, str]:
+def _should_sell(position: dict[str, Any], latest: pd.Series, holding_minutes: int, config: PaperTradingConfig) -> tuple[bool, str]:
     price = float(latest["close"])
+    ma20 = float(latest.get("ma20", price))
     ma50 = float(latest.get("ma50", price))
     rsi = float(latest.get("rsi", 50.0))
+    momentum = float(latest.get("momentum", 0.0))
+    atr_pct = float(latest.get("atr_pct", position.get("atr_pct", 0.0) or 0.0))
+    peak_price = max(float(position.get("peak_price", position.get("avg_price", price) or price)), price)
+    trailing_stop = max(
+        float(position.get("trailing_stop", 0.0) or 0.0),
+        round(peak_price * (1.0 - _dynamic_stop_pct(atr_pct, multiplier=float(config.trailing_stop_atr_mult))), 6),
+    )
 
-    if rsi >= 70.0:
-        return True, "rsi alto"
-    if price < ma50:
+    if trailing_stop > 0 and price <= trailing_stop:
+        return True, "trailing stop"
+    if rsi >= 74.0 and momentum <= 0.04:
+        return True, "rsi esticado"
+    if price < ma20 and momentum < -0.002:
+        return True, "perdeu media curta"
+    if price < ma50 * 0.99:
         return True, "perdeu tendencia"
     if _is_position_expired(position.get("opened_at"), holding_minutes):
         return True, "holding expirado"
     return False, ""
+
+
+def _position_size_notional(candidate: dict[str, Any], config: PaperTradingConfig, cash: float) -> float:
+    base_notional = float(config.ticket_value)
+    score = float(candidate.get("score", 0.0))
+    atr_pct = float(candidate.get("atr_pct", 0.0) or 0.0)
+
+    score_boost = _clip_score((score - float(config.min_signal_score)) / 0.18)
+    score_multiplier = 0.85 + (score_boost * 0.20)
+
+    if atr_pct > 0:
+        volatility_multiplier = _clip_score(0.028 / atr_pct, 0.65, 1.0)
+    else:
+        volatility_multiplier = 0.85
+
+    desired_notional = round(base_notional * min(score_multiplier, volatility_multiplier), 2)
+    return min(desired_notional, cash)
 
 
 def _portfolio_equity(state: dict[str, Any]) -> float:
@@ -334,7 +435,7 @@ def run_paper_trading_demo(config: PaperTradingConfig = PaperTradingConfig()) ->
     figure.add_trace(go.Scatter(x=prices["datetime"], y=prices["close"], mode="lines", name=first_symbol))
 
     latest = prices.iloc[-1]
-    should_buy, score = _should_buy(latest)
+    should_buy, score = _should_buy(latest, config)
 
     return {
         "symbol": first_symbol,
@@ -373,9 +474,18 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[s
 
         latest = data.iloc[-1]
         state["last_prices"][asset] = round(float(latest["close"]), 6)
-        should_sell, reason = _should_sell(position, latest, config.holding_minutes)
+        should_sell, reason = _should_sell(position, latest, config.holding_minutes, config)
         if not should_sell:
+            peak_price = max(float(position.get("peak_price", position.get("avg_price", latest["close"]) or latest["close"])), float(latest["close"]))
+            atr_pct = float(latest.get("atr_pct", position.get("atr_pct", 0.0) or 0.0))
+            trailing_stop = max(
+                float(position.get("trailing_stop", 0.0) or 0.0),
+                round(peak_price * (1.0 - _dynamic_stop_pct(atr_pct, multiplier=float(config.trailing_stop_atr_mult))), 6),
+            )
             position["last_price"] = round(float(latest["close"]), 6)
+            position["peak_price"] = round(peak_price, 6)
+            position["atr_pct"] = round(atr_pct, 6)
+            position["trailing_stop"] = trailing_stop
             position["updated_at"] = _utc_now_iso()
             state["positions"][asset] = position
             continue
@@ -413,11 +523,13 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[s
             continue
 
         latest = data.iloc[-1]
-        should_buy, score = _should_buy(latest)
+        should_buy, score = _should_buy(latest, config)
         signal = {
             "asset": asset,
             "price": round(float(latest["close"]), 6),
             "rsi": round(float(latest.get("rsi", 50.0)), 2),
+            "atr_pct": round(float(latest.get("atr_pct", 0.0) or 0.0), 4),
+            "pullback_to_ma20": round(float(latest.get("pullback_to_ma20", 0.0) or 0.0), 4),
             "score": score,
             "buy": should_buy,
         }
@@ -433,7 +545,7 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[s
             break
 
         cash = float(state.get("cash", 0.0))
-        notional = min(float(config.ticket_value), cash)
+        notional = _position_size_notional(candidate, config, cash)
         if notional < float(config.min_trade_notional):
             continue
 
@@ -448,6 +560,13 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[s
             "quantity": quantity,
             "avg_price": round(price, 6),
             "last_price": round(price, 6),
+            "peak_price": round(price, 6),
+            "atr_pct": round(float(candidate.get("atr_pct", 0.0) or 0.0), 6),
+            "trailing_stop": round(
+                price * (1.0 - _dynamic_stop_pct(float(candidate.get("atr_pct", 0.0) or 0.0), multiplier=float(config.trailing_stop_atr_mult))),
+                6,
+            ),
+            "entry_score": round(float(candidate.get("score", 0.0)), 4),
             "opened_at": _utc_now_iso(),
             "updated_at": _utc_now_iso(),
         }
@@ -463,7 +582,7 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[s
             "cost": 0.0,
             "cash_after": round(float(state["cash"]), 2),
             "realized_pnl": 0.0,
-            "reason": f"score {candidate['score']:.2f}",
+            "reason": f"score {candidate['score']:.2f} | rsi {candidate['rsi']:.1f}",
         }
         trades_executed.append(trade)
         _append_paper_trade(trade)

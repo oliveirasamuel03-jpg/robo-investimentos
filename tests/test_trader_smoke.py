@@ -31,8 +31,8 @@ def test_run_trader_cycle_smoke_with_synthetic_prices(isolated_storage, monkeypa
     trader_engine = load_module("engines.trader_engine")
 
     monkeypatch.setattr(paper_engine, "load_prices", lambda symbol, config: _fake_prices())
-    monkeypatch.setattr(paper_engine, "_should_buy", lambda latest: (True, 0.95))
-    monkeypatch.setattr(paper_engine, "_should_sell", lambda position, latest, holding_minutes: (False, ""))
+    monkeypatch.setattr(paper_engine, "_should_buy", lambda latest, config: (True, 0.95))
+    monkeypatch.setattr(paper_engine, "_should_sell", lambda position, latest, holding_minutes, config: (False, ""))
 
     state = state_store.load_bot_state()
     state["bot_status"] = "RUNNING"
