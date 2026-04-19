@@ -110,6 +110,17 @@ with t2:
             st.info("Nenhum relatorio encontrado com os filtros atuais.")
         else:
             display_df = filtered_reports.sort_values("closed_at", ascending=False).copy()
+            export_df = display_df.copy()
+            export_df["opened_at"] = export_df["opened_at"].astype("string")
+            export_df["closed_at"] = export_df["closed_at"].astype("string")
+            st.download_button(
+                "Exportar relatorios filtrados (CSV)",
+                data=export_df.to_csv(index=False).encode("utf-8-sig"),
+                file_name="trader_trade_reports_export.csv",
+                mime="text/csv",
+                use_container_width=False,
+                key="download_trade_reports_csv",
+            )
             st.dataframe(display_df, use_container_width=True)
 
 with t3:
