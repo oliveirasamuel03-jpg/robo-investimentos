@@ -20,13 +20,13 @@ st.caption(f"Usuario atual: {current_user['username']} ({current_user['role']})"
 if bool((state.get("security", {}) or {}).get("real_mode_enabled", False)):
     st.warning("Real trading enabled")
 
-st.page_link("pages/1_Trader.py", label="Abrir Trader", icon="ðŸ“ˆ")
-st.page_link("pages/2_Investimento.py", label="Abrir Investimento", icon="ðŸ¦")
-st.page_link("pages/3_Carteira.py", label="Abrir Carteira", icon="ðŸ’¼")
-st.page_link("pages/5_Historico.py", label="Abrir Historico", icon="ðŸ—‚ï¸")
+st.page_link("pages/1_Trader.py", label="Abrir Trader", icon="📈")
+st.page_link("pages/2_Investimento.py", label="Abrir Investimento", icon="🏦")
+st.page_link("pages/3_Carteira.py", label="Abrir Carteira", icon="💼")
+st.page_link("pages/5_Historico.py", label="Abrir Historico", icon="🗂️")
 
 if is_admin(current_user):
-    st.page_link("pages/4_Controle_do_Bot.py", label="Abrir Controle do Bot", icon="ðŸ› ï¸")
+    st.page_link("pages/4_Controle_do_Bot.py", label="Abrir Controle do Bot", icon="🛠️")
 
 st.markdown("---")
 st.subheader("Execucao manual (legado)")
