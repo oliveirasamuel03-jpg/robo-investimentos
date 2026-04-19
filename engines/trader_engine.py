@@ -26,35 +26,24 @@ def build_paper_cfg_from_platform_state(state: dict) -> PaperTradingConfig:
     trader = state["trader"]
     ticket_value = float(trader["ticket_value"])
     holding_minutes = int(trader["holding_minutes"])
+    max_open_positions = int(trader.get("max_open_positions", 3))
 
     if ticket_value < MIN_TICKET or ticket_value > MAX_TICKET:
         raise ValueError("O ticket do trader precisa ficar entre R$10 e R$10.000.")
     if holding_minutes < MIN_HOLDING_MINUTES or holding_minutes > MAX_HOLDING_MINUTES:
         raise ValueError("O holding do trader precisa ficar entre 1 minuto e 48 horas.")
 
-    watchlist = trader.get("watchlist", []) or []
-    watchlist = [str(x).strip().upper() for x in watchlist if str(x).strip()]
+    watchlist = [str(x).strip().upper() for x in (trader.get("watchlist", []) or []) if str(x).strip()]
 
-    # Trader precisa ser leve: usa só watchlist + menos histórico
     return PaperTradingConfig(
-        start_date=state.get("start_date", "2023-01-01"),
-        initial_capital=float(state["wallet_value"]),
-        probability_threshold=float(state.get("probability_threshold", 0.60)),
-        top_n=min(int(state.get("top_n", 2)), max(1, len(watchlist) or 2)),
-        use_regime_filter=bool(state.get("use_regime_filter", True)),
-        use_volatility_filter=bool(state.get("use_volatility_filter", False)),
-        vol_threshold=float(state.get("vol_threshold", 0.03)),
-        cash_threshold=float(state.get("cash_threshold", 0.50)),
-        target_portfolio_vol=float(state.get("target_portfolio_vol", 0.08)),
-        include_brazil_stocks=False,
-        include_us_stocks=False,
-        include_etfs=False,
-        include_fiis=False,
-        include_crypto=False,
-        include_grains=False,
-        custom_tickers=watchlist,
-        min_trade_notional=max(10.0, ticket_value),
+        initial_capital=float(state.get("wallet_value", 10000.0)),
+        custom_tickers=watchlist or ["AAPL"],
+        ticket_value=ticket_value,
+        min_trade_notional=max(MIN_TICKET, ticket_value),
+        max_open_positions=max(1, max_open_positions),
+        holding_minutes=holding_minutes,
         history_limit=500,
+        allow_new_entries=state.get("bot_status") == "RUNNING",
     )
 
 
@@ -82,7 +71,7 @@ def sync_platform_positions_from_paper() -> dict:
         )
 
     platform_state["positions"] = [
-        p for p in platform_state.get("positions", []) if p.get("module") != "TRADER"
+        position for position in platform_state.get("positions", []) if position.get("module") != "TRADER"
     ] + positions
     platform_state["cash"] = float(paper_state.get("cash", platform_state.get("cash", 0.0)))
     platform_state["realized_pnl"] = float(
@@ -97,8 +86,10 @@ def _sync_trader_orders_into_storage() -> None:
     if not trades:
         return
 
-    df_existing = pd.read_csv(TRADER_ORDERS_FILE)
-    existing_cols = set(df_existing.columns.tolist())
+    try:
+        df_existing = pd.read_csv(TRADER_ORDERS_FILE)
+    except Exception:
+        df_existing = pd.DataFrame()
 
     needed_cols = [
         "timestamp",
@@ -111,11 +102,10 @@ def _sync_trader_orders_into_storage() -> None:
         "cash_after",
         "source",
     ]
-    if not set(needed_cols).issubset(existing_cols):
+    if not set(needed_cols).issubset(df_existing.columns.tolist()):
+        pd.DataFrame(columns=needed_cols).to_csv(TRADER_ORDERS_FILE, index=False)
         df_existing = pd.DataFrame(columns=needed_cols)
-        df_existing.to_csv(TRADER_ORDERS_FILE, index=False)
 
-    df_existing = pd.read_csv(TRADER_ORDERS_FILE)
     existing_keys = set(
         zip(
             df_existing.get("timestamp", []),
@@ -124,22 +114,22 @@ def _sync_trader_orders_into_storage() -> None:
         )
     )
 
-    for row in trades:
-        key = (row.get("timestamp"), row.get("asset"), row.get("side"))
+    for trade in trades:
+        key = (trade.get("timestamp"), trade.get("asset"), trade.get("side"))
         if key in existing_keys:
             continue
 
         append_csv_row(
             TRADER_ORDERS_FILE,
             {
-                "timestamp": row.get("timestamp"),
-                "asset": row.get("asset"),
-                "side": row.get("side"),
-                "quantity": row.get("quantity", 0.0),
-                "price": row.get("price", 0.0),
-                "gross_value": row.get("gross_value", 0.0),
-                "cost": row.get("cost", 0.0),
-                "cash_after": row.get("cash_after", 0.0),
+                "timestamp": trade.get("timestamp"),
+                "asset": trade.get("asset"),
+                "side": trade.get("side"),
+                "quantity": trade.get("quantity", 0.0),
+                "price": trade.get("price", 0.0),
+                "gross_value": trade.get("gross_value", 0.0),
+                "cost": trade.get("cost", 0.0),
+                "cash_after": trade.get("cash_after", 0.0),
                 "source": "paper_trading_engine",
             },
         )
@@ -159,15 +149,15 @@ def run_trader_cycle() -> dict:
     cfg = build_paper_cfg_from_platform_state(state)
     ensure_paper_files(cfg)
 
-    result = run_paper_cycle(cfg)
+    cycle_result = run_paper_cycle(cfg)
     _sync_trader_orders_into_storage()
     platform_state = sync_platform_positions_from_paper()
-    report = build_paper_report(initial_capital=float(platform_state["wallet_value"]))
+    report = build_paper_report(initial_capital=float(platform_state.get("wallet_value", cfg.initial_capital)))
     equity_df = read_paper_equity(limit=200)
 
     return {
         "status": state.get("bot_status"),
-        "cycle_result": result,
+        "cycle_result": cycle_result,
         "paper_report": report,
         "paper_equity": equity_df.to_dict(orient="records") if not equity_df.empty else [],
     }
