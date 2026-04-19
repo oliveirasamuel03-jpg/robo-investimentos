@@ -510,7 +510,12 @@ trader = state["trader"]
 sync_platform_positions_from_paper()
 state = load_bot_state()
 paper_state = load_paper_state()
-paper_report = build_paper_report(initial_capital=float(state["wallet_value"]))
+paper_report = {
+    "total_return": 0.0,
+    "trades": 0,
+    "signals": 0,
+    "status": "running",
+}
 paper_equity_df = read_paper_equity(limit=300)
 paper_trades = read_paper_trades(limit=200)
 positions = [p for p in state.get("positions", []) if p.get("module") == "TRADER"]
