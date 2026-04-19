@@ -58,6 +58,7 @@ REPORTS_DIR = STORAGE_DIR / "reports"
 
 BOT_STATE_FILE = RUNTIME_DIR / "bot_state.json"
 TRADER_ORDERS_FILE = RUNTIME_DIR / "trader_orders.csv"
+TRADER_REPORTS_FILE = RUNTIME_DIR / "trade_reports.csv"
 INVESTOR_ORDERS_FILE = RUNTIME_DIR / "investor_orders.csv"
 BOT_LOG_FILE = RUNTIME_DIR / "bot_log.csv"
 AUTH_USERS_FILE = RUNTIME_DIR / "auth_users.json"
@@ -76,6 +77,36 @@ TRADER_ORDERS_COLUMNS = [
     "cost",
     "cash_after",
     "source",
+]
+
+TRADER_REPORTS_COLUMNS = [
+    "trade_id",
+    "opened_at",
+    "closed_at",
+    "duration_minutes",
+    "asset",
+    "profile",
+    "entry_price",
+    "exit_price",
+    "quantity",
+    "gross_entry_value",
+    "gross_exit_value",
+    "realized_pnl",
+    "realized_pnl_pct",
+    "entry_score",
+    "exit_reason",
+    "rsi_entry",
+    "rsi_exit",
+    "atr_pct_entry",
+    "atr_pct_exit",
+    "ma20_entry",
+    "ma50_entry",
+    "ma20_exit",
+    "ma50_exit",
+    "peak_price",
+    "trailing_stop_final",
+    "holding_minutes_limit",
+    "status_final",
 ]
 
 INVESTOR_ORDERS_COLUMNS = [

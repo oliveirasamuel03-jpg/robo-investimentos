@@ -10,6 +10,8 @@ MODULES_TO_CLEAR = [
     "core.config",
     "core.persistence",
     "core.state_store",
+    "core.trader_profiles",
+    "core.trader_reports",
     "core.auth.users_store",
     "paper_trading_engine",
     "engines.quant_bridge",
