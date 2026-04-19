@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import streamlit as st
 
+from core.auth.guards import render_auth_toolbar, require_auth
 from core.config import (
     BOT_LOG_COLUMNS,
     BOT_LOG_FILE,
@@ -12,7 +13,11 @@ from core.config import (
 )
 from core.state_store import read_storage_table
 
-st.title("Histórico")
+
+require_auth()
+render_auth_toolbar()
+
+st.title("HistÃ³rico")
 
 trader_orders = read_storage_table(TRADER_ORDERS_FILE, columns=TRADER_ORDERS_COLUMNS)
 investor_orders = read_storage_table(INVESTOR_ORDERS_FILE, columns=INVESTOR_ORDERS_COLUMNS)
