@@ -5,6 +5,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
 
+from core.auth.guards import render_auth_toolbar, require_auth
 from core.config import INVESTOR_ORDERS_FILE
 from core.state_store import append_csv_row, load_bot_state, save_bot_state
 from engines.investment_research_engine import run_investment_pipeline
@@ -54,6 +55,9 @@ def render_basic_summary(result: dict) -> None:
     with st.expander("Relatorio institucional"):
         st.json(result["report"])
 
+
+require_auth()
+render_auth_toolbar()
 
 st.title("Investimento / Pesquisa Institucional")
 state = load_bot_state()
