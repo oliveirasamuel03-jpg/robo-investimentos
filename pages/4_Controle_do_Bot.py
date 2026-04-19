@@ -18,7 +18,7 @@ if bool((state.get("security", {}) or {}).get("real_mode_enabled", False)):
     st.warning("Real trading enabled")
 
 status_options = ["RUNNING", "PAUSED", "STOPPED"]
-mode_options = ["AutomÃ¡tico", "Semi-automÃ¡tico"]
+mode_options = ["Automático", "Semi-automático"]
 
 status = st.radio("Status do bot", status_options, index=status_options.index(state["bot_status"]))
 mode = st.selectbox("Modo do bot", mode_options, index=mode_options.index(state["bot_mode"]))
@@ -45,4 +45,4 @@ with c4:
         reset_state()
         st.error("Estado resetado.")
 
-st.info("RUNNING abre e gerencia posiÃ§Ãµes. PAUSED nÃ£o abre novas posiÃ§Ãµes. STOPPED paralisa tudo.")
+st.info("RUNNING abre e gerencia posições. PAUSED não abre novas posições. STOPPED paralisa tudo.")
