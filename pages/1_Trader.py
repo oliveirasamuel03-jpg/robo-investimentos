@@ -1421,6 +1421,12 @@ with st.expander("Modo avançado"):
     preview_c2.metric("Holding efetivo", f"{int(selected_profile_preview['holding_minutes'])} min")
     preview_c3.metric("Posicoes efetivas", f"{int(selected_profile_preview['max_open_positions'])}")
     preview_c4.metric("Score minimo", f"{float(selected_profile_preview['min_signal_score']):.2f}")
+    st.caption(
+        "Cooldown de reentrada: "
+        f"{int(selected_profile_preview['reentry_cooldown_minutes'])} min"
+        " | Saidas suaves depois de: "
+        f"{int(selected_profile_preview['min_position_age_minutes'])} min"
+    )
 
     watchlist_text = st.text_input(
         "Lista de ativos",
