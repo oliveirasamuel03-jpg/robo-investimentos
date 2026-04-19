@@ -40,22 +40,42 @@ Esse processo roda continuamente e atualiza:
 - `equity`
 - `positions`
 
+## Service 3: Postgres compartilhado
+
+Para o `web` e o `worker` enxergarem o mesmo estado em produção, adicione também um service de Postgres no mesmo projeto Railway.
+
+Quando o Railway criar a variável `DATABASE_URL`, o projeto passa a usar o banco automaticamente para compartilhar:
+
+- `bot_state`
+- `paper_state`
+- `paper_trades`
+- `trader_orders`
+- `investor_orders`
+- `bot_log`
+
+Sem `DATABASE_URL`, o projeto continua em modo local usando arquivos na pasta `storage/`.
+
 ## Variáveis e storage
 
-Os dois services precisam usar o mesmo código e o mesmo estado persistido do projeto. Se você adicionar volume/storage no Railway depois, mantenha a pasta de dados persistente entre reinícios.
+- `DATABASE_URL`: fornecida automaticamente pelo Postgres do Railway
+- nenhum volume compartilhado é necessário para o estado principal quando o banco estiver ativo
+- a pasta `storage/` continua sendo o fallback local para desenvolvimento
 
 ## Fluxo recomendado
 
 1. Fazer merge do PR com as correções do paper trading.
 2. Deployar o `web` com o comando do Streamlit.
-3. Deployar o `worker` com `python -m workers.trader_worker`.
-4. Abrir a interface e mudar o bot para `RUNNING`.
-5. Conferir se o painel mostra o worker como `online`.
+3. Adicionar um service de Postgres no mesmo projeto.
+4. Confirmar que `DATABASE_URL` foi injetada no `web` e no `worker`.
+5. Deployar o `worker` com `python -m workers.trader_worker`.
+6. Abrir a interface e mudar o bot para `RUNNING`.
+7. Conferir se o painel mostra o worker como `online`.
 
 ## Checklist de validação
 
 - O site abre no domínio do Railway.
 - O botão `Rodar agora` funciona.
+- `web` e `worker` têm a variável `DATABASE_URL`.
 - O `worker_status` muda para `online`.
 - O `worker_heartbeat` atualiza sozinho.
 - `cash` e `equity` deixam de ficar travados.

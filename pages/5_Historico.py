@@ -1,15 +1,22 @@
 from __future__ import annotations
 
-import pandas as pd
 import streamlit as st
 
-from core.config import BOT_LOG_FILE, INVESTOR_ORDERS_FILE, TRADER_ORDERS_FILE
+from core.config import (
+    BOT_LOG_COLUMNS,
+    BOT_LOG_FILE,
+    INVESTOR_ORDERS_COLUMNS,
+    INVESTOR_ORDERS_FILE,
+    TRADER_ORDERS_COLUMNS,
+    TRADER_ORDERS_FILE,
+)
+from core.state_store import read_storage_table
 
 st.title("Histórico")
 
-trader_orders = pd.read_csv(TRADER_ORDERS_FILE)
-investor_orders = pd.read_csv(INVESTOR_ORDERS_FILE)
-logs = pd.read_csv(BOT_LOG_FILE)
+trader_orders = read_storage_table(TRADER_ORDERS_FILE, columns=TRADER_ORDERS_COLUMNS)
+investor_orders = read_storage_table(INVESTOR_ORDERS_FILE, columns=INVESTOR_ORDERS_COLUMNS)
+logs = read_storage_table(BOT_LOG_FILE, columns=BOT_LOG_COLUMNS)
 
 t1, t2, t3 = st.tabs(["Ordens Trader", "Pesquisa", "Logs"])
 with t1:

@@ -12,9 +12,10 @@ from core.config import (
     MAX_TICKET,
     MIN_HOLDING_MINUTES,
     MIN_TICKET,
+    TRADER_ORDERS_COLUMNS,
     TRADER_ORDERS_FILE,
 )
-from core.state_store import load_bot_state, save_bot_state
+from core.state_store import load_bot_state, read_storage_table, save_bot_state
 from engines.quant_bridge import (
     build_paper_report,
     load_paper_state,
@@ -75,10 +76,7 @@ def load_chart_data(ticker: str, period: str, interval: str) -> pd.DataFrame:
 
 
 def load_trader_orders() -> pd.DataFrame:
-    try:
-        df = pd.read_csv(TRADER_ORDERS_FILE)
-    except Exception:
-        return pd.DataFrame()
+    df = read_storage_table(TRADER_ORDERS_FILE, columns=TRADER_ORDERS_COLUMNS)
 
     if df.empty:
         return df
@@ -835,7 +833,7 @@ with st.expander("Modo avançado"):
 
     with tab2:
         try:
-            orders = pd.read_csv(TRADER_ORDERS_FILE)
+            orders = read_storage_table(TRADER_ORDERS_FILE, columns=TRADER_ORDERS_COLUMNS)
             if not orders.empty:
                 st.dataframe(orders.tail(200).iloc[::-1], use_container_width=True)
             else:

@@ -1,15 +1,20 @@
 from __future__ import annotations
 
-import pandas as pd
-
 from core.config import (
     MAX_HOLDING_MINUTES,
     MAX_TICKET,
     MIN_HOLDING_MINUTES,
     MIN_TICKET,
+    TRADER_ORDERS_COLUMNS,
     TRADER_ORDERS_FILE,
 )
-from core.state_store import append_csv_row, load_bot_state, log_event, save_bot_state
+from core.state_store import (
+    load_bot_state,
+    log_event,
+    read_storage_table,
+    replace_storage_table,
+    save_bot_state,
+)
 from engines.quant_bridge import (
     PaperTradingConfig,
     build_paper_report,
@@ -97,25 +102,7 @@ def _sync_trader_orders_into_storage() -> None:
     if not trades:
         return
 
-    df_existing = pd.read_csv(TRADER_ORDERS_FILE)
-    existing_cols = set(df_existing.columns.tolist())
-
-    needed_cols = [
-        "timestamp",
-        "asset",
-        "side",
-        "quantity",
-        "price",
-        "gross_value",
-        "cost",
-        "cash_after",
-        "source",
-    ]
-    if not set(needed_cols).issubset(existing_cols):
-        df_existing = pd.DataFrame(columns=needed_cols)
-        df_existing.to_csv(TRADER_ORDERS_FILE, index=False)
-
-    df_existing = pd.read_csv(TRADER_ORDERS_FILE)
+    df_existing = read_storage_table(TRADER_ORDERS_FILE, columns=TRADER_ORDERS_COLUMNS)
     existing_keys = set(
         zip(
             df_existing.get("timestamp", []),
@@ -124,13 +111,14 @@ def _sync_trader_orders_into_storage() -> None:
         )
     )
 
+    rows_to_store = df_existing.to_dict(orient="records")
+
     for row in trades:
         key = (row.get("timestamp"), row.get("asset"), row.get("side"))
         if key in existing_keys:
             continue
 
-        append_csv_row(
-            TRADER_ORDERS_FILE,
+        rows_to_store.append(
             {
                 "timestamp": row.get("timestamp"),
                 "asset": row.get("asset"),
@@ -141,8 +129,11 @@ def _sync_trader_orders_into_storage() -> None:
                 "cost": row.get("cost", 0.0),
                 "cash_after": row.get("cash_after", 0.0),
                 "source": "paper_trading_engine",
-            },
+            }
         )
+        existing_keys.add(key)
+
+    replace_storage_table(TRADER_ORDERS_FILE, rows_to_store, columns=TRADER_ORDERS_COLUMNS)
 
 
 def run_trader_cycle() -> dict:

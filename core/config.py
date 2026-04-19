@@ -12,6 +12,31 @@ TRADER_ORDERS_FILE = STORAGE_DIR / "trader_orders.csv"
 INVESTOR_ORDERS_FILE = STORAGE_DIR / "investor_orders.csv"
 BOT_LOG_FILE = STORAGE_DIR / "bot_log.csv"
 
+TRADER_ORDERS_COLUMNS = [
+    "timestamp",
+    "asset",
+    "side",
+    "quantity",
+    "price",
+    "gross_value",
+    "cost",
+    "cash_after",
+    "source",
+]
+
+INVESTOR_ORDERS_COLUMNS = [
+    "timestamp",
+    "metric",
+    "value",
+    "notes",
+]
+
+BOT_LOG_COLUMNS = [
+    "timestamp",
+    "level",
+    "message",
+]
+
 MIN_TICKET = 10.0
 MAX_TICKET = 10000.0
 MIN_HOLDING_MINUTES = 1
