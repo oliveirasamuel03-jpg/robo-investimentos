@@ -46,3 +46,26 @@ def test_run_trader_cycle_smoke_with_synthetic_prices(isolated_storage, monkeypa
     assert paper_state["run_count"] >= 1
     assert "cash" in paper_state
     assert "equity" in paper_state
+
+
+def test_paper_engine_does_not_reset_db_state_when_local_file_is_missing(isolated_storage, monkeypatch):
+    paper_engine = load_module("paper_trading_engine")
+
+    load_calls = []
+    cfg = paper_engine.PaperTradingConfig(initial_capital=25000.0)
+
+    monkeypatch.setattr(paper_engine, "database_enabled", lambda: True)
+    monkeypatch.setattr(
+        paper_engine,
+        "load_json_state",
+        lambda namespace, default_factory, path: load_calls.append((namespace, path)) or {"cash": 123.0},
+    )
+
+    def fail_save(state: dict) -> None:
+        raise AssertionError("save_paper_state should not be called when DATABASE_URL is active and local file is absent")
+
+    monkeypatch.setattr(paper_engine, "save_paper_state", fail_save)
+
+    paper_engine.ensure_paper_files(cfg)
+
+    assert load_calls

@@ -13,6 +13,7 @@ import yfinance as yf
 from core.config import RUNTIME_DIR, ensure_app_directories
 from core.persistence import (
     append_json_row,
+    database_enabled,
     load_json_rows,
     load_json_state,
     replace_json_rows,
@@ -68,6 +69,10 @@ def ensure_paper_files(config: PaperTradingConfig | None = None) -> None:
     ensure_app_directories()
 
     initial_capital = float(config.initial_capital) if config else 10000.0
+
+    if database_enabled():
+        load_json_state(PAPER_STATE_NAMESPACE, lambda: _default_state(initial_capital), PAPER_STATE_FILE)
+        return
 
     if not PAPER_STATE_FILE.exists():
         save_paper_state(_default_state(initial_capital))

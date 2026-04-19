@@ -84,6 +84,10 @@ def _ensure_csv(file_path, columns: list[str]) -> None:
 
 def ensure_storage() -> None:
     ensure_app_directories()
+    if database_enabled():
+        load_json_state("bot_state", lambda: deepcopy(DEFAULT_STATE), BOT_STATE_FILE)
+        return
+
     if not BOT_STATE_FILE.exists():
         save_bot_state(deepcopy(DEFAULT_STATE))
 
