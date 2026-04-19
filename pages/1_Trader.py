@@ -7,6 +7,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 import yfinance as yf
+from paper_trading_engine import PaperTradingConfig, load_prices as load_runtime_prices
 
 from core.auth.guards import is_admin, render_auth_toolbar, require_auth
 from core.auth.security import verify_password
@@ -51,6 +52,15 @@ def load_chart_data(ticker: str, period: str, interval: str, refresh_key: int | 
     )
 
     if df is None or df.empty:
+        fallback_cfg = PaperTradingConfig(
+            custom_tickers=[ticker],
+            period=period,
+            interval=interval,
+            history_limit=300,
+        )
+        df = load_runtime_prices(ticker, fallback_cfg)
+
+    if df is None or df.empty:
         return pd.DataFrame()
 
     if isinstance(df.columns, pd.MultiIndex):
@@ -66,6 +76,10 @@ def load_chart_data(ticker: str, period: str, interval: str, refresh_key: int | 
             "Volume": "volume",
         }
     ).copy()
+
+    if "datetime" in df.columns:
+        df["datetime"] = pd.to_datetime(df["datetime"], errors="coerce")
+        df = df.dropna(subset=["datetime"]).set_index("datetime")
 
     df.index = pd.to_datetime(df.index)
     if getattr(df.index, "tz", None) is not None:
@@ -841,6 +855,33 @@ st.caption(
 
 auto_refresh_fragment_supported = bool(auto_refresh_enabled and hasattr(st, "fragment"))
 
+page_snapshot = build_trader_snapshot(
+    selected_ticker,
+    period,
+    interval,
+    refresh_key=make_chart_refresh_key(auto_refresh_fragment_supported, int(live_refresh_seconds)),
+)
+
+state = page_snapshot["state"]
+security_state = page_snapshot["security_state"]
+paper_state = page_snapshot["paper_state"]
+paper_report = page_snapshot["paper_report"]
+paper_equity_df = page_snapshot["paper_equity_df"]
+paper_trades = page_snapshot["paper_trades"]
+positions = page_snapshot["positions"]
+open_positions = page_snapshot["open_positions"]
+selected_position = page_snapshot["selected_position"]
+entry_price = page_snapshot["entry_price"]
+chart_df = page_snapshot["chart_df"]
+orders_df = page_snapshot["orders_df"]
+chart_error = page_snapshot["chart_error"]
+last_price = float(page_snapshot["last_price"])
+signal_text = page_snapshot["signal_text"]
+signal_color = page_snapshot["signal_color"]
+robot_status = page_snapshot["robot_status"]
+robot_label = page_snapshot["robot_label"]
+robot_class = page_snapshot["robot_class"]
+
 selected_position = next((p for p in open_positions if p.get("asset") == selected_ticker), None)
 entry_price = float(selected_position.get("entry_price", 0.0)) if selected_position else None
 
@@ -865,6 +906,28 @@ signal_color = signal_badge_color(signal_text)
 robot_status = state.get("bot_status", "PAUSED")
 robot_label = "Ligado" if robot_status == "RUNNING" else "Pausado" if robot_status == "PAUSED" else "Desligado"
 robot_class = "metric-good" if robot_label == "Ligado" else "metric-bad" if robot_label == "Desligado" else "metric-neutral"
+
+# Reaplica o snapshot unificado mais recente para manter os cards principais e o painel vivo
+# lendo a mesma base de estado durante esta renderizacao.
+state = page_snapshot["state"]
+security_state = page_snapshot["security_state"]
+paper_state = page_snapshot["paper_state"]
+paper_report = page_snapshot["paper_report"]
+paper_equity_df = page_snapshot["paper_equity_df"]
+paper_trades = page_snapshot["paper_trades"]
+positions = page_snapshot["positions"]
+open_positions = page_snapshot["open_positions"]
+selected_position = page_snapshot["selected_position"]
+entry_price = page_snapshot["entry_price"]
+chart_df = page_snapshot["chart_df"]
+orders_df = page_snapshot["orders_df"]
+chart_error = page_snapshot["chart_error"]
+last_price = float(page_snapshot["last_price"])
+signal_text = page_snapshot["signal_text"]
+signal_color = page_snapshot["signal_color"]
+robot_status = page_snapshot["robot_status"]
+robot_label = page_snapshot["robot_label"]
+robot_class = page_snapshot["robot_class"]
 
 m1, m2, m3, m4 = st.columns(4)
 
@@ -1016,6 +1079,8 @@ if auto_refresh_fragment_supported:
 chart_col, side_col = st.columns([2.3, 0.95])
 
 with chart_col:
+    if chart_error:
+        st.caption(f"Fallback do grafico ativado: {chart_error}")
     if chart_df.empty:
         st.warning("Não foi possível carregar dados desse ativo agora.")
     else:
