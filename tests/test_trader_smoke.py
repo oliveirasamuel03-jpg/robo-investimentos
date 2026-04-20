@@ -31,7 +31,11 @@ def test_run_trader_cycle_smoke_with_synthetic_prices(isolated_storage, monkeypa
     paper_engine = load_module("paper_trading_engine")
     trader_engine = load_module("engines.trader_engine")
 
-    monkeypatch.setattr(paper_engine, "load_prices", lambda symbol, config: _fake_prices())
+    monkeypatch.setattr(
+        paper_engine,
+        "load_market_data_map",
+        lambda symbols, config: {str(symbol).upper(): _fake_prices() for symbol in symbols},
+    )
     monkeypatch.setattr(paper_engine, "_should_buy", lambda latest, config: (True, 0.95))
     monkeypatch.setattr(paper_engine, "_should_sell", lambda position, latest, holding_minutes, config: (False, ""))
 
@@ -80,7 +84,11 @@ def test_run_paper_cycle_skips_new_entries_when_prices_are_fallback(isolated_sto
         df["data_source"] = "fallback"
         return df
 
-    monkeypatch.setattr(paper_engine, "load_prices", lambda symbol, config: fallback_prices())
+    monkeypatch.setattr(
+        paper_engine,
+        "load_market_data_map",
+        lambda symbols, config: {str(symbol).upper(): fallback_prices() for symbol in symbols},
+    )
     monkeypatch.setattr(paper_engine, "_should_buy", lambda latest, config: (True, 0.95))
 
     result = paper_engine.run_paper_cycle(
@@ -96,3 +104,83 @@ def test_run_paper_cycle_skips_new_entries_when_prices_are_fallback(isolated_sto
     assert result["signals"]
     assert result["signals"][0]["data_source"] == "fallback"
     assert result["signals"][0]["buy"] is False
+
+
+def test_run_paper_cycle_does_not_close_open_position_when_market_data_is_not_live(isolated_storage, monkeypatch):
+    paper_engine = load_module("paper_trading_engine")
+
+    def cached_prices():
+        df = _fake_prices().copy()
+        df["data_source"] = "cached"
+        return df
+
+    monkeypatch.setattr(
+        paper_engine,
+        "load_market_data_map",
+        lambda symbols, config: {str(symbol).upper(): cached_prices() for symbol in symbols},
+    )
+    monkeypatch.setattr(paper_engine, "_should_sell", lambda position, latest, holding_minutes, config: (True, "stop loss"))
+
+    state = paper_engine.load_paper_state(paper_engine.PaperTradingConfig(initial_capital=10000.0))
+    state["positions"] = {
+        "AAPL": {
+            "trade_id": "AAPL-test",
+            "profile": "Equilibrado",
+            "quantity": 1.0,
+            "entry_price": 100.0,
+            "avg_price": 100.0,
+            "last_price": 100.0,
+            "peak_price": 101.0,
+            "atr_pct": 0.02,
+            "trailing_stop": 98.0,
+            "gross_entry_value": 100.0,
+            "entry_score": 0.8,
+            "rsi_entry": 55.0,
+            "ma20_entry": 99.0,
+            "ma50_entry": 98.0,
+            "holding_minutes_limit": 60,
+            "opened_at": "2026-04-19T20:00:00+00:00",
+            "updated_at": "2026-04-19T20:00:00+00:00",
+        }
+    }
+    paper_engine.save_paper_state(state)
+
+    result = paper_engine.run_paper_cycle(
+        paper_engine.PaperTradingConfig(
+            custom_tickers=["AAPL"],
+            allow_new_entries=True,
+            history_limit=50,
+        )
+    )
+
+    assert result["trades_executed"] == 0
+    assert "AAPL" in result["state"]["positions"]
+
+
+def test_load_market_data_map_reuses_cache_between_cycles(isolated_storage, monkeypatch):
+    paper_engine = load_module("paper_trading_engine")
+
+    calls = {"count": 0}
+
+    def fake_download(*args, **kwargs):
+        calls["count"] += 1
+        return pd.DataFrame(
+            {
+                "Datetime": pd.date_range("2025-01-01", periods=120, freq="h"),
+                "Open": _fake_prices()["open"].values,
+                "High": _fake_prices()["high"].values,
+                "Low": _fake_prices()["low"].values,
+                "Close": _fake_prices()["close"].values,
+                "Volume": _fake_prices()["volume"].values,
+            }
+        )
+
+    monkeypatch.setattr(paper_engine.yf, "download", fake_download)
+
+    config = paper_engine.PaperTradingConfig(custom_tickers=["AAPL"], history_limit=50)
+    first = paper_engine.load_market_data_map(["AAPL"], config)
+    second = paper_engine.load_market_data_map(["AAPL"], config)
+
+    assert "AAPL" in first
+    assert "AAPL" in second
+    assert calls["count"] == 1

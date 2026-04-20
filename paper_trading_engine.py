@@ -27,6 +27,8 @@ PAPER_STATE_FILE = RUNTIME_DIR / "paper_state.json"
 PAPER_TRADES_FILE = RUNTIME_DIR / "paper_trades.json"
 PAPER_STATE_NAMESPACE = "paper_state"
 PAPER_TRADES_NAMESPACE = "paper_trades"
+MARKET_DATA_CACHE_TTL_SECONDS = 300
+_MARKET_DATA_CACHE: dict[str, dict[str, Any]] = {}
 
 
 @dataclass
@@ -200,21 +202,9 @@ def fallback_data(symbol: str, rows: int = 240) -> pd.DataFrame:
     return df
 
 
-def load_prices(symbol: str, config: PaperTradingConfig) -> pd.DataFrame:
-    try:
-        df = yf.download(
-            tickers=symbol,
-            period=config.period,
-            interval=config.interval,
-            auto_adjust=False,
-            progress=False,
-            threads=False,
-        )
-    except Exception:
-        df = pd.DataFrame()
-
+def _normalize_downloaded_prices(df: pd.DataFrame, config: PaperTradingConfig) -> pd.DataFrame:
     if df is None or df.empty:
-        return fallback_data(symbol, rows=max(180, config.history_limit))
+        return pd.DataFrame()
 
     if isinstance(df.columns, pd.MultiIndex):
         df.columns = [c[0] for c in df.columns]
@@ -233,7 +223,7 @@ def load_prices(symbol: str, config: PaperTradingConfig) -> pd.DataFrame:
     )
 
     if "close" not in df.columns:
-        return fallback_data(symbol, rows=max(180, config.history_limit))
+        return pd.DataFrame()
 
     if "volume" not in df.columns:
         df["volume"] = 0.0
@@ -241,6 +231,120 @@ def load_prices(symbol: str, config: PaperTradingConfig) -> pd.DataFrame:
 
     keep = [c for c in ["datetime", "open", "high", "low", "close", "volume", "data_source"] if c in df.columns]
     return df[keep].tail(config.history_limit).copy()
+
+
+def _market_cache_key(symbols: list[str], config: PaperTradingConfig) -> str:
+    normalized = [str(symbol).strip().upper() for symbol in symbols if str(symbol).strip()]
+    return "|".join(
+        [
+            config.period,
+            config.interval,
+            str(int(config.history_limit)),
+            *normalized,
+        ]
+    )
+
+
+def _clone_market_frames(frames: dict[str, pd.DataFrame], source: str | None = None) -> dict[str, pd.DataFrame]:
+    cloned: dict[str, pd.DataFrame] = {}
+    for symbol, frame in frames.items():
+        if frame is None or frame.empty:
+            continue
+        copy = frame.copy()
+        if source:
+            copy["data_source"] = source
+        cloned[str(symbol).upper()] = copy
+    return cloned
+
+
+def _cached_market_frames(
+    symbols: list[str],
+    config: PaperTradingConfig,
+    *,
+    allow_stale: bool,
+) -> dict[str, pd.DataFrame]:
+    key = _market_cache_key(symbols, config)
+    cache_entry = _MARKET_DATA_CACHE.get(key)
+    if not cache_entry:
+        return {}
+
+    cached_frames = cache_entry.get("frames", {}) or {}
+    fetched_at = cache_entry.get("fetched_at")
+    if not isinstance(fetched_at, datetime):
+        return {}
+
+    age_seconds = (_utc_now() - fetched_at).total_seconds()
+    if not allow_stale and age_seconds > MARKET_DATA_CACHE_TTL_SECONDS:
+        return {}
+
+    source = "cached" if allow_stale and age_seconds > MARKET_DATA_CACHE_TTL_SECONDS else "market"
+    return _clone_market_frames(cached_frames, source=source)
+
+
+def _extract_symbol_download(batch_df: pd.DataFrame, symbol: str) -> pd.DataFrame:
+    if batch_df is None or batch_df.empty:
+        return pd.DataFrame()
+
+    if isinstance(batch_df.columns, pd.MultiIndex):
+        top_level = {str(value).upper() for value in batch_df.columns.get_level_values(0)}
+        if str(symbol).upper() not in top_level:
+            return pd.DataFrame()
+        return batch_df.xs(str(symbol).upper(), axis=1, level=0, drop_level=True).copy()
+
+    return batch_df.copy()
+
+
+def load_market_data_map(symbols: list[str], config: PaperTradingConfig) -> dict[str, pd.DataFrame]:
+    normalized_symbols = [str(symbol).strip().upper() for symbol in symbols if str(symbol).strip()]
+    if not normalized_symbols:
+        normalized_symbols = ["AAPL"]
+
+    cached_frames = _cached_market_frames(normalized_symbols, config, allow_stale=False)
+    if cached_frames:
+        return cached_frames
+
+    try:
+        download_target: str | list[str]
+        download_target = normalized_symbols if len(normalized_symbols) > 1 else normalized_symbols[0]
+        batch_df = yf.download(
+            tickers=download_target,
+            period=config.period,
+            interval=config.interval,
+            auto_adjust=False,
+            progress=False,
+            threads=False,
+            group_by="ticker",
+        )
+    except Exception:
+        batch_df = pd.DataFrame()
+
+    frames: dict[str, pd.DataFrame] = {}
+    for symbol in normalized_symbols:
+        normalized_frame = _normalize_downloaded_prices(_extract_symbol_download(batch_df, symbol), config)
+        if not normalized_frame.empty:
+            frames[symbol] = normalized_frame
+
+    if frames:
+        _MARKET_DATA_CACHE[_market_cache_key(normalized_symbols, config)] = {
+            "fetched_at": _utc_now(),
+            "frames": _clone_market_frames(frames),
+        }
+
+    stale_frames = _cached_market_frames(normalized_symbols, config, allow_stale=True)
+
+    for symbol in normalized_symbols:
+        if symbol in frames:
+            continue
+        if symbol in stale_frames:
+            frames[symbol] = stale_frames[symbol]
+        else:
+            frames[symbol] = fallback_data(symbol, rows=max(180, config.history_limit))
+
+    return frames
+
+
+def load_prices(symbol: str, config: PaperTradingConfig) -> pd.DataFrame:
+    return load_market_data_map([symbol], config).get(str(symbol).upper(), pd.DataFrame())
 
 
 def _calculate_rsi(series: pd.Series, period: int = 14) -> pd.Series:
@@ -326,6 +430,10 @@ def _frame_data_source(data: pd.DataFrame | None) -> str:
         return "market"
     value = str(series.iloc[-1]).strip().lower()
     return value or "market"
+
+
+def _is_live_market_source(data_source: str) -> bool:
+    return str(data_source).strip().lower() == "market"
 
 
 def _compute_buy_score(latest: pd.Series) -> float:
@@ -510,7 +618,7 @@ def build_paper_report(
 def run_paper_trading_demo(config: PaperTradingConfig = PaperTradingConfig()) -> dict[str, Any]:
     symbols = _normalize_symbol_list(config)
     first_symbol = symbols[0]
-    prices = _enrich_indicators(load_prices(first_symbol, config))
+    prices = _enrich_indicators(load_market_data_map([first_symbol], config).get(first_symbol, pd.DataFrame()))
     figure = go.Figure()
     figure.add_trace(go.Scatter(x=prices["datetime"], y=prices["close"], mode="lines", name=first_symbol))
 
@@ -534,14 +642,16 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[s
         state["cash"] = round(float(config.initial_capital), 2)
 
     symbols = _normalize_symbol_list(config)
+    raw_market_data = load_market_data_map(symbols, config)
     market_data: dict[str, pd.DataFrame] = {}
 
     for symbol in symbols:
-        data = _enrich_indicators(load_prices(symbol, config))
+        data = _enrich_indicators(raw_market_data.get(symbol, pd.DataFrame()))
         if data.empty:
             continue
         market_data[symbol] = data
-        state["last_prices"][symbol] = round(float(data["close"].iloc[-1]), 6)
+        if _is_live_market_source(_frame_data_source(data)):
+            state["last_prices"][symbol] = round(float(data["close"].iloc[-1]), 6)
 
     trades_executed: list[dict[str, Any]] = []
     signals: list[dict[str, Any]] = []
@@ -550,6 +660,8 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[s
     for asset, position in list(open_positions.items()):
         data = market_data.get(asset)
         if data is None or data.empty:
+            continue
+        if not _is_live_market_source(_frame_data_source(data)):
             continue
 
         latest = data.iloc[-1]
@@ -631,7 +743,7 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[s
         latest = data.iloc[-1]
         data_source = _frame_data_source(data)
         should_buy, score = _should_buy(latest, config)
-        if data_source == "fallback":
+        if not _is_live_market_source(data_source):
             should_buy = False
         signal = {
             "asset": asset,
