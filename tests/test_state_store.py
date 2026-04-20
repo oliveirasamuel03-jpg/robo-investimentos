@@ -63,8 +63,11 @@ def test_update_market_data_status_tracks_last_success_and_error(isolated_storag
             "requested_by": "worker_cycle",
         }
     )
+    root_after_success = state_store.load_bot_state()["market_data"]
     assert success["last_success_at"] == "2026-04-20T01:00:00+00:00"
     assert success["last_error"] == ""
+    assert root_after_success["requested_by"] == "worker_cycle"
+    assert root_after_success["status"] == "healthy"
 
     degraded = state_store.update_market_data_status(
         {
@@ -78,5 +81,9 @@ def test_update_market_data_status_tracks_last_success_and_error(isolated_storag
             "requested_by": "trader_chart",
         }
     )
+    root_after_chart = state_store.load_bot_state()["market_data"]
     assert degraded["last_success_at"] == "2026-04-20T01:00:00+00:00"
     assert degraded["last_error"] == "rate limit"
+    assert root_after_chart["requested_by"] == "worker_cycle"
+    assert root_after_chart["status"] == "healthy"
+    assert root_after_chart["contexts"]["trader_chart"]["status"] == "error"

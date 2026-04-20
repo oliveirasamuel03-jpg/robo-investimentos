@@ -51,6 +51,7 @@ DEFAULT_STATE = {
         "source_breakdown": {},
         "symbols": [],
         "requested_by": "",
+        "contexts": {},
     },
     "broker": {
         "provider": BROKER_PROVIDER,
@@ -165,32 +166,53 @@ def update_market_data_status(status_payload: dict | None) -> dict:
     state = load_bot_state()
     market_state = state.get("market_data", {}) or {}
     payload = status_payload or {}
+    context_name = str(payload.get("requested_by") or "runtime")
+    contexts = market_state.get("contexts", {}) or {}
+    context_state = dict(contexts.get(context_name, {}) or {})
 
     if payload.get("provider"):
-        market_state["provider"] = str(payload.get("provider"))
+        context_state["provider"] = str(payload.get("provider"))
     if payload.get("status"):
-        market_state["status"] = str(payload.get("status"))
+        context_state["status"] = str(payload.get("status"))
     if payload.get("last_sync_at"):
-        market_state["last_sync_at"] = str(payload.get("last_sync_at"))
+        context_state["last_sync_at"] = str(payload.get("last_sync_at"))
     if payload.get("last_source"):
-        market_state["last_source"] = str(payload.get("last_source"))
+        context_state["last_source"] = str(payload.get("last_source"))
     if isinstance(payload.get("source_breakdown"), dict):
-        market_state["source_breakdown"] = dict(payload.get("source_breakdown") or {})
+        context_state["source_breakdown"] = dict(payload.get("source_breakdown") or {})
     if payload.get("symbols") is not None:
-        market_state["symbols"] = [str(symbol).upper() for symbol in (payload.get("symbols") or [])]
-    if payload.get("requested_by"):
-        market_state["requested_by"] = str(payload.get("requested_by"))
+        context_state["symbols"] = [str(symbol).upper() for symbol in (payload.get("symbols") or [])]
+    context_state["requested_by"] = context_name
 
-    source_breakdown = market_state.get("source_breakdown", {}) or {}
+    source_breakdown = context_state.get("source_breakdown", {}) or {}
     if int(source_breakdown.get("market", 0) or 0) > 0 or int(source_breakdown.get("cached", 0) or 0) > 0:
-        market_state["last_success_at"] = market_state.get("last_sync_at", "")
-        market_state["last_error"] = ""
+        context_state["last_success_at"] = context_state.get("last_sync_at", "")
+        context_state["last_error"] = ""
     elif payload.get("last_error"):
-        market_state["last_error"] = str(payload.get("last_error"))
+        context_state["last_error"] = str(payload.get("last_error"))
+
+    contexts[context_name] = context_state
+    market_state["contexts"] = contexts
+
+    should_promote_to_top_level = context_name == "worker_cycle" or not market_state.get("requested_by")
+    if should_promote_to_top_level:
+        for key in (
+            "provider",
+            "status",
+            "last_sync_at",
+            "last_success_at",
+            "last_error",
+            "last_source",
+            "source_breakdown",
+            "symbols",
+            "requested_by",
+        ):
+            if key in context_state:
+                market_state[key] = context_state.get(key)
 
     state["market_data"] = market_state
     save_bot_state(state)
-    return market_state
+    return context_state
 
 
 def update_broker_status(status_payload: dict | None) -> dict:
