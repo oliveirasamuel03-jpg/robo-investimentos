@@ -7,6 +7,7 @@ import pandas as pd
 
 from core.config import (
     ALERT_EMAIL_ENABLED,
+    ALERT_EMAIL_PROVIDER,
     BOT_LOG_COLUMNS,
     BOT_LOG_FILE,
     BOT_STATE_FILE,
@@ -81,6 +82,7 @@ DEFAULT_STATE = {
     "production": {
         "enabled": PRODUCTION_MODE,
         "alert_email_enabled": ALERT_EMAIL_ENABLED,
+        "alert_provider": ALERT_EMAIL_PROVIDER,
         "heartbeat_age_seconds": None,
         "last_execution_at": "",
         "last_success_at": "",
@@ -99,6 +101,7 @@ DEFAULT_STATE = {
         "last_alert_sent_at": "",
         "last_alert_type": "",
         "last_alert_subject": "",
+        "last_alert_provider": "",
         "last_alert_error": "",
         "next_alert_eligible_at": "",
         "last_recovery_email_at": "",
@@ -150,6 +153,7 @@ def load_bot_state() -> dict:
     production_state = state.get("production", {}) or {}
     production_state["enabled"] = PRODUCTION_MODE
     production_state["alert_email_enabled"] = ALERT_EMAIL_ENABLED
+    production_state["alert_provider"] = ALERT_EMAIL_PROVIDER
     state["production"] = production_state
     return state
 

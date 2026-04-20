@@ -100,12 +100,16 @@ Variaveis suportadas:
 - `ADMIN_PASSWORD`
 - `PRODUCTION_MODE`
 - `ALERT_EMAIL_ENABLED`
+- `ALERT_EMAIL_PROVIDER`
 - `ALERT_EMAIL_TO`
+- `ALERT_EMAIL_FROM`
 - `SMTP_HOST`
 - `SMTP_PORT`
 - `SMTP_USERNAME`
 - `SMTP_PASSWORD`
 - `SMTP_USE_TLS`
+- `RESEND_API_KEY`
+- `RESEND_API_BASE`
 - `ALERT_HEARTBEAT_MAX_DELAY_SECONDS`
 - `ALERT_MAX_CONSECUTIVE_ERRORS`
 - `ALERT_FEED_FALLBACK_MAX_MINUTES`
@@ -199,12 +203,15 @@ Para ativar:
 ```env
 PRODUCTION_MODE=true
 ALERT_EMAIL_ENABLED=true
+ALERT_EMAIL_PROVIDER=smtp
 ALERT_EMAIL_TO=oliveirasamuel03@gmail.com
+ALERT_EMAIL_FROM=
 SMTP_HOST=seu_smtp
 SMTP_PORT=587
 SMTP_USERNAME=seu_usuario
 SMTP_PASSWORD=sua_senha
 SMTP_USE_TLS=true
+RESEND_API_KEY=
 ALERT_HEARTBEAT_MAX_DELAY_SECONDS=180
 ALERT_MAX_CONSECUTIVE_ERRORS=3
 ALERT_FEED_FALLBACK_MAX_MINUTES=15
@@ -213,6 +220,24 @@ ALERT_SEND_RECOVERY_EMAIL=true
 BROKER_PROVIDER=paper
 BROKER_MODE=paper
 ```
+
+Para cloud, o provider recomendado agora e `resend`, mantendo `smtp` como fallback:
+
+```env
+ALERT_EMAIL_PROVIDER=resend
+ALERT_EMAIL_FROM=Trade Ops Desk <alerts@seudominio.com>
+ALERT_EMAIL_TO=oliveirasamuel03@gmail.com
+RESEND_API_KEY=re_xxxxxxxxx
+RESEND_API_BASE=https://api.resend.com/emails
+BROKER_PROVIDER=paper
+BROKER_MODE=paper
+```
+
+Observacao importante:
+
+- o `smtp` continua suportado para ambiente local ou legado
+- no `resend`, o campo `from` precisa usar um dominio verificado para entrega fora do modo de teste
+- o app continua em `paper` e nao libera ordens reais nesta etapa
 
 Como validar:
 

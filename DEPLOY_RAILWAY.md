@@ -67,12 +67,11 @@ Se quiser alertas por email no Railway, configure tambem no `web` e no `worker`:
 
 ```env
 ALERT_EMAIL_ENABLED=true
+ALERT_EMAIL_PROVIDER=resend
 ALERT_EMAIL_TO=oliveirasamuel03@gmail.com
-SMTP_HOST=seu_smtp
-SMTP_PORT=587
-SMTP_USERNAME=seu_usuario
-SMTP_PASSWORD=sua_senha
-SMTP_USE_TLS=true
+ALERT_EMAIL_FROM=Trade Ops Desk <alerts@seudominio.com>
+RESEND_API_KEY=re_xxxxxxxxx
+RESEND_API_BASE=https://api.resend.com/emails
 ALERT_HEARTBEAT_MAX_DELAY_SECONDS=180
 ALERT_MAX_CONSECUTIVE_ERRORS=3
 ALERT_FEED_FALLBACK_MAX_MINUTES=15
@@ -94,6 +93,7 @@ Observacoes:
 - `ROBO_STORAGE_DIR` e opcional; em producao com Postgres o estado principal vem do banco
 - `BROKER_PROVIDER=paper` e `BROKER_MODE=paper` mantem a etapa em simulacao
 - `PRODUCTION_MODE=true` ativa monitoramento e alertas, mas nao libera ordem real
+- em cloud, prefira `ALERT_EMAIL_PROVIDER=resend`; `smtp` continua disponivel como fallback
 
 ## Passo 6. Fazer deploy
 
