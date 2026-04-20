@@ -6,6 +6,7 @@ from core.config import (
     MIN_HOLDING_MINUTES,
     MIN_TICKET,
     SWING_VALIDATION_RECOMMENDED_WATCHLIST,
+    VALIDATION_INITIAL_CAPITAL_BRL,
     TRADER_ORDERS_COLUMNS,
     TRADER_ORDERS_FILE,
 )
@@ -58,7 +59,7 @@ def build_paper_cfg_from_platform_state(state: dict) -> PaperTradingConfig:
         profile_config = apply_swing_validation_overrides(str(profile_config["name"]), profile_config)
 
     return PaperTradingConfig(
-        initial_capital=float(state.get("wallet_value", 10000.0)),
+        initial_capital=float(state.get("wallet_value", VALIDATION_INITIAL_CAPITAL_BRL)),
         custom_tickers=watchlist or list(SWING_VALIDATION_RECOMMENDED_WATCHLIST),
         period=str(profile_config.get("period", "6mo")),
         interval=str(profile_config.get("interval", "1h")),
@@ -187,7 +188,7 @@ def run_trader_cycle() -> dict:
     update_market_context_status(cycle_result.get("market_context"))
     _sync_trader_orders_into_storage()
     platform_state = sync_platform_positions_from_paper()
-    report = build_paper_report(initial_capital=float(platform_state.get("wallet_value", cfg.initial_capital)))
+    report = build_paper_report()
     equity_df = read_paper_equity(limit=200)
 
     return {

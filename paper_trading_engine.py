@@ -11,9 +11,12 @@ import pandas as pd
 import plotly.graph_objects as go
 
 from core.config import (
+    LEGACY_VALIDATION_INITIAL_CAPITAL_BRL,
     MARKET_DATA_HISTORY_LIMIT,
     RUNTIME_DIR,
     SWING_VALIDATION_RECOMMENDED_WATCHLIST,
+    VALIDATION_DEFAULT_MAX_OPEN_POSITIONS,
+    VALIDATION_INITIAL_CAPITAL_BRL,
     ensure_app_directories,
 )
 from core.market_context import apply_context_filter, get_market_context
@@ -43,14 +46,14 @@ PAPER_TRADES_NAMESPACE = "paper_trades"
 
 @dataclass
 class PaperTradingConfig:
-    initial_capital: float = 10000.0
+    initial_capital: float = VALIDATION_INITIAL_CAPITAL_BRL
     custom_tickers: list[str] = field(default_factory=lambda: list(SWING_VALIDATION_RECOMMENDED_WATCHLIST))
     period: str = "6mo"
     interval: str = "1h"
     profile_name: str = "Equilibrado"
     ticket_value: float = 100.0
     min_trade_notional: float = 100.0
-    max_open_positions: int = 3
+    max_open_positions: int = VALIDATION_DEFAULT_MAX_OPEN_POSITIONS
     holding_minutes: int = 60
     history_limit: int = MARKET_DATA_HISTORY_LIMIT
     allow_new_entries: bool = True
@@ -104,10 +107,39 @@ def _default_state(initial_capital: float) -> dict[str, Any]:
     }
 
 
+def _is_close_number(current: float | int | None, expected: float) -> bool:
+    try:
+        return abs(float(current or 0.0) - float(expected)) < 1e-9
+    except (TypeError, ValueError):
+        return False
+
+
+def _should_migrate_fresh_paper_state(state: dict[str, Any], desired_initial_capital: float) -> bool:
+    if _is_close_number(desired_initial_capital, LEGACY_VALIDATION_INITIAL_CAPITAL_BRL):
+        return False
+
+    positions = state.get("positions", {}) or {}
+    history = state.get("history", []) or []
+    if positions or history:
+        return False
+    if int(state.get("run_count", 0) or 0) != 0:
+        return False
+    if str(state.get("last_trade_at") or "").strip():
+        return False
+    if not _is_close_number(state.get("realized_pnl", 0.0), 0.0):
+        return False
+
+    return (
+        _is_close_number(state.get("initial_capital"), LEGACY_VALIDATION_INITIAL_CAPITAL_BRL)
+        and _is_close_number(state.get("cash"), LEGACY_VALIDATION_INITIAL_CAPITAL_BRL)
+        and _is_close_number(state.get("equity"), LEGACY_VALIDATION_INITIAL_CAPITAL_BRL)
+    )
+
+
 def ensure_paper_files(config: PaperTradingConfig | None = None) -> None:
     ensure_app_directories()
 
-    initial_capital = float(config.initial_capital) if config else 10000.0
+    initial_capital = float(config.initial_capital) if config else VALIDATION_INITIAL_CAPITAL_BRL
 
     if database_enabled():
         load_json_state(PAPER_STATE_NAMESPACE, lambda: _default_state(initial_capital), PAPER_STATE_FILE)
@@ -122,17 +154,21 @@ def ensure_paper_files(config: PaperTradingConfig | None = None) -> None:
 
 def load_paper_state(config: PaperTradingConfig | None = None) -> dict[str, Any]:
     ensure_paper_files(config)
+    desired_initial_capital = float(config.initial_capital) if config else VALIDATION_INITIAL_CAPITAL_BRL
     state = load_json_state(
         PAPER_STATE_NAMESPACE,
-        lambda: _default_state(float(config.initial_capital) if config else 10000.0),
+        lambda: _default_state(desired_initial_capital),
         PAPER_STATE_FILE,
     )
-    merged = _default_state(float(config.initial_capital) if config else state.get("initial_capital", 10000.0))
+    merged = _default_state(float(state.get("initial_capital", desired_initial_capital) or desired_initial_capital))
     merged.update(state)
     merged["positions"] = merged.get("positions", {}) or {}
     merged["asset_cooldowns"] = merged.get("asset_cooldowns", {}) or {}
     merged["last_prices"] = merged.get("last_prices", {}) or {}
     merged["history"] = merged.get("history", []) or []
+    if _should_migrate_fresh_paper_state(merged, desired_initial_capital):
+        merged = _default_state(desired_initial_capital)
+        save_paper_state(merged)
     return merged
 
 
@@ -498,7 +534,7 @@ def build_paper_report(
     initial_capital: float | None = None,
 ) -> dict[str, Any]:
     state = load_paper_state()
-    initial = float(initial_capital or state.get("initial_capital", 10000.0))
+    initial = float(initial_capital or state.get("initial_capital", VALIDATION_INITIAL_CAPITAL_BRL))
     equity = float(state.get("equity", state.get("cash", initial)))
     net_profit = round(equity - initial, 2)
     total_return = (net_profit / initial) if initial > 0 else 0.0
