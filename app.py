@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 from __future__ import annotations
 
 import streamlit as st
@@ -15,23 +14,21 @@ current_user = require_auth()
 render_auth_toolbar()
 state = load_bot_state()
 
-st.title("Robo de Investimentos")
+st.title("Painel Operacional do Trader")
 st.caption(f"Usuario atual: {current_user['username']} ({current_user['role']})")
 
 if bool((state.get("security", {}) or {}).get("real_mode_enabled", False)):
     st.warning("Real trading enabled")
 
-st.page_link("pages/1_Trader.py", label="Abrir Trader", icon="📈")
-st.page_link("pages/2_Investimento.py", label="Abrir Investimento", icon="🏦")
-st.page_link("pages/3_Carteira.py", label="Abrir Carteira", icon="💼")
-st.page_link("pages/5_Historico.py", label="Abrir Historico", icon="🗂️")
+st.page_link("pages/1_Trader.py", label="Abrir Painel do Trader")
+st.page_link("pages/5_Historico.py", label="Abrir Historico Operacional")
 
 if is_admin(current_user):
-    st.page_link("pages/4_Controle_do_Bot.py", label="Abrir Controle do Bot", icon="🛠️")
+    st.page_link("pages/4_Controle_do_Bot.py", label="Abrir Controle do Bot")
 
 st.markdown("---")
-st.subheader("Execucao manual (legado)")
-st.caption("Mantido por compatibilidade. Apenas administradores podem executar o ciclo manualmente por aqui.")
+st.subheader("Execucao Operacional Manual")
+st.caption("Mantido por compatibilidade. Apenas administradores podem disparar um ciclo manual por aqui.")
 
 if st.button("Rodar ciclo", use_container_width=True, disabled=not is_admin(current_user)):
     result = run_paper_cycle()
@@ -39,8 +36,8 @@ if st.button("Rodar ciclo", use_container_width=True, disabled=not is_admin(curr
     st.subheader("Resultado")
     st.write(result["report"])
 
-    st.subheader("Equity")
+    st.subheader("Curva de capital")
     st.line_chart(result["equity"])
 
-    st.subheader("Trades")
+    st.subheader("Trades executados")
     st.write(result["trades"])

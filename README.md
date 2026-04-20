@@ -1,56 +1,44 @@
-# Robo de Investimentos
+# Trade Ops Desk
 
-Plataforma de trading e pesquisa em Streamlit com dois fluxos principais:
-
-- `Trader`: operacao automatizada em paper trading com worker continuo.
-- `Investimento`: pesquisa institucional, backtest, walk-forward e analise de carteira.
-
-O projeto foi endurecido para uso local e deploy com separacao clara entre codigo-fonte, estado de execucao, autenticacao e persistencia compartilhada.
+Plataforma Streamlit focada exclusivamente em trade operacional, com worker continuo, paper trading, controle de risco, autenticacao e persistencia local ou em PostgreSQL.
 
 ## Visao geral
 
-Esta base combina:
+O produto agora e orientado apenas ao fluxo de trading:
 
-- interface Streamlit multipagina
-- worker continuo para o trader
-- paper trading com sincronizacao de estado
-- persistencia local em arquivos JSON/CSV
-- persistencia compartilhada em PostgreSQL quando `DATABASE_URL` estiver configurado
-- autenticacao com hash de senha e controle por perfil
+- painel do trader com sinais, posicoes, PnL e monitoramento do worker
+- worker continuo para execucao automatizada
+- historico operacional com ordens, relatorios fechados e logs
+- controle administrativo do bot
+- autenticacao com perfis de usuario
+- persistencia local em `storage/runtime/`
+- persistencia compartilhada em PostgreSQL quando `DATABASE_URL` existir
 
-O objetivo e manter o comportamento atual do app sem simplificar a plataforma, mas deixando o repositório mais previsivel para desenvolvimento e deploy.
-
-## Arquitetura atual
+## Arquitetura
 
 ### Interface
 
-- `app.py`: ponto de entrada principal do app
-- `pages/0_Login.py`: login e bootstrap do primeiro admin
+- `app.py`: entrada principal da plataforma
+- `pages/0_Login.py`: login e bootstrap do admin inicial
 - `pages/1_Trader.py`: painel do trader
-- `pages/2_Investimento.py`: pesquisa institucional
-- `pages/3_Carteira.py`: carteira e capital
-- `pages/4_Controle_do_Bot.py`: acoes administrativas
-- `pages/5_Historico.py`: auditoria de ordens e logs
+- `pages/4_Controle_do_Bot.py`: controle administrativo
+- `pages/5_Historico.py`: ordens, relatorios operacionais e logs
 
-### Nucleo
+### Core
 
-- `core/config.py`: configuracao central, env vars e diretorios
-- `core/persistence.py`: persistencia local e PostgreSQL
-- `core/state_store.py`: estado do app trader/investimento
+- `core/config.py`: configuracao central e caminhos de runtime
+- `core/persistence.py`: leitura e escrita local ou em PostgreSQL
+- `core/state_store.py`: estado operacional do bot e do trader
+- `core/trader_profiles.py`: perfis Reservado, Equilibrado e Agressivo
+- `core/trader_reports.py`: relatorios fechados e analytics
 - `core/auth/`: autenticacao, sessao e autorizacao
-- `core/ui.py`: utilitarios visuais compartilhados
 
-### Engines
+### Engines e workers
 
 - `engines/trader_engine.py`: orquestracao do ciclo do trader
-- `engines/quant_bridge.py`: ponte de compatibilidade entre engines
-- `engines/investment_research_engine.py`: pipeline de pesquisa
-- `paper_trading_engine.py`: simulacao e estado do paper trading
-
-### Execucao
-
-- `workers/trader_worker.py`: loop continuo do trader
-- `bot_engine.py` e `bot_runner.py`: compatibilidade com fluxo legado
+- `engines/quant_bridge.py`: ponte oficial para o fluxo de paper trading
+- `paper_trading_engine.py`: execucao, sinais, relatorios e paper state
+- `workers/trader_worker.py`: loop continuo do worker
 
 ## Estrutura de pastas
 
@@ -62,39 +50,33 @@ O objetivo e manter o comportamento atual do app sem simplificar a plataforma, m
 |   |-- config.py
 |   |-- persistence.py
 |   |-- state_store.py
-|   `-- ui.py
+|   |-- trader_profiles.py
+|   `-- trader_reports.py
 |-- engines/
-|-- institutional/
 |-- pages/
-|-- portfolio/
 |-- storage/
 |   |-- cache/
 |   |-- reports/
 |   `-- runtime/
+|-- tests/
 |-- workers/
 |-- requirements.txt
 |-- requirements-dev.txt
 `-- DEPLOY_RAILWAY.md
 ```
 
-## Persistencia e runtime
+## Runtime e persistencia
 
-O projeto opera em dois modos:
-
-- sem `DATABASE_URL`: usa arquivos locais em `storage/runtime/`
-- com `DATABASE_URL`: usa PostgreSQL para estado compartilhado e mantem o filesystem como fallback local
+Sem `DATABASE_URL`, o app usa arquivos locais em `storage/runtime/`.
+Com `DATABASE_URL`, o estado principal vai para PostgreSQL e o filesystem segue como fallback seguro.
 
 Arquivos de runtime principais:
 
 - `storage/runtime/bot_state.json`
-- `storage/runtime/paper_state.json`
-- `storage/runtime/paper_trades.json`
 - `storage/runtime/trader_orders.csv`
-- `storage/runtime/investor_orders.csv`
+- `storage/runtime/trade_reports.csv`
 - `storage/runtime/bot_log.csv`
 - `storage/runtime/auth_users.json`
-
-Arquivos de runtime nao devem ser versionados.
 
 ## Variaveis de ambiente
 
@@ -106,14 +88,14 @@ cp .env.example .env
 
 Variaveis suportadas:
 
-- `APP_TITLE`: titulo exibido no app
-- `APP_ENV`: `development` ou `production`
-- `ROBO_STORAGE_DIR`: diretorio de armazenamento local
-- `DATABASE_URL`: ativa PostgreSQL quando preenchida
-- `AUTH_REQUIRED`: força autenticacao mesmo em ambiente local
-- `AUTH_SESSION_TIMEOUT_MINUTES`: timeout de sessao
-- `ADMIN_USERNAME`: bootstrap opcional do primeiro admin
-- `ADMIN_PASSWORD`: bootstrap opcional do primeiro admin
+- `APP_TITLE`
+- `APP_ENV`
+- `ROBO_STORAGE_DIR`
+- `DATABASE_URL`
+- `AUTH_REQUIRED`
+- `AUTH_SESSION_TIMEOUT_MINUTES`
+- `ADMIN_USERNAME`
+- `ADMIN_PASSWORD`
 
 ## Instalacao local
 
@@ -151,33 +133,33 @@ pip install -r requirements-dev.txt
 cp .env.example .env
 ```
 
-Em desenvolvimento, a autenticacao pode permanecer opcional com:
+Em desenvolvimento:
 
 ```env
 AUTH_REQUIRED=false
 ```
 
-### 4. Rodar o app
+### 4. Rodar a plataforma
 
 ```bash
 streamlit run app.py
 ```
 
-### 5. Rodar o worker localmente
+### 5. Rodar o worker
 
 ```bash
 python -m workers.trader_worker
 ```
 
-## Testes basicos
+## Validacao rapida
 
 Compilacao:
 
 ```bash
-python -m py_compile app.py paper_trading_engine.py
+python -m py_compile app.py paper_trading_engine.py workers/trader_worker.py
 ```
 
-Suite basica:
+Testes:
 
 ```bash
 python -m pytest -q
@@ -191,38 +173,16 @@ O deploy recomendado usa:
 - `worker`: loop continuo do trader
 - `Postgres`: persistencia compartilhada
 
-Guia passo a passo:
-
-- veja [`DEPLOY_RAILWAY.md`](DEPLOY_RAILWAY.md)
+Veja o passo a passo em [`DEPLOY_RAILWAY.md`](DEPLOY_RAILWAY.md).
 
 ## Seguranca
 
-- senhas sao armazenadas com hash `bcrypt`
-- autenticacao e opcional em dev, mas obrigatoria em ambiente de producao
-- `real mode` exige conta admin e confirmacao de senha
-- segredos nao devem ser hardcoded no codigo
-- `.env`, `storage/runtime/` e logs locais ficam fora do versionamento
+- senhas com hash `bcrypt`
+- autenticacao obrigatoria em producao
+- `real mode` restrito a admin com confirmacao de senha
+- segredos fora do codigo
+- arquivos de runtime e logs fora do versionamento
 
-## Compatibilidade e legado
+## Compatibilidade
 
-Alguns arquivos na raiz foram mantidos como wrappers de compatibilidade para fluxos antigos. O caminho oficial para a interface continua sendo `app.py` e `pages/`.
-
-## Comandos uteis
-
-Subir app:
-
-```bash
-streamlit run app.py
-```
-
-Rodar worker:
-
-```bash
-python -m workers.trader_worker
-```
-
-Executar testes:
-
-```bash
-python -m pytest -q
-```
+Wrappers de compatibilidade na raiz foram mantidos apenas para o fluxo de trade legado. O caminho oficial da interface continua sendo `app.py` e `pages/`.

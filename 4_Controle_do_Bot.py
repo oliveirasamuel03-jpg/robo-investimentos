@@ -1,9 +1,0 @@
-from __future__ import annotations
-
-from pathlib import Path
-import runpy
-
-
-TARGET = Path(__file__).resolve().parent / "pages" / "4_Controle_do_Bot.py"
-
-runpy.run_path(str(TARGET), run_name="__main__")
