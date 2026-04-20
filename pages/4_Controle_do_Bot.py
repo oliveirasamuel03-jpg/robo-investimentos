@@ -5,7 +5,8 @@ import json
 import streamlit as st
 
 from core.auth.guards import render_auth_toolbar, require_admin
-from core.state_store import load_bot_state, log_event, reset_state, save_bot_state
+from core.broker import broker_status_label, probe_broker_status
+from core.state_store import load_bot_state, log_event, reset_state, save_bot_state, update_broker_status
 from engines.trader_engine import run_trader_cycle
 
 
@@ -60,7 +61,7 @@ market_data_state = state.get("market_data", {}) or {}
 market_contexts = market_data_state.get("contexts", {}) or {}
 operational_market_state = market_contexts.get("worker_cycle") or market_data_state
 chart_market_state = market_contexts.get("trader_chart") or {}
-broker_state = state.get("broker", {}) or {}
+broker_state = update_broker_status(probe_broker_status(security_state, requested_by="admin_panel"))
 
 if bool(security_state.get("real_mode_enabled", False)):
     st.warning("Real trading enabled")
@@ -94,10 +95,12 @@ with diag_c1:
     st.caption(f"Ultimo sucesso: {operational_market_state.get('last_success_at') or 'Sem registro'}")
 with diag_c2:
     st.caption(f"Broker provider: {str(broker_state.get('provider', 'paper')).upper()}")
-    st.caption(f"Status do broker: {str(broker_state.get('status', 'paper')).title()}")
+    st.caption(f"Status do broker: {broker_status_label(broker_state.get('status'))}")
 
 if operational_market_state.get("last_error"):
     st.caption(f"Ultimo alerta de mercado: {operational_market_state.get('last_error')}")
+if broker_state.get("warning"):
+    st.caption(f"Observacao do broker: {broker_state.get('warning')}")
 
 with st.expander("Diagnostico do feed"):
     st.write("**Contexto operacional (worker):**")
@@ -115,6 +118,18 @@ with st.expander("Diagnostico do feed"):
             json.dumps(chart_market_state.get("source_breakdown", {}) or {}, ensure_ascii=False, indent=2),
             language="json",
         )
+
+with st.expander("Diagnostico do broker"):
+    st.write(f"**Provider:** {str(broker_state.get('provider', 'paper')).upper()}")
+    st.write(f"**Status:** {broker_status_label(broker_state.get('status'))}")
+    st.write(f"**Modo configurado:** {broker_mode_label(broker_state.get('configured_mode'))}")
+    st.write(f"**Modo efetivo:** {broker_mode_label(broker_state.get('effective_mode'))}")
+    st.write(f"**Conta:** {broker_state.get('account_id') or 'Sem registro'}")
+    st.write(f"**Base URL:** {broker_state.get('base_url') or 'Sem registro'}")
+    st.write(f"**API key configurada:** {'Sim' if broker_state.get('api_key_configured') else 'Nao'}")
+    st.write(f"**API secret configurada:** {'Sim' if broker_state.get('api_secret_configured') else 'Nao'}")
+    st.write(f"**Pode enviar ordens agora:** {'Sim' if broker_state.get('can_submit_orders') else 'Nao'}")
+    st.write(f"**Execucao real habilitada nesta etapa:** {'Sim' if broker_state.get('execution_enabled') else 'Nao'}")
 
 status_options = ["RUNNING", "PAUSED", "STOPPED"]
 mode_options = ["Automatico", "Semi-automatico"]

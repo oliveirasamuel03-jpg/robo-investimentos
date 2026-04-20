@@ -87,3 +87,32 @@ def test_update_market_data_status_tracks_last_success_and_error(isolated_storag
     assert root_after_chart["requested_by"] == "worker_cycle"
     assert root_after_chart["status"] == "healthy"
     assert root_after_chart["contexts"]["trader_chart"]["status"] == "error"
+
+
+def test_update_broker_status_tracks_readiness_fields(isolated_storage):
+    state_store = load_module("core.state_store")
+
+    broker_state = state_store.update_broker_status(
+        {
+            "provider": "alpaca",
+            "mode": "live",
+            "status": "guarded",
+            "last_sync_at": "2026-04-20T04:00:00+00:00",
+            "last_error": "",
+            "account_id": "***1234",
+            "requested_by": "admin_panel",
+            "configured_mode": "live",
+            "effective_mode": "live",
+            "base_url": "https://api.alpaca.markets",
+            "api_key_configured": True,
+            "api_secret_configured": True,
+            "execution_enabled": False,
+            "can_submit_orders": False,
+            "warning": "guarded",
+        }
+    )
+
+    assert broker_state["provider"] == "alpaca"
+    assert broker_state["status"] == "guarded"
+    assert broker_state["api_key_configured"] is True
+    assert broker_state["execution_enabled"] is False
