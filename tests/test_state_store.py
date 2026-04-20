@@ -16,15 +16,19 @@ def test_state_store_bootstraps_files_and_defaults(isolated_storage):
     assert config.TRADER_ORDERS_FILE.exists()
     assert config.TRADER_REPORTS_FILE.exists()
     assert config.BOT_LOG_FILE.exists()
-    assert state["wallet_value"] > 0
+    assert state["wallet_value"] == config.VALIDATION_INITIAL_CAPITAL_BRL
     assert isinstance(state["positions"], list)
     assert state["trader"]["profile"] == "Equilibrado"
+    assert state["trader"]["ticket_value"] == config.VALIDATION_DEFAULT_ENTRY_AMOUNT_BRL
+    assert state["trader"]["max_open_positions"] == config.VALIDATION_DEFAULT_MAX_OPEN_POSITIONS
     assert state["market_data"]["provider"] == config.MARKET_DATA_PROVIDER
     assert state["broker"]["provider"] == config.BROKER_PROVIDER
     assert state["production"]["health_level"] == "healthy"
     assert state["retention"]["retention_days"] == config.RETENTION_DAYS
     assert state["retention"]["weekly_reports_index"] == []
     assert state["validation"]["validation_mode"] == "swing_10d"
+    assert state["validation"]["validation_mode_label"] == config.VALIDATION_MODE_DISPLAY
+    assert state["validation"]["trading_mode"] == config.VALIDATION_TRADING_MODE
     assert state["validation"]["final_email_sent"] is False
     assert state["trader"]["watchlist"] == config.SWING_VALIDATION_RECOMMENDED_WATCHLIST
 

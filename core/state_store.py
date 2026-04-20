@@ -20,11 +20,18 @@ from core.config import (
     RETENTION_ENABLED,
     RETENTION_RUN_INTERVAL_HOURS,
     LEGACY_MIXED_DEFAULT_WATCHLIST,
+    LEGACY_VALIDATION_INITIAL_CAPITAL_BRL,
     SWING_VALIDATION_RECOMMENDED_WATCHLIST,
     TRADER_REPORTS_COLUMNS,
     TRADER_REPORTS_FILE,
     TRADER_ORDERS_COLUMNS,
     TRADER_ORDERS_FILE,
+    VALIDATION_DEFAULT_ENTRY_AMOUNT_BRL,
+    VALIDATION_DEFAULT_MAX_OPEN_POSITIONS,
+    VALIDATION_INITIAL_CAPITAL_BRL,
+    VALIDATION_LIVE_TRADING_ENABLED,
+    VALIDATION_MODE_DISPLAY,
+    VALIDATION_TRADING_MODE,
     ensure_app_directories,
 )
 from core.persistence import (
@@ -64,9 +71,59 @@ def _apply_trader_watchlist_defaults(state: dict) -> dict:
     return state
 
 
+def _is_close_number(current: float | int | None, expected: float) -> bool:
+    try:
+        return abs(float(current or 0.0) - float(expected)) < 1e-9
+    except (TypeError, ValueError):
+        return False
+
+
+def _looks_like_fresh_validation_cycle(state: dict) -> bool:
+    positions = state.get("positions", []) or []
+    validation_state = state.get("validation", {}) or {}
+
+    if positions:
+        return False
+    if not _is_close_number(state.get("realized_pnl", 0.0), 0.0):
+        return False
+    if str(state.get("last_run_at") or "").strip():
+        return False
+    if str(validation_state.get("validation_started_at") or "").strip():
+        return False
+    if validation_state.get("last_report"):
+        return False
+
+    return True
+
+
+def _apply_validation_operating_defaults(state: dict) -> dict:
+    trader_state = state.get("trader", {}) or {}
+    validation_state = state.get("validation", {}) or {}
+    security_state = state.get("security", {}) or {}
+
+    if _looks_like_fresh_validation_cycle(state):
+        if _is_close_number(state.get("wallet_value"), LEGACY_VALIDATION_INITIAL_CAPITAL_BRL):
+            state["wallet_value"] = float(VALIDATION_INITIAL_CAPITAL_BRL)
+        if _is_close_number(state.get("cash"), LEGACY_VALIDATION_INITIAL_CAPITAL_BRL):
+            state["cash"] = float(VALIDATION_INITIAL_CAPITAL_BRL)
+        if _is_close_number(trader_state.get("ticket_value"), VALIDATION_DEFAULT_ENTRY_AMOUNT_BRL):
+            trader_state["ticket_value"] = float(VALIDATION_DEFAULT_ENTRY_AMOUNT_BRL)
+        if int(trader_state.get("max_open_positions", 0) or 0) == 3:
+            trader_state["max_open_positions"] = int(VALIDATION_DEFAULT_MAX_OPEN_POSITIONS)
+
+    validation_state["validation_mode_label"] = VALIDATION_MODE_DISPLAY
+    validation_state["trading_mode"] = VALIDATION_TRADING_MODE
+    validation_state["live_trading_enabled"] = bool(security_state.get("real_mode_enabled", VALIDATION_LIVE_TRADING_ENABLED))
+    validation_state["paper_only"] = True
+
+    state["trader"] = trader_state
+    state["validation"] = validation_state
+    return state
+
+
 DEFAULT_STATE = {
-    "wallet_value": 10000.0,
-    "cash": 10000.0,
+    "wallet_value": VALIDATION_INITIAL_CAPITAL_BRL,
+    "cash": VALIDATION_INITIAL_CAPITAL_BRL,
     "bot_status": "PAUSED",
     "bot_mode": "Automatico",
     "realized_pnl": 0.0,
@@ -169,6 +226,7 @@ DEFAULT_STATE = {
     },
     "validation": {
         "validation_mode": "swing_10d",
+        "validation_mode_label": VALIDATION_MODE_DISPLAY,
         "validation_started_at": "",
         "validation_day_number": 1,
         "validation_phase": "Coleta e observacao",
@@ -181,6 +239,8 @@ DEFAULT_STATE = {
         "timeframe": "1d",
         "timeframe_label": "Diario (1D)",
         "period_label": "2y",
+        "trading_mode": VALIDATION_TRADING_MODE,
+        "live_trading_enabled": VALIDATION_LIVE_TRADING_ENABLED,
         "paper_only": True,
         "last_evaluated_at": "",
         "last_reset_at": "",
@@ -215,9 +275,9 @@ DEFAULT_STATE = {
     "trader": {
         "enabled": True,
         "profile": DEFAULT_TRADER_PROFILE,
-        "ticket_value": 100.0,
+        "ticket_value": VALIDATION_DEFAULT_ENTRY_AMOUNT_BRL,
         "holding_minutes": 60,
-        "max_open_positions": 3,
+        "max_open_positions": VALIDATION_DEFAULT_MAX_OPEN_POSITIONS,
         "watchlist": list(SWING_VALIDATION_RECOMMENDED_WATCHLIST),
     },
 }
@@ -267,7 +327,8 @@ def load_bot_state() -> dict:
     retention_state["run_interval_hours"] = RETENTION_RUN_INTERVAL_HOURS
     retention_state["archive_trader_orders"] = RETENTION_ARCHIVE_TRADER_ORDERS
     state["retention"] = retention_state
-    return _apply_trader_watchlist_defaults(state)
+    state = _apply_trader_watchlist_defaults(state)
+    return _apply_validation_operating_defaults(state)
 
 
 def save_bot_state(state: dict) -> None:

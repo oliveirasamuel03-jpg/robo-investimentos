@@ -4,6 +4,7 @@ from tests.conftest import load_module
 
 
 def test_apply_swing_validation_overrides_promotes_daily_swing_config(isolated_storage):
+    config = load_module("core.config")
     profiles = load_module("core.trader_profiles")
     swing_validation = load_module("core.swing_validation")
 
@@ -19,6 +20,7 @@ def test_apply_swing_validation_overrides_promotes_daily_swing_config(isolated_s
     assert swing["period"] == "2y"
     assert swing["holding_minutes"] >= 6 * 24 * 60
     assert swing["min_signal_score"] >= 0.74
+    assert swing["max_open_positions"] == config.VALIDATION_DEFAULT_MAX_OPEN_POSITIONS
     assert swing["reentry_cooldown_minutes"] >= 24 * 60
 
 

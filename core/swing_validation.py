@@ -5,7 +5,16 @@ from typing import Any
 
 import pandas as pd
 
-from core.config import BOT_LOG_COLUMNS, BOT_LOG_FILE, TRADER_ORDERS_COLUMNS, TRADER_ORDERS_FILE
+from core.config import (
+    BOT_LOG_COLUMNS,
+    BOT_LOG_FILE,
+    TRADER_ORDERS_COLUMNS,
+    TRADER_ORDERS_FILE,
+    VALIDATION_DEFAULT_MAX_OPEN_POSITIONS,
+    VALIDATION_LIVE_TRADING_ENABLED,
+    VALIDATION_MODE_DISPLAY,
+    VALIDATION_TRADING_MODE,
+)
 from core.state_store import load_bot_state, read_storage_table, save_bot_state
 from core.trader_reports import (
     calculate_trade_report_metrics,
@@ -37,7 +46,7 @@ VERDICT_MESSAGES = {
 SWING_PROFILE_OVERRIDES: dict[str, dict[str, Any]] = {
     "Reservado": {
         "holding_minutes": 8 * 24 * 60,
-        "max_open_positions": 2,
+        "max_open_positions": VALIDATION_DEFAULT_MAX_OPEN_POSITIONS,
         "min_signal_score": 0.80,
         "min_atr_pct": 0.005,
         "max_atr_pct": 0.045,
@@ -61,7 +70,7 @@ SWING_PROFILE_OVERRIDES: dict[str, dict[str, Any]] = {
     },
     "Equilibrado": {
         "holding_minutes": 6 * 24 * 60,
-        "max_open_positions": 3,
+        "max_open_positions": VALIDATION_DEFAULT_MAX_OPEN_POSITIONS,
         "min_signal_score": 0.74,
         "min_atr_pct": 0.004,
         "max_atr_pct": 0.055,
@@ -85,7 +94,7 @@ SWING_PROFILE_OVERRIDES: dict[str, dict[str, Any]] = {
     },
     "Agressivo": {
         "holding_minutes": 4 * 24 * 60,
-        "max_open_positions": 4,
+        "max_open_positions": VALIDATION_DEFAULT_MAX_OPEN_POSITIONS,
         "min_signal_score": 0.70,
         "min_atr_pct": 0.0035,
         "max_atr_pct": 0.07,
@@ -173,6 +182,7 @@ def _default_signal_counters() -> dict[str, Any]:
 def default_validation_state() -> dict[str, Any]:
     return {
         "validation_mode": SWING_VALIDATION_MODE,
+        "validation_mode_label": VALIDATION_MODE_DISPLAY,
         "validation_started_at": "",
         "validation_day_number": 1,
         "validation_phase": PHASE_COLETA,
@@ -185,6 +195,8 @@ def default_validation_state() -> dict[str, Any]:
         "timeframe": SWING_VALIDATION_INTERVAL,
         "timeframe_label": "Diario (1D)",
         "period_label": SWING_VALIDATION_PERIOD,
+        "trading_mode": VALIDATION_TRADING_MODE,
+        "live_trading_enabled": VALIDATION_LIVE_TRADING_ENABLED,
         "paper_only": True,
         "last_evaluated_at": "",
         "last_reset_at": "",

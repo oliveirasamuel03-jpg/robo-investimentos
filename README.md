@@ -350,6 +350,38 @@ Compatibilidade da etapa:
 - o contexto de mercado cripto reaproveita esta watchlist sem duplicar logica
 - nao ha habilitacao de ordens reais nesta etapa
 
+## Configuracao inicial do ciclo swing
+
+Para iniciar a validacao swing de `10 dias` com mais disciplina, a base operacional do ciclo atual foi alinhada para:
+
+- capital inicial de validacao: `R$ 1.000,00`
+- entrada padrao por operacao: `R$ 100,00`
+- maximo de posicoes abertas: `2`
+- modo exibido da fase: `swing_10d_crypto`
+- execucao: `paper trading` obrigatoria
+
+Mapeamento na estrutura atual:
+
+- `wallet_value` e `paper_state.initial_capital`: capital inicial do ciclo
+- `trader.ticket_value`: valor base por entrada
+- `trader.max_open_positions`: limite de exposicao simultanea
+- `validation.validation_mode`: continua interno como `swing_10d` para preservar compatibilidade
+- `validation.validation_mode_label`: exposto como `swing_10d_crypto`
+- `security.real_mode_enabled`: continua `false` por padrao nesta fase
+
+Observacoes importantes:
+
+- o robo ja respeita saldo simulado insuficiente e o limite maximo de posicoes antes de abrir novas entradas
+- os defaults novos valem para novos ciclos e para estados legados ainda nao iniciados
+- para recomecar um ciclo limpo com esses parametros, use `Salvar configuracao avancada` e depois `Resetar modulo trader`
+
+Novos indicadores de PnL no Trader:
+
+- `PnL Acumulado`: resultado total realizado
+- `Ultima Operacao`: resultado do trade fechado mais recente
+- `PnL em Aberto`: resultado das posicoes ainda abertas
+- `Retorno do ciclo`: soma do realizado com o aberto sobre o capital inicial atual
+
 ## Retencao e validacao semanal
 
 O historico operacional agora aplica uma politica segura de retencao:

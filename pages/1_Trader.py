@@ -27,6 +27,10 @@ from core.config import (
     SWING_VALIDATION_WATCHLIST_DETAILS,
     TRADER_ORDERS_COLUMNS,
     TRADER_ORDERS_FILE,
+    VALIDATION_DEFAULT_ENTRY_AMOUNT_BRL,
+    VALIDATION_DEFAULT_MAX_OPEN_POSITIONS,
+    VALIDATION_INITIAL_CAPITAL_BRL,
+    VALIDATION_MODE_DISPLAY,
 )
 from core.state_store import load_bot_state, read_storage_table, save_bot_state, update_market_data_status
 from core.swing_validation import SWING_VALIDATION_MODE, apply_swing_validation_overrides
@@ -320,6 +324,61 @@ def br_pct(value: float) -> str:
     return f"{value * 100:.2f}%"
 
 
+def metric_class_for_value(value: float | None) -> str:
+    if value is None:
+        return "metric-neutral"
+    if float(value) > 0:
+        return "metric-good"
+    if float(value) < 0:
+        return "metric-bad"
+    return "metric-neutral"
+
+
+def resolve_last_trade_pnl(trade_reports_df: pd.DataFrame, paper_trades: list[dict]) -> float | None:
+    if trade_reports_df is not None and not trade_reports_df.empty and "closed_at" in trade_reports_df.columns:
+        working = trade_reports_df.copy()
+        working["closed_at"] = pd.to_datetime(working["closed_at"], errors="coerce", utc=True)
+        working["realized_pnl"] = pd.to_numeric(working.get("realized_pnl"), errors="coerce")
+        working = working.dropna(subset=["closed_at"]).sort_values("closed_at")
+        if not working.empty:
+            last_trade_value = working.iloc[-1].get("realized_pnl")
+            if pd.notna(last_trade_value):
+                return round(float(last_trade_value), 2)
+
+    for trade in reversed(paper_trades or []):
+        if str(trade.get("side") or "").upper() != "SELL":
+            continue
+        realized = pd.to_numeric(pd.Series([trade.get("realized_pnl")]), errors="coerce").iloc[0]
+        if pd.notna(realized):
+            return round(float(realized), 2)
+
+    return None
+
+
+def build_pnl_summary(
+    paper_state: dict,
+    trade_reports_df: pd.DataFrame,
+    open_positions: list[dict],
+    paper_trades: list[dict],
+) -> dict:
+    initial_capital = float(paper_state.get("initial_capital", VALIDATION_INITIAL_CAPITAL_BRL) or VALIDATION_INITIAL_CAPITAL_BRL)
+    cumulative_pnl = round(float(paper_state.get("realized_pnl", 0.0) or 0.0), 2)
+    open_pnl = round(
+        sum(float(position.get("unrealized_pnl", 0.0) or 0.0) for position in (open_positions or [])),
+        2,
+    )
+    last_trade_pnl = resolve_last_trade_pnl(trade_reports_df, paper_trades)
+    cycle_return_pct = ((cumulative_pnl + open_pnl) / initial_capital) if initial_capital > 0 else 0.0
+
+    return {
+        "initial_capital": initial_capital,
+        "cumulative_pnl": cumulative_pnl,
+        "last_trade_pnl": last_trade_pnl,
+        "open_pnl": open_pnl,
+        "cycle_return_pct": cycle_return_pct,
+    }
+
+
 def simple_signal_text(chart_df: pd.DataFrame) -> str:
     if chart_df.empty or len(chart_df) < 2:
         return "Aguardando dados"
@@ -558,7 +617,7 @@ def build_trader_snapshot(
         base_max_open_positions=int(trader_state.get("max_open_positions", 1)),
     )
     paper_state = load_paper_state()
-    paper_report = build_paper_report(initial_capital=float(state.get("wallet_value", 10000.0)))
+    paper_report = build_paper_report(initial_capital=float(paper_state.get("initial_capital", VALIDATION_INITIAL_CAPITAL_BRL)))
     paper_equity_df = read_paper_equity(limit=300)
     paper_trades = read_paper_trades()[-200:]
     trade_reports_df = read_trade_reports(limit=300)
@@ -567,6 +626,7 @@ def build_trader_snapshot(
     trade_suggestions = generate_trade_suggestions(trade_reports_df)
     positions = [p for p in state.get("positions", []) if p.get("module") == "TRADER"]
     open_positions = [p for p in positions if p.get("status") == "OPEN"]
+    pnl_summary = build_pnl_summary(paper_state, trade_reports_df, open_positions, paper_trades)
     selected_position = next((p for p in open_positions if p.get("asset") == selected_ticker), None)
     entry_price = float(selected_position.get("entry_price", 0.0)) if selected_position else None
 
@@ -633,6 +693,7 @@ def build_trader_snapshot(
         "trade_report_metrics": trade_report_metrics,
         "profile_summary_df": profile_summary_df,
         "trade_suggestions": trade_suggestions,
+        "pnl_summary": pnl_summary,
     }
 
 
@@ -837,6 +898,13 @@ st.markdown(
         margin-bottom: 0.35rem;
     }
 
+    .metric-help {
+        color: #64748b;
+        font-size: 0.78rem;
+        margin-top: 0.35rem;
+        line-height: 1.35;
+    }
+
     .metric-value {
         font-size: 1.85rem;
         font-weight: 800;
@@ -946,7 +1014,7 @@ sync_platform_positions_from_paper()
 state = load_bot_state()
 security_state = state.get("security", {}) or {}
 paper_state = load_paper_state()
-paper_report = build_paper_report(initial_capital=float(state.get("wallet_value", 10000.0)))
+paper_report = build_paper_report(initial_capital=float(paper_state.get("initial_capital", VALIDATION_INITIAL_CAPITAL_BRL)))
 paper_equity_df = read_paper_equity(limit=300)
 paper_trades = read_paper_trades()[-200:]
 positions = [p for p in state.get("positions", []) if p.get("module") == "TRADER"]
@@ -1059,6 +1127,7 @@ paper_state = page_snapshot["paper_state"]
 paper_report = page_snapshot["paper_report"]
 paper_equity_df = page_snapshot["paper_equity_df"]
 paper_trades = page_snapshot["paper_trades"]
+pnl_summary = page_snapshot["pnl_summary"]
 positions = page_snapshot["positions"]
 open_positions = page_snapshot["open_positions"]
 selected_position = page_snapshot["selected_position"]
@@ -1074,9 +1143,10 @@ robot_label = page_snapshot["robot_label"]
 robot_class = page_snapshot["robot_class"]
 market_data_status = page_snapshot.get("market_data_status", market_data_status)
 market_context_state = state.get("market_context", {}) or {}
-validation_last_report = (state.get("validation", {}) or {}).get("last_report", {}) or {}
+validation_state = state.get("validation", {}) or {}
+validation_last_report = (validation_state.get("last_report", {}) or {})
 
-m1, m2, m3, m4 = st.columns(4)
+m1, m2, m3, m4, m5 = st.columns(5)
 
 with m1:
     st.markdown(
@@ -1084,50 +1154,75 @@ with m1:
         <div class="glass-card">
             <div class="metric-label">Saldo disponível</div>
             <div class="metric-value metric-neutral">{br_money(float(paper_state.get('cash', 0.0)))}</div>
+            <div class="metric-help">Caixa simulado pronto para novas entradas.</div>
         </div>
         """,
         unsafe_allow_html=True,
     )
 
 with m2:
-    pnl_value = float(paper_report.get("net_profit", 0.0))
-    pnl_class = "metric-good" if pnl_value >= 0 else "metric-bad"
+    pnl_value = float(pnl_summary.get("cumulative_pnl", 0.0) or 0.0)
+    pnl_class = metric_class_for_value(pnl_value)
     st.markdown(
         f"""
         <div class="glass-card">
-            <div class="metric-label">Lucro / prejuízo</div>
+            <div class="metric-label">PnL Acumulado</div>
             <div class="metric-value {pnl_class}">{br_money(pnl_value)}</div>
+            <div class="metric-help">Resultado total realizado do ciclo atual.</div>
         </div>
         """,
         unsafe_allow_html=True,
     )
 
 with m3:
+    last_trade_pnl = pnl_summary.get("last_trade_pnl")
+    last_trade_value = br_money(float(last_trade_pnl)) if last_trade_pnl is not None else "Sem trade fechado"
+    last_trade_class = metric_class_for_value(last_trade_pnl)
     st.markdown(
         f"""
         <div class="glass-card">
-            <div class="metric-label">Status do robô</div>
-            <div class="metric-value {robot_class}">{robot_label}</div>
+            <div class="metric-label">Última Operação</div>
+            <div class="metric-value {last_trade_class}">{last_trade_value}</div>
+            <div class="metric-help">Resultado do último trade fechado.</div>
         </div>
         """,
         unsafe_allow_html=True,
     )
 
 with m4:
-    equity_value = float(paper_state.get("equity", 0.0))
-    return_pct = 0.0
-    initial_capital = float(state.get("wallet_value", 0.0))
-    if initial_capital > 0:
-        return_pct = (equity_value - initial_capital) / initial_capital
+    open_pnl = float(pnl_summary.get("open_pnl", 0.0) or 0.0)
+    open_pnl_class = metric_class_for_value(open_pnl)
     st.markdown(
         f"""
         <div class="glass-card">
-            <div class="metric-label">Resultado %</div>
-            <div class="metric-value metric-neutral">{br_pct(return_pct)}</div>
+            <div class="metric-label">PnL em Aberto</div>
+            <div class="metric-value {open_pnl_class}">{br_money(open_pnl)}</div>
+            <div class="metric-help">Resultado das posições ainda abertas.</div>
         </div>
         """,
         unsafe_allow_html=True,
     )
+
+with m5:
+    cycle_return_pct = float(pnl_summary.get("cycle_return_pct", 0.0) or 0.0)
+    st.markdown(
+        f"""
+        <div class="glass-card">
+            <div class="metric-label">Retorno do ciclo</div>
+            <div class="metric-value metric-neutral">{br_pct(cycle_return_pct)}</div>
+            <div class="metric-help">Resultado realizado + aberto sobre o capital inicial.</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+st.caption(
+    "Configuração inicial desta fase: "
+    f"capital base {br_money(VALIDATION_INITIAL_CAPITAL_BRL)} | "
+    f"entrada padrão {br_money(VALIDATION_DEFAULT_ENTRY_AMOUNT_BRL)} | "
+    f"até {int(VALIDATION_DEFAULT_MAX_OPEN_POSITIONS)} posições simultâneas | "
+    f"modo {VALIDATION_MODE_DISPLAY} | PAPER TRADING obrigatório."
+)
 
 st.markdown(
     f"""
@@ -1489,6 +1584,13 @@ with st.expander("Modo avançado"):
             "Modo swing 10 dias ativo: a engine opera com timeframe diario e holding de dias, "
             "mesmo que o preview base abaixo continue mostrando a configuracao manual."
         )
+        st.caption(
+            "Configuracao inicial recomendada para este ciclo: "
+            f"capital base {br_money(VALIDATION_INITIAL_CAPITAL_BRL)} | "
+            f"entrada padrao {br_money(VALIDATION_DEFAULT_ENTRY_AMOUNT_BRL)} | "
+            f"ate {int(VALIDATION_DEFAULT_MAX_OPEN_POSITIONS)} posicoes abertas | "
+            f"modo {VALIDATION_MODE_DISPLAY}."
+        )
 
     preview_c1, preview_c2, preview_c3, preview_c4 = st.columns(4)
     preview_c1.metric("Ticket efetivo", br_money(float(effective_profile_preview["ticket_value"])))
@@ -1511,6 +1613,10 @@ with st.expander("Modo avançado"):
     st.caption(
         "Watchlist padrao recomendada para esta fase: "
         f"{', '.join(recommended_watchlist)}"
+    )
+    st.caption(
+        "Para iniciar um ciclo limpo com essa configuracao, salve os parametros e use "
+        "'Resetar modulo trader'. O historico consolidado continua preservado."
     )
     st.markdown("**Logica da watchlist recomendada**")
     st.caption(
@@ -1594,7 +1700,13 @@ with st.expander("Modo avançado"):
         k3.metric("Execuções", f"{paper_state.get('run_count', 0)}")
         k4.metric("Trades", f"{paper_report.get('trades_count', 0)}")
 
-        st.metric("P&L", br_money(float(paper_report.get("net_profit", 0.0))))
+        pnl_m1, pnl_m2, pnl_m3 = st.columns(3)
+        pnl_m1.metric("PnL Acumulado", br_money(float(pnl_summary.get("cumulative_pnl", 0.0) or 0.0)))
+        pnl_m2.metric(
+            "Última Operação",
+            br_money(float(pnl_summary["last_trade_pnl"])) if pnl_summary.get("last_trade_pnl") is not None else "Sem trade fechado",
+        )
+        pnl_m3.metric("PnL em Aberto", br_money(float(pnl_summary.get("open_pnl", 0.0) or 0.0)))
 
         if not paper_equity_df.empty:
             equity_plot = paper_equity_df.copy()
