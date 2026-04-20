@@ -1512,14 +1512,14 @@ with st.expander("Modo avançado"):
         "Watchlist padrao recomendada para esta fase: "
         f"{', '.join(recommended_watchlist)}"
     )
-    with st.expander("Ver logica da watchlist recomendada"):
-        st.caption(
-            "Selecao otimizada para swing de 10 dias, CRIPTO ONLY e PAPER TRADING. "
-            "O objetivo aqui e validar qualidade de sinal com poucos ativos liquidos e legiveis."
-        )
-        st.dataframe(pd.DataFrame(SWING_VALIDATION_WATCHLIST_DETAILS), use_container_width=True)
-        for note in SWING_VALIDATION_DISCOURAGED_ASSET_NOTES:
-            st.caption(f"- {note}")
+    st.markdown("**Logica da watchlist recomendada**")
+    st.caption(
+        "Selecao otimizada para swing de 10 dias, CRIPTO ONLY e PAPER TRADING. "
+        "O objetivo aqui e validar qualidade de sinal com poucos ativos liquidos e legiveis."
+    )
+    st.dataframe(pd.DataFrame(SWING_VALIDATION_WATCHLIST_DETAILS), use_container_width=True)
+    for note in SWING_VALIDATION_DISCOURAGED_ASSET_NOTES:
+        st.caption(f"- {note}")
 
     ac1, ac2, ac3 = st.columns(3)
 
