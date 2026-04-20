@@ -56,6 +56,10 @@ MARKET_DATA_HISTORY_LIMIT = max(120, env_int("MARKET_DATA_HISTORY_LIMIT", 500))
 BROKER_PROVIDER = _env_str("BROKER_PROVIDER", "paper") or "paper"
 BROKER_MODE = _env_str("BROKER_MODE", "paper") or "paper"
 BROKER_ACCOUNT_ID = _env_str("BROKER_ACCOUNT_ID", "")
+BROKER_BASE_URL = _env_str("BROKER_BASE_URL", "")
+BROKER_API_KEY = _env_str("BROKER_API_KEY", "")
+BROKER_API_SECRET = _env_str("BROKER_API_SECRET", "")
+BROKER_HTTP_HEALTHCHECK = env_flag("BROKER_HTTP_HEALTHCHECK", False)
 
 STORAGE_DIR = _resolve_storage_dir()
 RUNTIME_DIR = STORAGE_DIR / "runtime"

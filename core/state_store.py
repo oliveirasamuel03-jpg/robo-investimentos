@@ -60,6 +60,15 @@ DEFAULT_STATE = {
         "last_sync_at": "",
         "last_error": "",
         "account_id": "",
+        "requested_by": "",
+        "configured_mode": BROKER_MODE,
+        "effective_mode": BROKER_MODE,
+        "base_url": "",
+        "api_key_configured": False,
+        "api_secret_configured": False,
+        "execution_enabled": False,
+        "can_submit_orders": False,
+        "warning": "",
     },
     "security": {
         "real_mode_enabled": False,
@@ -220,7 +229,23 @@ def update_broker_status(status_payload: dict | None) -> dict:
     broker_state = state.get("broker", {}) or {}
     payload = status_payload or {}
 
-    for key in ("provider", "mode", "status", "last_sync_at", "last_error", "account_id"):
+    for key in (
+        "provider",
+        "mode",
+        "status",
+        "last_sync_at",
+        "last_error",
+        "account_id",
+        "requested_by",
+        "configured_mode",
+        "effective_mode",
+        "base_url",
+        "api_key_configured",
+        "api_secret_configured",
+        "execution_enabled",
+        "can_submit_orders",
+        "warning",
+    ):
         if payload.get(key) is not None:
             broker_state[key] = payload.get(key)
 

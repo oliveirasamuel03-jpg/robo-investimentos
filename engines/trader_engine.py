@@ -8,12 +8,14 @@ from core.config import (
     TRADER_ORDERS_COLUMNS,
     TRADER_ORDERS_FILE,
 )
+from core.broker import probe_broker_status
 from core.state_store import (
     load_bot_state,
     log_event,
     read_storage_table,
     replace_storage_table,
     save_bot_state,
+    update_broker_status,
     update_market_data_status,
 )
 from core.trader_profiles import get_trader_profile_config
@@ -157,6 +159,8 @@ def _sync_trader_orders_into_storage() -> None:
 
 def run_trader_cycle() -> dict:
     state = load_bot_state()
+    broker_status = probe_broker_status(state.get("security", {}), requested_by="worker_cycle")
+    update_broker_status(broker_status)
 
     if state.get("bot_status") == "STOPPED":
         log_event("INFO", "Trader parado pelo status STOPPED")
@@ -181,6 +185,7 @@ def run_trader_cycle() -> dict:
         "cycle_result": cycle_result,
         "paper_report": report,
         "paper_equity": equity_df.to_dict(orient="records") if not equity_df.empty else [],
+        "broker_status": broker_status,
     }
 
 
