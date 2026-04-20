@@ -267,6 +267,89 @@ Como validar:
 
 Mesmo com `PRODUCTION_MODE=true`, a etapa atual nao habilita envio de ordem real.
 
+## Contexto de mercado cripto
+
+O app agora possui uma camada leve de contexto de mercado para cripto, pensada apenas como filtro auxiliar em `paper trading`.
+
+O contexto considera:
+
+- movimento recente do `BTC`
+- volatilidade do ambiente cripto
+- regime predominante (`tendencia`, `lateral`, `baixa`)
+- consistencia da watchlist cripto observada
+
+Status possiveis:
+
+- `FAVORAVEL`
+- `NEUTRO`
+- `DESFAVORAVEL`
+- `CRITICO`
+
+Como influencia os sinais:
+
+- o contexto **nao gera ordem**
+- o contexto **nao usa noticia como gatilho**
+- quando o ambiente fica `DESFAVORAVEL`, o robo endurece o score minimo para entradas de cripto
+- quando o ambiente fica `CRITICO`, novas entradas fracas de cripto podem ser bloqueadas
+- se o calculo do contexto falhar, o sistema volta para `NEUTRO` sem travar o worker
+
+Onde acompanhar:
+
+- `Trader`: painel simples com contexto atual, motivo, impacto e sinais barrados
+- `Controle do Bot`: painel administrativo com status, regime, contexto por periodo e impacto estimado
+
+Observacao importante:
+
+- esta camada serve apenas para filtrar ou endurecer sinais
+- ordens reais continuam desabilitadas
+- o broker permanece em `paper`
+
+## Watchlist padrao da validacao swing
+
+Para a fase atual de validacao swing em `paper trading`, a watchlist padrao foi consolidada para um escopo `CRYPTO ONLY` com cinco ativos:
+
+- `BTC-USD`
+- `ETH-USD`
+- `BNB-USD`
+- `SOL-USD`
+- `LINK-USD`
+
+Motivo da selecao:
+
+- reduzir ruido e excesso de comparacoes irrelevantes
+- melhorar a coerencia dos testes e dos relatorios
+- alinhar a watchlist com o modulo de contexto de mercado cripto
+- priorizar liquidez, leitura tecnica e estabilidade operacional
+
+Justificativa objetiva por ativo:
+
+- `BTC-USD`: referencia principal do mercado, maior liquidez e melhor leitura estrutural. Risco principal: pode ficar mais lento em algumas janelas. Perfil: consistencia / tendencia.
+- `ETH-USD`: segundo ativo-base da watchlist, muito liquido e com excelente relevancia. Risco principal: costuma ampliar movimentos do BTC em periodos de stress. Perfil: consistencia / tendencia com mais amplitude.
+- `BNB-USD`: ativo intermediario entre estabilidade e oportunidade, com boa liquidez e leitura relativamente organizada. Risco principal: impacto especifico do ecossistema relacionado. Perfil: consistencia moderada / tendencia.
+- `SOL-USD`: ativo de maior oportunidade, com swings mais fortes e boa chance de tendencia. Risco principal: volatilidade mais alta e ruido maior. Perfil: volatilidade / tendencia.
+- `LINK-USD`: diversificacao tatica dentro da watchlist, com leitura tecnica util em varios ciclos. Risco principal: pode perder tracao em alguns periodos. Perfil: tendencia / oportunidade moderada.
+
+Ativos desaconselhados nesta fase:
+
+- memecoins
+- altcoins de baixa liquidez
+- ativos com feed instavel
+- ativos excessivamente erraticos para uma validacao inicial de 10 dias
+
+Como alterar no app:
+
+- abrir `Trader`
+- entrar em `Modo avancado`
+- editar `Lista de ativos`
+- ou usar `Aplicar watchlist recomendada`
+
+Compatibilidade da etapa:
+
+- a ETAPA 3 continua intacta
+- o modo segue 100% `paper`
+- o contexto de mercado cripto reaproveita esta watchlist sem duplicar logica
+- nao ha habilitacao de ordens reais nesta etapa
+
 ## Retencao e validacao semanal
 
 O historico operacional agora aplica uma politica segura de retencao:

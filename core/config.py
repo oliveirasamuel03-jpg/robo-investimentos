@@ -157,6 +157,67 @@ MAX_TICKET = 10000.0
 MIN_HOLDING_MINUTES = 1
 MAX_HOLDING_MINUTES = 2880
 
+SWING_VALIDATION_RECOMMENDED_WATCHLIST = [
+    "BTC-USD",
+    "ETH-USD",
+    "BNB-USD",
+    "SOL-USD",
+    "LINK-USD",
+]
+
+LEGACY_MIXED_DEFAULT_WATCHLIST = [
+    "BTC-USD",
+    "ETH-USD",
+    "VALE3.SA",
+    "PETR4.SA",
+    "AAPL",
+    "KC=F",
+]
+
+SWING_VALIDATION_WATCHLIST_DETAILS = [
+    {
+        "asset": "BTC-USD",
+        "papel": "Referencia principal do mercado",
+        "motivo": "Maior liquidez e melhor leitura estrutural para swing.",
+        "risco": "Pode andar mais devagar em alguns ciclos.",
+        "perfil": "Consistencia / tendencia",
+    },
+    {
+        "asset": "ETH-USD",
+        "papel": "Segundo ativo-base da watchlist",
+        "motivo": "Alta liquidez e relevancia ampla no mercado cripto.",
+        "risco": "Pode ampliar movimentos do BTC em momentos de estresse.",
+        "perfil": "Consistencia / tendencia com mais amplitude",
+    },
+    {
+        "asset": "BNB-USD",
+        "papel": "Ativo intermediario entre estabilidade e oportunidade",
+        "motivo": "Boa liquidez e comportamento tecnico relativamente organizado.",
+        "risco": "Pode sofrer impacto especifico do ecossistema relacionado.",
+        "perfil": "Consistencia moderada / tendencia",
+    },
+    {
+        "asset": "SOL-USD",
+        "papel": "Ativo de maior oportunidade",
+        "motivo": "Costuma oferecer swings mais fortes e legiveis.",
+        "risco": "Volatilidade mais alta e ruido maior.",
+        "perfil": "Volatilidade / tendencia",
+    },
+    {
+        "asset": "LINK-USD",
+        "papel": "Diversificacao tatica da watchlist",
+        "motivo": "Boa leitura tecnica em muitos ciclos e liquidez adequada.",
+        "risco": "Pode perder forca em periodos mais seletivos.",
+        "perfil": "Tendencia / oportunidade moderada",
+    },
+]
+
+SWING_VALIDATION_DISCOURAGED_ASSET_NOTES = [
+    "Memecoins e altcoins de baixa liquidez nao sao recomendadas nesta fase.",
+    "Ativos com feed inconsistente ou comportamento excessivamente caotico devem ficar fora da watchlist padrao.",
+    "A lista foi reduzida intencionalmente para priorizar qualidade de sinal, estabilidade operacional e comparabilidade dos relatorios.",
+]
+
 
 def ensure_app_directories() -> None:
     for directory in (

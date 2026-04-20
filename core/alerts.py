@@ -269,3 +269,53 @@ def send_recovery_email(
     if result.get("sent"):
         _update_alert_state({"last_recovery_email_at": current_time.isoformat()})
     return result
+
+
+def send_final_validation_email(report_data: dict[str, object]) -> dict:
+    metrics = dict(report_data.get("metrics", {}) or {})
+    performance = dict(report_data.get("performance", {}) or {})
+    best_assets = report_data.get("best_assets", []) or []
+    worst_assets = report_data.get("worst_assets", []) or []
+    errors = report_data.get("errors", []) or []
+    successes = report_data.get("successes", []) or []
+
+    best_text = ", ".join(str(item.get("asset")) for item in best_assets[:3] if isinstance(item, dict) and item.get("asset"))
+    worst_text = ", ".join(str(item.get("asset")) for item in worst_assets[:3] if isinstance(item, dict) and item.get("asset"))
+    payoff_value = performance.get("payoff")
+    payoff_text = "-" if payoff_value is None else f"{float(payoff_value or 0.0):.2f}"
+    avg_duration = metrics.get("avg_duration_minutes")
+    avg_duration_text = "-" if avg_duration is None else f"{float(avg_duration or 0.0):.1f} min"
+    fallback_pct = metrics.get("fallback_cycle_pct")
+    fallback_text = "-" if fallback_pct is None else f"{float(fallback_pct or 0.0):.2f}%"
+    errors_text = "\n".join(f"- {item}" for item in errors) if errors else "- Nenhum erro relevante registrado"
+    successes_text = "\n".join(f"- {item}" for item in successes) if successes else "- Nenhum acerto destacado"
+
+    subject = "Resultado do Robo - Validacao Swing 10 Dias"
+    body = (
+        "RESUMO GERAL\n"
+        f"Periodo: {report_data.get('validation_mode', 'swing_10d')}\n"
+        f"Data inicial: {report_data.get('validation_started_at', 'Sem registro')}\n"
+        f"Data final: {report_data.get('validation_window_end_at', 'Sem registro')}\n"
+        f"Status final: {report_data.get('validation_status', 'completed')}\n\n"
+        "VEREDITO FINAL\n"
+        f"{report_data.get('verdict_message', 'Sem veredito final')}\n"
+        f"Motivo: {report_data.get('final_validation_reason', 'Sem justificativa')}\n\n"
+        "METRICAS\n"
+        f"Trades fechados: {int(metrics.get('trades_closed', 0) or 0)}\n"
+        f"Win rate: {float(performance.get('win_rate', 0.0) or 0.0) * 100:.2f}%\n"
+        f"Payoff: {payoff_text}\n"
+        f"PnL: R$ {float(performance.get('pnl_total', 0.0) or 0.0):,.2f}\n"
+        f"Duracao media: {avg_duration_text}\n"
+        f"Fallback: {fallback_text}\n"
+        f"Falhas operacionais: {int(metrics.get('operational_errors', 0) or 0)}\n\n"
+        "ATIVOS\n"
+        f"Melhores: {best_text or 'Sem destaque'}\n"
+        f"Problematicos: {worst_text or 'Sem destaque'}\n\n"
+        "ERROS\n"
+        f"{errors_text}\n\n"
+        "ACERTOS\n"
+        f"{successes_text}\n\n"
+        "RECOMENDACAO FINAL\n"
+        f"{report_data.get('verdict_message', 'Sem recomendacao final')}\n"
+    )
+    return send_email_alert(subject, body, alert_type="final_validation", force=True)

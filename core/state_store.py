@@ -19,6 +19,8 @@ from core.config import (
     RETENTION_DAYS,
     RETENTION_ENABLED,
     RETENTION_RUN_INTERVAL_HOURS,
+    LEGACY_MIXED_DEFAULT_WATCHLIST,
+    SWING_VALIDATION_RECOMMENDED_WATCHLIST,
     TRADER_REPORTS_COLUMNS,
     TRADER_REPORTS_FILE,
     TRADER_ORDERS_COLUMNS,
@@ -34,6 +36,32 @@ from core.persistence import (
     save_json_state,
 )
 from core.trader_profiles import DEFAULT_TRADER_PROFILE
+
+
+def _normalize_watchlist_values(values: list[str] | None) -> list[str]:
+    normalized: list[str] = []
+    for value in values or []:
+        item = str(value or "").strip().upper()
+        if item and item not in normalized:
+            normalized.append(item)
+    return normalized
+
+
+def _should_migrate_watchlist(values: list[str]) -> bool:
+    return _normalize_watchlist_values(values) == _normalize_watchlist_values(LEGACY_MIXED_DEFAULT_WATCHLIST)
+
+
+def _apply_trader_watchlist_defaults(state: dict) -> dict:
+    trader_state = state.get("trader", {}) or {}
+    current_watchlist = _normalize_watchlist_values(trader_state.get("watchlist", []))
+
+    if not current_watchlist or _should_migrate_watchlist(current_watchlist):
+        trader_state["watchlist"] = list(SWING_VALIDATION_RECOMMENDED_WATCHLIST)
+    else:
+        trader_state["watchlist"] = current_watchlist
+
+    state["trader"] = trader_state
+    return state
 
 
 DEFAULT_STATE = {
@@ -60,6 +88,17 @@ DEFAULT_STATE = {
         "symbols": [],
         "requested_by": "",
         "contexts": {},
+    },
+    "market_context": {
+        "market_context_status": "NEUTRO",
+        "market_context_reason": "Contexto neutro por padrao.",
+        "market_context_updated_at": "",
+        "market_context_score": 50.0,
+        "market_context_impact": "Sem restricao adicional sobre sinais de cripto.",
+        "market_context_regime": "indefinido",
+        "watchlist_consistency": None,
+        "btc_move_pct": None,
+        "btc_volatility_pct": None,
     },
     "broker": {
         "provider": BROKER_PROVIDER,
@@ -128,13 +167,58 @@ DEFAULT_STATE = {
         },
         "weekly_reports_index": [],
     },
+    "validation": {
+        "validation_mode": "swing_10d",
+        "validation_started_at": "",
+        "validation_day_number": 1,
+        "validation_phase": "Coleta e observacao",
+        "validation_status": "running",
+        "final_validation_grade": "",
+        "final_validation_reason": "",
+        "final_validation_generated_at": "",
+        "final_email_sent": False,
+        "final_email_sent_at": "",
+        "timeframe": "1d",
+        "timeframe_label": "Diario (1D)",
+        "period_label": "2y",
+        "paper_only": True,
+        "last_evaluated_at": "",
+        "last_reset_at": "",
+        "last_report": {},
+        "signal_counters": {
+            "signals_total": 0,
+            "signals_approved": 0,
+            "signals_rejected": 0,
+            "entries_against_trend": 0,
+            "rejections": {
+                "against_trend": 0,
+                "weak_score": 0,
+                "rsi_filter": 0,
+                "atr_filter": 0,
+                "structure_filter": 0,
+                "momentum_filter": 0,
+                "feed_unreliable": 0,
+                "context_blocked": 0,
+            },
+            "assets_observed": {},
+            "assets_approved": {},
+            "context_status_counts": {
+                "FAVORAVEL": 0,
+                "NEUTRO": 0,
+                "DESFAVORAVEL": 0,
+                "CRITICO": 0,
+            },
+            "context_blocked_signals": 0,
+        },
+        "last_signal_keys": {},
+    },
     "trader": {
         "enabled": True,
         "profile": DEFAULT_TRADER_PROFILE,
         "ticket_value": 100.0,
         "holding_minutes": 60,
         "max_open_positions": 3,
-        "watchlist": ["BTC-USD", "ETH-USD", "VALE3.SA", "PETR4.SA", "AAPL", "KC=F"],
+        "watchlist": list(SWING_VALIDATION_RECOMMENDED_WATCHLIST),
     },
 }
 
@@ -183,7 +267,7 @@ def load_bot_state() -> dict:
     retention_state["run_interval_hours"] = RETENTION_RUN_INTERVAL_HOURS
     retention_state["archive_trader_orders"] = RETENTION_ARCHIVE_TRADER_ORDERS
     state["retention"] = retention_state
-    return state
+    return _apply_trader_watchlist_defaults(state)
 
 
 def save_bot_state(state: dict) -> None:
@@ -326,6 +410,20 @@ def update_broker_status(status_payload: dict | None) -> dict:
     return broker_state
 
 
+def update_market_context_status(status_payload: dict | None) -> dict:
+    state = load_bot_state()
+    market_context_state = state.get("market_context", {}) or {}
+    payload = status_payload or {}
+
+    for key, value in payload.items():
+        if value is not None:
+            market_context_state[key] = value
+
+    state["market_context"] = market_context_state
+    save_bot_state(state)
+    return market_context_state
+
+
 def update_production_status(status_payload: dict | None) -> dict:
     state = load_bot_state()
     production_state = state.get("production", {}) or {}
@@ -352,3 +450,17 @@ def update_retention_status(status_payload: dict | None) -> dict:
     state["retention"] = retention_state
     save_bot_state(state)
     return retention_state
+
+
+def update_validation_status(status_payload: dict | None) -> dict:
+    state = load_bot_state()
+    validation_state = state.get("validation", {}) or {}
+    payload = status_payload or {}
+
+    for key, value in payload.items():
+        if value is not None:
+            validation_state[key] = value
+
+    state["validation"] = validation_state
+    save_bot_state(state)
+    return validation_state

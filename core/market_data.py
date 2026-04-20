@@ -10,7 +10,7 @@ import numpy as np
 import pandas as pd
 import yfinance as yf
 
-from core.config import MARKET_DATA_CACHE_TTL_SECONDS, MARKET_DATA_PROVIDER
+from core.config import MARKET_DATA_CACHE_TTL_SECONDS, MARKET_DATA_PROVIDER, SWING_VALIDATION_RECOMMENDED_WATCHLIST
 
 
 _MARKET_DATA_CACHE: dict[str, dict[str, Any]] = {}
@@ -100,7 +100,7 @@ def _normalize_downloaded_prices(df: pd.DataFrame, history_limit: int) -> pd.Dat
 
 def _normalize_symbols(symbols: list[str]) -> list[str]:
     normalized = [str(symbol).strip().upper() for symbol in (symbols or []) if str(symbol).strip()]
-    return normalized or ["AAPL"]
+    return normalized or list(SWING_VALIDATION_RECOMMENDED_WATCHLIST)
 
 
 def _cache_key(symbols: list[str], period: str, interval: str, history_limit: int, provider: str) -> str:

@@ -22,10 +22,14 @@ from core.config import (
     MAX_TICKET,
     MIN_HOLDING_MINUTES,
     MIN_TICKET,
+    SWING_VALIDATION_DISCOURAGED_ASSET_NOTES,
+    SWING_VALIDATION_RECOMMENDED_WATCHLIST,
+    SWING_VALIDATION_WATCHLIST_DETAILS,
     TRADER_ORDERS_COLUMNS,
     TRADER_ORDERS_FILE,
 )
 from core.state_store import load_bot_state, read_storage_table, save_bot_state, update_market_data_status
+from core.swing_validation import SWING_VALIDATION_MODE, apply_swing_validation_overrides
 from core.trader_profiles import (
     get_trader_profile_config,
     list_trader_profiles,
@@ -108,6 +112,16 @@ def market_data_source_label(status: dict | None) -> str:
         "unknown": "Desconhecido",
     }
     return labels.get(raw, raw.title())
+
+
+def market_context_label(raw_status: str | None) -> str:
+    labels = {
+        "FAVORAVEL": "Favoravel",
+        "NEUTRO": "Neutro",
+        "DESFAVORAVEL": "Desfavoravel",
+        "CRITICO": "Critico",
+    }
+    return labels.get(str(raw_status or "NEUTRO").strip().upper(), str(raw_status or "Neutro").title())
 
 
 def load_trader_orders() -> pd.DataFrame:
@@ -938,7 +952,9 @@ paper_trades = read_paper_trades()[-200:]
 positions = [p for p in state.get("positions", []) if p.get("module") == "TRADER"]
 open_positions = [p for p in positions if p.get("status") == "OPEN"]
 
-watchlist = trader.get("watchlist", []) or ["AAPL"]
+watchlist = trader.get("watchlist", []) or list(SWING_VALIDATION_RECOMMENDED_WATCHLIST)
+recommended_watchlist = list(SWING_VALIDATION_RECOMMENDED_WATCHLIST)
+non_recommended_watchlist = [asset for asset in watchlist if asset not in recommended_watchlist]
 
 top_left, top_right = st.columns([1.4, 1.0])
 
@@ -1057,6 +1073,8 @@ robot_status = page_snapshot["robot_status"]
 robot_label = page_snapshot["robot_label"]
 robot_class = page_snapshot["robot_class"]
 market_data_status = page_snapshot.get("market_data_status", market_data_status)
+market_context_state = state.get("market_context", {}) or {}
+validation_last_report = (state.get("validation", {}) or {}).get("last_report", {}) or {}
 
 m1, m2, m3, m4 = st.columns(4)
 
@@ -1131,6 +1149,33 @@ st.markdown(
     """,
     unsafe_allow_html=True,
 )
+
+context_c1, context_c2, context_c3, context_c4 = st.columns(4)
+context_c1.metric("Contexto cripto", market_context_label(market_context_state.get("market_context_status")))
+context_c2.metric("Score de contexto", f"{float(market_context_state.get('market_context_score', 50.0) or 50.0):.1f}")
+context_c3.metric(
+    "Sinais barrados",
+    str(int((validation_last_report.get("metrics", {}) or {}).get("context_blocked_signals", 0) or 0)),
+)
+context_c4.metric("PAPER", "Ativo")
+st.caption(
+    "Watchlist otimizada para validacao swing em paper. "
+    f"Motivo atual: {market_context_state.get('market_context_reason') or 'Sem motivo registrado.'}"
+)
+st.caption(
+    f"Impacto no robo: {market_context_state.get('market_context_impact') or 'Sem impacto adicional.'}"
+)
+st.caption(
+    "Escopo atual: CRIPTO ONLY | PAPER TRADING | validacao swing de 10 dias. "
+    "A selecao foi reduzida intencionalmente para priorizar qualidade de sinal e estabilidade."
+)
+st.caption(f"Watchlist atual: {', '.join(watchlist)}")
+st.caption(f"Watchlist recomendada da fase: {', '.join(recommended_watchlist)}")
+if non_recommended_watchlist:
+    st.warning(
+        "Ha ativos fora da watchlist recomendada desta fase: "
+        f"{', '.join(non_recommended_watchlist)}. Eles continuam editaveis, mas nao sao os mais indicados agora."
+    )
 
 if bool(security_state.get("real_mode_enabled", False)):
     st.warning("Real trading enabled")
@@ -1430,27 +1475,53 @@ with st.expander("Modo avançado"):
         base_holding_minutes=int(holding),
         base_max_open_positions=int(max_open),
     )
+    swing_validation_active = (
+        str(load_bot_state().get("validation", {}).get("validation_mode") or "").strip().lower() == SWING_VALIDATION_MODE
+    )
+    effective_profile_preview = (
+        apply_swing_validation_overrides(selected_profile_name, selected_profile_preview)
+        if swing_validation_active
+        else selected_profile_preview
+    )
     st.caption(selected_profile_preview["description"])
+    if swing_validation_active:
+        st.info(
+            "Modo swing 10 dias ativo: a engine opera com timeframe diario e holding de dias, "
+            "mesmo que o preview base abaixo continue mostrando a configuracao manual."
+        )
 
     preview_c1, preview_c2, preview_c3, preview_c4 = st.columns(4)
-    preview_c1.metric("Ticket efetivo", br_money(float(selected_profile_preview["ticket_value"])))
-    preview_c2.metric("Holding efetivo", f"{int(selected_profile_preview['holding_minutes'])} min")
-    preview_c3.metric("Posicoes efetivas", f"{int(selected_profile_preview['max_open_positions'])}")
-    preview_c4.metric("Score minimo", f"{float(selected_profile_preview['min_signal_score']):.2f}")
+    preview_c1.metric("Ticket efetivo", br_money(float(effective_profile_preview["ticket_value"])))
+    preview_c2.metric("Holding efetivo", f"{int(effective_profile_preview['holding_minutes'])} min")
+    preview_c3.metric("Posicoes efetivas", f"{int(effective_profile_preview['max_open_positions'])}")
+    preview_c4.metric("Score minimo", f"{float(effective_profile_preview['min_signal_score']):.2f}")
     st.caption(
         "Cooldown de reentrada: "
-        f"{int(selected_profile_preview['reentry_cooldown_minutes'])} min"
+        f"{int(effective_profile_preview['reentry_cooldown_minutes'])} min"
         " | Saidas suaves depois de: "
-        f"{int(selected_profile_preview['min_position_age_minutes'])} min"
+        f"{int(effective_profile_preview['min_position_age_minutes'])} min"
     )
 
     watchlist_text = st.text_input(
         "Lista de ativos",
         value=", ".join(trader.get("watchlist", [])),
-        help="Exemplo: BTC-USD, ETH-USD, PETR4.SA",
+        help="Exemplo: BTC-USD, ETH-USD, BNB-USD, SOL-USD, LINK-USD",
     )
 
-    ac1, ac2 = st.columns(2)
+    st.caption(
+        "Watchlist padrao recomendada para esta fase: "
+        f"{', '.join(recommended_watchlist)}"
+    )
+    with st.expander("Ver logica da watchlist recomendada"):
+        st.caption(
+            "Selecao otimizada para swing de 10 dias, CRIPTO ONLY e PAPER TRADING. "
+            "O objetivo aqui e validar qualidade de sinal com poucos ativos liquidos e legiveis."
+        )
+        st.dataframe(pd.DataFrame(SWING_VALIDATION_WATCHLIST_DETAILS), use_container_width=True)
+        for note in SWING_VALIDATION_DISCOURAGED_ASSET_NOTES:
+            st.caption(f"- {note}")
+
+    ac1, ac2, ac3 = st.columns(3)
 
     with ac1:
         if st.button("Salvar configuração avançada", use_container_width=True, disabled=not admin_mode):
@@ -1465,6 +1536,14 @@ with st.expander("Modo avançado"):
             st.rerun()
 
     with ac2:
+        if st.button("Aplicar watchlist recomendada", use_container_width=True, disabled=not admin_mode):
+            state = load_bot_state()
+            state["trader"]["watchlist"] = list(recommended_watchlist)
+            save_bot_state(state)
+            st.success("Watchlist recomendada aplicada.")
+            st.rerun()
+
+    with ac3:
         if st.button("Resetar módulo trader", use_container_width=True, disabled=not admin_mode):
             try:
                 with st.spinner("Resetando trader..."):

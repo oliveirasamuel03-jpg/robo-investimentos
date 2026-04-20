@@ -3,7 +3,7 @@ from __future__ import annotations
 import time
 from datetime import datetime, timedelta, timezone
 
-from core.alerts import send_email_alert, send_recovery_email
+from core.alerts import send_email_alert, send_final_validation_email, send_recovery_email
 from core.config import ALERT_EMAIL_ENABLED, PRODUCTION_MODE
 from core.production_monitor import evaluate_production_health
 from core.retention import run_retention_job, should_run_retention_job
@@ -13,8 +13,10 @@ from core.state_store import (
     save_bot_state,
     update_production_status,
     update_retention_status,
+    update_validation_status,
     update_worker_heartbeat,
 )
+from core.swing_validation import refresh_swing_validation_cycle
 from engines.trader_engine import run_trader_cycle
 
 SLEEP_SECONDS = 60
@@ -94,6 +96,57 @@ def _log_cycle_health(health_payload: dict) -> None:
         f"fallback={fallback_flag}"
     )
     log_event("INFO", message)
+
+
+def _log_validation_cycle(validation_report: dict) -> None:
+    metrics = dict(validation_report.get("metrics", {}) or {})
+    rejections = dict(metrics.get("signal_rejections", {}) or {})
+    current_context = dict(validation_report.get("current_market_context", {}) or {})
+    message = (
+        "[validation_signal] "
+        f"day={int(validation_report.get('validation_day_number', 1) or 1)};"
+        f"phase={str(validation_report.get('validation_phase') or '').lower().replace(' ', '_')};"
+        f"approved={int(metrics.get('signals_approved', 0) or 0)};"
+        f"rejected={int(metrics.get('signals_rejected', 0) or 0)};"
+        f"against_trend={int(metrics.get('against_trend_entries', 0) or 0)};"
+        f"weak_score={int(rejections.get('weak_score', 0) or 0)};"
+        f"feed_unreliable={int(rejections.get('feed_unreliable', 0) or 0)};"
+        f"context={str(current_context.get('market_context_status') or 'NEUTRO').upper()};"
+        f"context_blocked={int(metrics.get('context_blocked_signals', 0) or 0)}"
+    )
+    log_event("INFO", message)
+
+
+def _maybe_send_final_validation_email(validation_report: dict, *, current_time: datetime) -> None:
+    if int(validation_report.get("validation_day_number", 0) or 0) < 10:
+        return
+    if not validation_report.get("final_validation_grade"):
+        return
+
+    state = load_bot_state()
+    validation_state = state.get("validation", {}) or {}
+    if bool(validation_state.get("final_email_sent", False)):
+        return
+
+    try:
+        result = send_final_validation_email(validation_report)
+    except Exception as exc:
+        log_event("ERROR", f"Falha ao enviar email final da validacao swing: {exc}")
+        return
+
+    if result.get("sent"):
+        update_validation_status(
+            {
+                "final_email_sent": True,
+                "final_email_sent_at": current_time.isoformat(),
+            }
+        )
+        log_event("INFO", "Email final da validacao swing enviado com sucesso.")
+    else:
+        log_event(
+            "WARNING",
+            f"Email final da validacao swing nao enviado: {result.get('reason') or 'motivo nao informado'}",
+        )
 
 
 def _run_daily_retention_maintenance() -> None:
@@ -198,6 +251,7 @@ def worker_loop() -> None:
 
     while True:
         try:
+            current_time = datetime.now(timezone.utc)
             update_worker_heartbeat("online")
             state = load_bot_state()
 
@@ -208,6 +262,8 @@ def worker_loop() -> None:
                 )
                 _refresh_production_monitor(cycle_success=True)
                 _run_daily_retention_maintenance()
+                validation_report = refresh_swing_validation_cycle(now=current_time)
+                _maybe_send_final_validation_email(validation_report, current_time=current_time)
                 time.sleep(PAUSED_SLEEP_SECONDS)
                 continue
 
@@ -223,6 +279,12 @@ def worker_loop() -> None:
             health_payload = _refresh_production_monitor(cycle_success=True)
             _log_cycle_health(health_payload)
             _run_daily_retention_maintenance()
+            validation_report = refresh_swing_validation_cycle(
+                cycle_result=result.get("cycle_result", {}),
+                now=current_time,
+            )
+            _log_validation_cycle(validation_report)
+            _maybe_send_final_validation_email(validation_report, current_time=current_time)
 
         except Exception as exc:
             error_msg = str(exc)
@@ -231,6 +293,8 @@ def worker_loop() -> None:
             health_payload = _refresh_production_monitor(cycle_success=False, exception_message=error_msg)
             _log_cycle_health(health_payload)
             _run_daily_retention_maintenance()
+            validation_report = refresh_swing_validation_cycle(now=datetime.now(timezone.utc))
+            _maybe_send_final_validation_email(validation_report, current_time=datetime.now(timezone.utc))
 
         time.sleep(SLEEP_SECONDS)
 

@@ -5,6 +5,7 @@ from core.config import (
     MAX_TICKET,
     MIN_HOLDING_MINUTES,
     MIN_TICKET,
+    SWING_VALIDATION_RECOMMENDED_WATCHLIST,
     TRADER_ORDERS_COLUMNS,
     TRADER_ORDERS_FILE,
 )
@@ -16,8 +17,10 @@ from core.state_store import (
     replace_storage_table,
     save_bot_state,
     update_broker_status,
+    update_market_context_status,
     update_market_data_status,
 )
+from core.swing_validation import SWING_VALIDATION_MODE, apply_swing_validation_overrides
 from core.trader_profiles import get_trader_profile_config
 from engines.quant_bridge import (
     PaperTradingConfig,
@@ -49,16 +52,22 @@ def build_paper_cfg_from_platform_state(state: dict) -> PaperTradingConfig:
         base_holding_minutes=holding_minutes,
         base_max_open_positions=max_open_positions,
     )
+    validation_state = state.get("validation", {}) or {}
+    validation_mode = str(validation_state.get("validation_mode") or "").strip().lower()
+    if validation_mode == SWING_VALIDATION_MODE:
+        profile_config = apply_swing_validation_overrides(str(profile_config["name"]), profile_config)
 
     return PaperTradingConfig(
         initial_capital=float(state.get("wallet_value", 10000.0)),
-        custom_tickers=watchlist or ["AAPL"],
+        custom_tickers=watchlist or list(SWING_VALIDATION_RECOMMENDED_WATCHLIST),
+        period=str(profile_config.get("period", "6mo")),
+        interval=str(profile_config.get("interval", "1h")),
         profile_name=str(profile_config["name"]),
         ticket_value=float(profile_config["ticket_value"]),
         min_trade_notional=max(MIN_TICKET, float(profile_config["ticket_value"])),
         max_open_positions=max(1, int(profile_config["max_open_positions"])),
         holding_minutes=int(profile_config["holding_minutes"]),
-        history_limit=500,
+        history_limit=int(profile_config.get("history_limit", 500)),
         allow_new_entries=state.get("bot_status") == "RUNNING",
         min_signal_score=float(profile_config["min_signal_score"]),
         min_atr_pct=float(profile_config["min_atr_pct"]),
@@ -175,6 +184,7 @@ def run_trader_cycle() -> dict:
 
     cycle_result = run_paper_cycle(cfg)
     update_market_data_status(cycle_result.get("market_data_status"))
+    update_market_context_status(cycle_result.get("market_context"))
     _sync_trader_orders_into_storage()
     platform_state = sync_platform_positions_from_paper()
     report = build_paper_report(initial_capital=float(platform_state.get("wallet_value", cfg.initial_capital)))

@@ -10,7 +10,13 @@ import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 
-from core.config import MARKET_DATA_HISTORY_LIMIT, RUNTIME_DIR, ensure_app_directories
+from core.config import (
+    MARKET_DATA_HISTORY_LIMIT,
+    RUNTIME_DIR,
+    SWING_VALIDATION_RECOMMENDED_WATCHLIST,
+    ensure_app_directories,
+)
+from core.market_context import apply_context_filter, get_market_context
 from core.market_data import (
     fallback_data as build_fallback_market_data,
     fetch_market_data_frame,
@@ -38,7 +44,7 @@ PAPER_TRADES_NAMESPACE = "paper_trades"
 @dataclass
 class PaperTradingConfig:
     initial_capital: float = 10000.0
-    custom_tickers: list[str] = field(default_factory=lambda: ["AAPL"])
+    custom_tickers: list[str] = field(default_factory=lambda: list(SWING_VALIDATION_RECOMMENDED_WATCHLIST))
     period: str = "6mo"
     interval: str = "1h"
     profile_name: str = "Equilibrado"
@@ -264,17 +270,17 @@ def _enrich_indicators(df: pd.DataFrame) -> pd.DataFrame:
     data["high"] = pd.to_numeric(data.get("high"), errors="coerce")
     data["low"] = pd.to_numeric(data.get("low"), errors="coerce")
     data["close"] = pd.to_numeric(data["close"], errors="coerce")
-    data["returns"] = data["close"].pct_change()
+    data["returns"] = data["close"].pct_change(fill_method=None)
     data["ma20"] = data["close"].rolling(20).mean()
     data["ma50"] = data["close"].rolling(50).mean()
-    data["ma20_slope"] = data["ma20"].pct_change(5).fillna(0.0)
-    data["ma50_slope"] = data["ma50"].pct_change(5).fillna(0.0)
+    data["ma20_slope"] = data["ma20"].pct_change(5, fill_method=None).fillna(0.0)
+    data["ma50_slope"] = data["ma50"].pct_change(5, fill_method=None).fillna(0.0)
     data["rsi"] = _calculate_rsi(data["close"])
     data["atr"] = _calculate_atr(data)
     data["atr_pct"] = (data["atr"] / data["close"]).replace([np.inf, -np.inf], np.nan)
     data["volatility"] = data["returns"].rolling(12).std().fillna(0.0)
-    data["momentum"] = data["close"].pct_change(3).fillna(0.0)
-    data["momentum_8"] = data["close"].pct_change(8).fillna(0.0)
+    data["momentum"] = data["close"].pct_change(3, fill_method=None).fillna(0.0)
+    data["momentum_8"] = data["close"].pct_change(8, fill_method=None).fillna(0.0)
     data["breakout_20"] = (data["close"] / data["close"].rolling(20).max()) - 1.0
     data["pullback_to_ma20"] = (data["close"] / data["ma20"]) - 1.0
     return data.dropna(subset=["close", "ma20", "ma50", "atr_pct"]).reset_index(drop=True)
@@ -282,7 +288,7 @@ def _enrich_indicators(df: pd.DataFrame) -> pd.DataFrame:
 
 def _normalize_symbol_list(config: PaperTradingConfig) -> list[str]:
     symbols = [str(symbol).strip().upper() for symbol in (config.custom_tickers or []) if str(symbol).strip()]
-    return symbols or ["AAPL"]
+    return symbols or list(SWING_VALIDATION_RECOMMENDED_WATCHLIST)
 
 
 def _frame_data_source(data: pd.DataFrame | None) -> str:
@@ -326,7 +332,16 @@ def _compute_buy_score(latest: pd.Series) -> float:
     )
 
 
-def _should_buy(latest: pd.Series, config: PaperTradingConfig) -> tuple[bool, float]:
+def _signal_snapshot_key(asset: str, latest: pd.Series, data_source: str) -> str:
+    raw_datetime = latest.get("datetime")
+    if isinstance(raw_datetime, pd.Timestamp):
+        signal_dt = raw_datetime.isoformat()
+    else:
+        signal_dt = str(raw_datetime or "")
+    return f"{str(asset).upper()}|{signal_dt}|{str(data_source or 'unknown').lower()}"
+
+
+def _evaluate_buy_signal(latest: pd.Series, config: PaperTradingConfig) -> dict[str, Any]:
     score = _compute_buy_score(latest)
     price = float(latest["close"])
     ma20 = float(latest.get("ma20", price))
@@ -340,6 +355,7 @@ def _should_buy(latest: pd.Series, config: PaperTradingConfig) -> tuple[bool, fl
     ma20_slope = float(latest.get("ma20_slope", 0.0))
     ma50_slope = float(latest.get("ma50_slope", 0.0))
 
+    dominant_trend = "aligned" if price >= ma20 >= ma50 else "countertrend" if price < ma50 else "neutral"
     trend_ok = (
         price >= ma50
         and ma20 >= ma50
@@ -356,7 +372,39 @@ def _should_buy(latest: pd.Series, config: PaperTradingConfig) -> tuple[bool, fl
     )
 
     setup_ok = trend_ok and rsi_ok and atr_ok and structure_ok and momentum_ok
-    return bool(setup_ok and score >= float(config.min_signal_score)), score
+    score_ok = score >= float(config.min_signal_score)
+
+    rejection_reasons: list[str] = []
+    if not trend_ok:
+        rejection_reasons.append("against_trend")
+    if not score_ok:
+        rejection_reasons.append("weak_score")
+    if not rsi_ok:
+        rejection_reasons.append("rsi_filter")
+    if not atr_ok:
+        rejection_reasons.append("atr_filter")
+    if not structure_ok:
+        rejection_reasons.append("structure_filter")
+    if not momentum_ok:
+        rejection_reasons.append("momentum_filter")
+
+    return {
+        "buy": bool(setup_ok and score_ok),
+        "score": score,
+        "trend_ok": trend_ok,
+        "score_ok": score_ok,
+        "rsi_ok": rsi_ok,
+        "atr_ok": atr_ok,
+        "structure_ok": structure_ok,
+        "momentum_ok": momentum_ok,
+        "trend_alignment": dominant_trend,
+        "rejection_reasons": rejection_reasons,
+    }
+
+
+def _should_buy(latest: pd.Series, config: PaperTradingConfig) -> tuple[bool, float]:
+    evaluation = _evaluate_buy_signal(latest, config)
+    return bool(evaluation["buy"]), float(evaluation["score"])
 
 
 def _is_position_expired(opened_at: str | None, holding_minutes: int) -> bool:
@@ -514,6 +562,25 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[s
 
     trades_executed: list[dict[str, Any]] = []
     signals: list[dict[str, Any]] = []
+    market_context = get_market_context(market_data)
+    cycle_validation = {
+        "signals_total": 0,
+        "signals_approved": 0,
+        "signals_rejected": 0,
+        "entries_against_trend": 0,
+        "context_blocked": 0,
+        "market_context_status": str(market_context.get("market_context_status") or "NEUTRO"),
+        "rejections": {
+            "against_trend": 0,
+            "weak_score": 0,
+            "rsi_filter": 0,
+            "atr_filter": 0,
+            "structure_filter": 0,
+            "momentum_filter": 0,
+            "feed_unreliable": 0,
+            "context_blocked": 0,
+        },
+    }
 
     open_positions = dict(state.get("positions", {}) or {})
     for asset, position in list(open_positions.items()):
@@ -601,9 +668,29 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[s
 
         latest = data.iloc[-1]
         data_source = _frame_data_source(data)
-        should_buy, score = _should_buy(latest, config)
+        evaluation = _evaluate_buy_signal(latest, config)
+        should_buy = bool(evaluation["buy"])
+        score = float(evaluation["score"])
+        context_filter = apply_context_filter(
+            {
+                "asset": asset,
+                "score": score,
+                "base_min_signal_score": float(config.min_signal_score),
+            },
+            market_context,
+        )
+        adjusted_score = float(context_filter["adjusted_score"])
+        effective_min_signal_score = float(context_filter["effective_min_signal_score"])
+        if should_buy and (bool(context_filter["blocked"]) or adjusted_score < effective_min_signal_score):
+            should_buy = False
+            if "context_blocked" not in evaluation["rejection_reasons"]:
+                evaluation["rejection_reasons"] = [*evaluation["rejection_reasons"], "context_blocked"]
         if not _is_live_market_source(data_source):
             should_buy = False
+            if "feed_unreliable" not in evaluation["rejection_reasons"]:
+                evaluation["rejection_reasons"] = [*evaluation["rejection_reasons"], "feed_unreliable"]
+
+        signal_key = _signal_snapshot_key(asset, latest, data_source)
         signal = {
             "asset": asset,
             "price": round(float(latest["close"]), 6),
@@ -615,11 +702,38 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[s
             "momentum": round(float(latest.get("momentum", 0.0) or 0.0), 6),
             "momentum_8": round(float(latest.get("momentum_8", 0.0) or 0.0), 6),
             "breakout_20": round(float(latest.get("breakout_20", 0.0) or 0.0), 6),
-            "score": score,
+            "score": adjusted_score,
+            "raw_score": score,
             "buy": should_buy,
             "data_source": data_source,
+            "signal_key": signal_key,
+            "trend_ok": bool(evaluation["trend_ok"]),
+            "score_ok": bool(evaluation["score_ok"]),
+            "rsi_ok": bool(evaluation["rsi_ok"]),
+            "atr_ok": bool(evaluation["atr_ok"]),
+            "structure_ok": bool(evaluation["structure_ok"]),
+            "momentum_ok": bool(evaluation["momentum_ok"]),
+            "trend_alignment": str(evaluation["trend_alignment"]),
+            "rejection_reasons": list(evaluation["rejection_reasons"]),
+            "base_min_signal_score": float(config.min_signal_score),
+            "effective_min_signal_score": effective_min_signal_score,
+            "context_status": str(context_filter["context_status"]),
+            "context_impact": str(context_filter["impact_message"]),
         }
         signals.append(signal)
+        cycle_validation["signals_total"] = int(cycle_validation["signals_total"]) + 1
+        if should_buy:
+            cycle_validation["signals_approved"] = int(cycle_validation["signals_approved"]) + 1
+            if str(evaluation["trend_alignment"]).lower() == "countertrend":
+                cycle_validation["entries_against_trend"] = int(cycle_validation["entries_against_trend"]) + 1
+        else:
+            cycle_validation["signals_rejected"] = int(cycle_validation["signals_rejected"]) + 1
+            for reason in signal["rejection_reasons"]:
+                if reason not in cycle_validation["rejections"]:
+                    cycle_validation["rejections"][reason] = 0
+                cycle_validation["rejections"][reason] = int(cycle_validation["rejections"][reason]) + 1
+            if "context_blocked" in signal["rejection_reasons"]:
+                cycle_validation["context_blocked"] = int(cycle_validation["context_blocked"]) + 1
 
         if should_buy:
             candidates.append(signal)
@@ -663,6 +777,9 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[s
             "rsi_entry": round(float(candidate.get("rsi", 50.0) or 50.0), 2),
             "ma20_entry": round(float(candidate.get("ma20", price) or price), 6),
             "ma50_entry": round(float(candidate.get("ma50", price) or price), 6),
+            "entry_trend_alignment": str(candidate.get("trend_alignment") or "aligned"),
+            "entry_signal_key": str(candidate.get("signal_key") or ""),
+            "entry_data_source": str(candidate.get("data_source") or "unknown"),
             "holding_minutes_limit": int(config.holding_minutes),
             "opened_at": opened_at,
             "updated_at": opened_at,
@@ -717,4 +834,6 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[s
         "signals": signals,
         "trades_executed": len(trades_executed),
         "market_data_status": market_data_status,
+        "market_context": market_context,
+        "validation_cycle": cycle_validation,
     }
