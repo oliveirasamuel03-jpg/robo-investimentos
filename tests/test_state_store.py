@@ -22,6 +22,8 @@ def test_state_store_bootstraps_files_and_defaults(isolated_storage):
     assert state["market_data"]["provider"] == config.MARKET_DATA_PROVIDER
     assert state["broker"]["provider"] == config.BROKER_PROVIDER
     assert state["production"]["health_level"] == "healthy"
+    assert state["retention"]["retention_days"] == config.RETENTION_DAYS
+    assert state["retention"]["weekly_reports_index"] == []
 
     logs = state_store.read_storage_table(config.BOT_LOG_FILE, columns=config.BOT_LOG_COLUMNS)
     assert isinstance(logs, pd.DataFrame)

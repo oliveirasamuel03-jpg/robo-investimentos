@@ -31,6 +31,7 @@ O produto agora e orientado apenas ao fluxo de trading:
 - `core/state_store.py`: estado operacional do bot e do trader
 - `core/production_monitor.py`: saude operacional, heartbeat, feed e broker
 - `core/alerts.py`: envio de alertas por email com cooldown
+- `core/retention.py`: retencao automatica, arquivamento e resumos semanais
 - `core/trader_profiles.py`: perfis Reservado, Equilibrado e Agressivo
 - `core/trader_reports.py`: relatorios fechados e analytics
 - `core/auth/`: autenticacao, sessao e autorizacao
@@ -57,9 +58,14 @@ O produto agora e orientado apenas ao fluxo de trading:
 |-- engines/
 |-- pages/
 |-- storage/
+|   |-- archive/
+|   |   |-- logs/
+|   |   |-- reports/
+|   |   `-- weekly_reports/
 |   |-- cache/
 |   |-- reports/
 |   `-- runtime/
+|       `-- weekly_reports/
 |-- tests/
 |-- workers/
 |-- requirements.txt
@@ -79,6 +85,13 @@ Arquivos de runtime principais:
 - `storage/runtime/trade_reports.csv`
 - `storage/runtime/bot_log.csv`
 - `storage/runtime/auth_users.json`
+
+Arquivamento automatico:
+
+- `storage/archive/reports/trade_reports_YYYY_MM.csv`
+- `storage/archive/logs/bot_log_YYYY_MM.csv`
+- `storage/runtime/weekly_reports/`
+- `storage/archive/weekly_reports/`
 
 ## Variaveis de ambiente
 
@@ -115,6 +128,11 @@ Variaveis suportadas:
 - `ALERT_FEED_FALLBACK_MAX_MINUTES`
 - `ALERT_COOLDOWN_MINUTES`
 - `ALERT_SEND_RECOVERY_EMAIL`
+- `RETENTION_ENABLED`
+- `RETENTION_DAYS`
+- `RETENTION_RUN_INTERVAL_HOURS`
+- `RETENTION_ARCHIVE_TRADER_ORDERS`
+- `WEEKLY_REPORT_RUNTIME_WEEKS`
 
 ## Instalacao local
 
@@ -248,6 +266,50 @@ Como validar:
 - confirmar que o broker permanece `Simulado`
 
 Mesmo com `PRODUCTION_MODE=true`, a etapa atual nao habilita envio de ordem real.
+
+## Retencao e validacao semanal
+
+O historico operacional agora aplica uma politica segura de retencao:
+
+- mantem no runtime os ultimos `60 dias` por padrao
+- arquiva automaticamente relatorios e logs mais antigos por mes
+- nao apaga diretamente nada antes de arquivar
+- executa a rotina uma vez por dia dentro do worker
+- continua compativel com local e com `DATABASE_URL`
+
+Arquivos que entram na retencao:
+
+- `storage/runtime/trade_reports.csv`
+- `storage/runtime/bot_log.csv`
+
+`trader_orders.csv` permanece no runtime por padrao nesta etapa para preservar a aba `Ordens` sem alterar seu comportamento. Se quiser avaliar essa expansao depois, existe a flag `RETENTION_ARCHIVE_TRADER_ORDERS`.
+
+Resumos semanais:
+
+- quantidade de trades
+- win rate semanal
+- payoff semanal
+- pnl semanal
+- melhores e piores ativos
+- trades fechados cedo demais
+- trades mantidos tempo demais
+- erros operacionais
+- percentual de ciclos em fallback
+- sugestoes analiticas
+- observacao final de estabilidade
+
+Como acessar:
+
+- abrir `Historico`
+- entrar na aba `Validacao Semanal`
+- selecionar a semana
+- exportar o consolidado semanal em CSV quando necessario
+
+Como validar que o historico nao foi quebrado:
+
+- a aba `Relatorios Trader` continua lendo o runtime recente normalmente
+- a aba `Logs` continua mostrando o runtime atual
+- o resumo semanal passa a mostrar os dados arquivados de forma consolidada
 
 ## Seguranca
 

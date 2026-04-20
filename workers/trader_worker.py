@@ -6,11 +6,13 @@ from datetime import datetime, timedelta, timezone
 from core.alerts import send_email_alert, send_recovery_email
 from core.config import ALERT_EMAIL_ENABLED, PRODUCTION_MODE
 from core.production_monitor import evaluate_production_health
+from core.retention import run_retention_job, should_run_retention_job
 from core.state_store import (
     load_bot_state,
     log_event,
     save_bot_state,
     update_production_status,
+    update_retention_status,
     update_worker_heartbeat,
 )
 from engines.trader_engine import run_trader_cycle
@@ -78,6 +80,54 @@ def _send_health_alert(state: dict, health_payload: dict, *, alert_type: str, cu
         f"Data UTC: {current_time.isoformat()}\n"
     )
     send_email_alert(subject, body, alert_type=alert_type, state=state, now=current_time)
+
+
+def _log_cycle_health(health_payload: dict) -> None:
+    fallback_flag = 1 if str(health_payload.get("feed_status") or "").lower() == "error" else 0
+    message = (
+        "[cycle_health] "
+        f"health_level={str(health_payload.get('health_level') or 'healthy').lower()};"
+        f"feed_status={str(health_payload.get('feed_status') or 'unknown').lower()};"
+        f"broker_status={str(health_payload.get('broker_status') or 'paper').lower()};"
+        f"worker_status={str(health_payload.get('worker_status') or 'online').lower()};"
+        f"consecutive_errors={int(health_payload.get('consecutive_errors') or 0)};"
+        f"fallback={fallback_flag}"
+    )
+    log_event("INFO", message)
+
+
+def _run_daily_retention_maintenance() -> None:
+    state = load_bot_state()
+    if not should_run_retention_job(state):
+        return
+
+    retention_state = state.get("retention", {}) or {}
+    current_time = datetime.now(timezone.utc)
+
+    try:
+        summary = run_retention_job(
+            now=current_time,
+            retention_days=int(retention_state.get("retention_days") or 60),
+            archive_trader_orders=bool(retention_state.get("archive_trader_orders", False)),
+        )
+        update_retention_status(summary)
+        last_summary = summary.get("last_summary", {}) or {}
+        log_event(
+            "INFO",
+            "Retencao executada com sucesso: "
+            f"relatorios={int(last_summary.get('trade_reports_archived_rows', 0) or 0)}, "
+            f"logs={int(last_summary.get('bot_logs_archived_rows', 0) or 0)}, "
+            f"weeklies={int(last_summary.get('weekly_reports_generated', 0) or 0)}",
+        )
+    except Exception as exc:
+        update_retention_status(
+            {
+                "last_run_at": current_time.isoformat(),
+                "last_error": str(exc),
+                "last_error_at": current_time.isoformat(),
+            }
+        )
+        log_event("ERROR", f"Falha na retencao automatica: {exc}")
 
 
 def _refresh_production_monitor(*, cycle_success: bool, exception_message: str = "") -> dict:
@@ -157,6 +207,7 @@ def worker_loop() -> None:
                     next_run_delta_seconds=PAUSED_SLEEP_SECONDS,
                 )
                 _refresh_production_monitor(cycle_success=True)
+                _run_daily_retention_maintenance()
                 time.sleep(PAUSED_SLEEP_SECONDS)
                 continue
 
@@ -169,13 +220,17 @@ def worker_loop() -> None:
             )
 
             log_event("INFO", action_text)
-            _refresh_production_monitor(cycle_success=True)
+            health_payload = _refresh_production_monitor(cycle_success=True)
+            _log_cycle_health(health_payload)
+            _run_daily_retention_maintenance()
 
         except Exception as exc:
             error_msg = str(exc)
             log_event("ERROR", f"Erro no worker: {error_msg}")
             mark_error(error_msg)
-            _refresh_production_monitor(cycle_success=False, exception_message=error_msg)
+            health_payload = _refresh_production_monitor(cycle_success=False, exception_message=error_msg)
+            _log_cycle_health(health_payload)
+            _run_daily_retention_maintenance()
 
         time.sleep(SLEEP_SECONDS)
 

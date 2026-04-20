@@ -77,6 +77,11 @@ ALERT_MAX_CONSECUTIVE_ERRORS=3
 ALERT_FEED_FALLBACK_MAX_MINUTES=15
 ALERT_COOLDOWN_MINUTES=30
 ALERT_SEND_RECOVERY_EMAIL=true
+RETENTION_ENABLED=true
+RETENTION_DAYS=60
+RETENTION_RUN_INTERVAL_HOURS=24
+RETENTION_ARCHIVE_TRADER_ORDERS=false
+WEEKLY_REPORT_RUNTIME_WEEKS=8
 ```
 
 Opcional para bootstrap do primeiro admin:
@@ -94,6 +99,9 @@ Observacoes:
 - `BROKER_PROVIDER=paper` e `BROKER_MODE=paper` mantem a etapa em simulacao
 - `PRODUCTION_MODE=true` ativa monitoramento e alertas, mas nao libera ordem real
 - em cloud, prefira `ALERT_EMAIL_PROVIDER=resend`; `smtp` continua disponivel como fallback
+- `RETENTION_ENABLED=true` ativa arquivamento automatico diario no worker
+- `RETENTION_DAYS=60` mantem o runtime leve e arquiva o restante por mes
+- `RETENTION_ARCHIVE_TRADER_ORDERS=false` preserva a aba `Ordens` sem mudanca de comportamento nesta etapa
 
 ## Passo 6. Fazer deploy
 
@@ -122,6 +130,8 @@ Observacoes:
    - `Controle do Bot` mostrando `Modo producao`
    - broker em `Simulado`
    - email de teste funcionando, se SMTP estiver configurado
+   - `Historico` mostrando a aba `Validacao Semanal`
+   - retencao ativa sem quebrar `Relatorios Trader` ou `Logs`
 
 ## Troubleshooting
 
