@@ -186,7 +186,7 @@ def fallback_data(symbol: str, rows: int = 240) -> pd.DataFrame:
     low = np.minimum(open_, close) - 0.6
     volume = 1000 + ((idx + seed) % 30) * 25
 
-    return pd.DataFrame(
+    df = pd.DataFrame(
         {
             "datetime": pd.date_range(end=pd.Timestamp.utcnow(), periods=rows, freq="h"),
             "open": open_,
@@ -194,8 +194,10 @@ def fallback_data(symbol: str, rows: int = 240) -> pd.DataFrame:
             "low": low,
             "close": close,
             "volume": volume,
+            "data_source": "fallback",
         }
     )
+    return df
 
 
 def load_prices(symbol: str, config: PaperTradingConfig) -> pd.DataFrame:
@@ -235,8 +237,9 @@ def load_prices(symbol: str, config: PaperTradingConfig) -> pd.DataFrame:
 
     if "volume" not in df.columns:
         df["volume"] = 0.0
+    df["data_source"] = "market"
 
-    keep = [c for c in ["datetime", "open", "high", "low", "close", "volume"] if c in df.columns]
+    keep = [c for c in ["datetime", "open", "high", "low", "close", "volume", "data_source"] if c in df.columns]
     return df[keep].tail(config.history_limit).copy()
 
 
@@ -313,6 +316,16 @@ def _enrich_indicators(df: pd.DataFrame) -> pd.DataFrame:
 def _normalize_symbol_list(config: PaperTradingConfig) -> list[str]:
     symbols = [str(symbol).strip().upper() for symbol in (config.custom_tickers or []) if str(symbol).strip()]
     return symbols or ["AAPL"]
+
+
+def _frame_data_source(data: pd.DataFrame | None) -> str:
+    if data is None or data.empty or "data_source" not in data.columns:
+        return "market"
+    series = data["data_source"].astype("string").dropna()
+    if series.empty:
+        return "market"
+    value = str(series.iloc[-1]).strip().lower()
+    return value or "market"
 
 
 def _compute_buy_score(latest: pd.Series) -> float:
@@ -506,7 +519,7 @@ def run_paper_trading_demo(config: PaperTradingConfig = PaperTradingConfig()) ->
 
     return {
         "symbol": first_symbol,
-        "signals": [{"asset": first_symbol, "score": score, "buy": should_buy}],
+        "signals": [{"asset": first_symbol, "score": score, "buy": should_buy, "data_source": _frame_data_source(prices)}],
         "result": {"total_return": 0.0, "trades": 0},
         "equity": prices["close"].tail(50).tolist(),
         "figure": figure,
@@ -616,7 +629,10 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[s
             continue
 
         latest = data.iloc[-1]
+        data_source = _frame_data_source(data)
         should_buy, score = _should_buy(latest, config)
+        if data_source == "fallback":
+            should_buy = False
         signal = {
             "asset": asset,
             "price": round(float(latest["close"]), 6),
@@ -630,6 +646,7 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[s
             "breakout_20": round(float(latest.get("breakout_20", 0.0) or 0.0), 6),
             "score": score,
             "buy": should_buy,
+            "data_source": data_source,
         }
         signals.append(signal)
 
@@ -729,4 +746,3 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[s
         "signals": signals,
         "trades_executed": len(trades_executed),
     }
-    holding_limit = int(position.get("holding_minutes_limit", holding_minutes) or holding_minutes)
