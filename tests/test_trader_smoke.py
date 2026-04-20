@@ -21,6 +21,7 @@ def _fake_prices(rows: int = 120) -> pd.DataFrame:
             "low": low,
             "close": close,
             "volume": volume,
+            "data_source": "market",
         }
     )
 
@@ -69,3 +70,29 @@ def test_paper_engine_does_not_reset_db_state_when_local_file_is_missing(isolate
     paper_engine.ensure_paper_files(cfg)
 
     assert load_calls
+
+
+def test_run_paper_cycle_skips_new_entries_when_prices_are_fallback(isolated_storage, monkeypatch):
+    paper_engine = load_module("paper_trading_engine")
+
+    def fallback_prices():
+        df = _fake_prices().copy()
+        df["data_source"] = "fallback"
+        return df
+
+    monkeypatch.setattr(paper_engine, "load_prices", lambda symbol, config: fallback_prices())
+    monkeypatch.setattr(paper_engine, "_should_buy", lambda latest, config: (True, 0.95))
+
+    result = paper_engine.run_paper_cycle(
+        paper_engine.PaperTradingConfig(
+            custom_tickers=["AAPL"],
+            allow_new_entries=True,
+            history_limit=50,
+        )
+    )
+
+    assert result["trades_executed"] == 0
+    assert result["state"]["positions"] == {}
+    assert result["signals"]
+    assert result["signals"][0]["data_source"] == "fallback"
+    assert result["signals"][0]["buy"] is False
