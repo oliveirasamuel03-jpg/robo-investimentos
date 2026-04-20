@@ -17,6 +17,18 @@ state = load_bot_state()
 if bool((state.get("security", {}) or {}).get("real_mode_enabled", False)):
     st.warning("Real trading enabled")
 
+market_data_state = state.get("market_data", {}) or {}
+broker_state = state.get("broker", {}) or {}
+
+info_c1, info_c2, info_c3, info_c4 = st.columns(4)
+info_c1.metric("Provider de dados", str(market_data_state.get("provider", "yahoo")).upper())
+info_c2.metric("Status do feed", str(market_data_state.get("status", "unknown")).title())
+info_c3.metric("Fonte atual", str(market_data_state.get("last_source", "unknown")).title())
+info_c4.metric("Broker", f"{str(broker_state.get('provider', 'paper')).upper()} / {str(broker_state.get('mode', 'paper')).upper()}")
+
+if market_data_state.get("last_error"):
+    st.caption(f"Ultimo alerta de mercado: {market_data_state.get('last_error')}")
+
 status_options = ["RUNNING", "PAUSED", "STOPPED"]
 mode_options = ["Automatico", "Semi-automatico"]
 

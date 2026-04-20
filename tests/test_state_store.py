@@ -19,6 +19,8 @@ def test_state_store_bootstraps_files_and_defaults(isolated_storage):
     assert state["wallet_value"] > 0
     assert isinstance(state["positions"], list)
     assert state["trader"]["profile"] == "Equilibrado"
+    assert state["market_data"]["provider"] == config.MARKET_DATA_PROVIDER
+    assert state["broker"]["provider"] == config.BROKER_PROVIDER
 
     logs = state_store.read_storage_table(config.BOT_LOG_FILE, columns=config.BOT_LOG_COLUMNS)
     assert isinstance(logs, pd.DataFrame)
@@ -45,3 +47,36 @@ def test_state_store_does_not_reset_db_state_when_local_file_is_missing(isolated
     state_store.ensure_storage()
 
     assert load_calls
+
+
+def test_update_market_data_status_tracks_last_success_and_error(isolated_storage):
+    state_store = load_module("core.state_store")
+
+    success = state_store.update_market_data_status(
+        {
+            "provider": "yahoo",
+            "status": "healthy",
+            "last_sync_at": "2026-04-20T01:00:00+00:00",
+            "last_source": "market",
+            "source_breakdown": {"market": 2, "cached": 0, "fallback": 0, "unknown": 0},
+            "symbols": ["AAPL", "MSFT"],
+            "requested_by": "worker_cycle",
+        }
+    )
+    assert success["last_success_at"] == "2026-04-20T01:00:00+00:00"
+    assert success["last_error"] == ""
+
+    degraded = state_store.update_market_data_status(
+        {
+            "provider": "yahoo",
+            "status": "error",
+            "last_sync_at": "2026-04-20T01:05:00+00:00",
+            "last_source": "fallback",
+            "last_error": "rate limit",
+            "source_breakdown": {"market": 0, "cached": 0, "fallback": 2, "unknown": 0},
+            "symbols": ["AAPL", "MSFT"],
+            "requested_by": "trader_chart",
+        }
+    )
+    assert degraded["last_success_at"] == "2026-04-20T01:00:00+00:00"
+    assert degraded["last_error"] == "rate limit"

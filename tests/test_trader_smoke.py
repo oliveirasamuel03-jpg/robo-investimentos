@@ -158,6 +158,7 @@ def test_run_paper_cycle_does_not_close_open_position_when_market_data_is_not_li
 
 
 def test_load_market_data_map_reuses_cache_between_cycles(isolated_storage, monkeypatch):
+    market_data = load_module("core.market_data")
     paper_engine = load_module("paper_trading_engine")
 
     calls = {"count": 0}
@@ -175,7 +176,7 @@ def test_load_market_data_map_reuses_cache_between_cycles(isolated_storage, monk
             }
         )
 
-    monkeypatch.setattr(paper_engine.yf, "download", fake_download)
+    monkeypatch.setattr(market_data.yf, "download", fake_download)
 
     config = paper_engine.PaperTradingConfig(custom_tickers=["AAPL"], history_limit=50)
     first = paper_engine.load_market_data_map(["AAPL"], config)
@@ -184,3 +185,40 @@ def test_load_market_data_map_reuses_cache_between_cycles(isolated_storage, monk
     assert "AAPL" in first
     assert "AAPL" in second
     assert calls["count"] == 1
+
+
+def test_run_trader_cycle_updates_market_data_state(isolated_storage, monkeypatch):
+    state_store = load_module("core.state_store")
+    paper_engine = load_module("paper_trading_engine")
+    trader_engine = load_module("engines.trader_engine")
+
+    monkeypatch.setattr(
+        paper_engine,
+        "load_market_data_result",
+        lambda symbols, config, requested_by="worker_cycle": {
+            "frames": {str(symbol).upper(): _fake_prices() for symbol in symbols},
+            "status": {
+                "provider": "yahoo",
+                "status": "healthy",
+                "last_sync_at": "2026-04-20T01:00:00+00:00",
+                "last_source": "market",
+                "source_breakdown": {"market": len(symbols), "cached": 0, "fallback": 0, "unknown": 0},
+                "symbols": [str(symbol).upper() for symbol in symbols],
+                "requested_by": requested_by,
+                "last_error": "",
+            },
+        },
+    )
+    monkeypatch.setattr(paper_engine, "_should_buy", lambda latest, config: (False, 0.55))
+    monkeypatch.setattr(paper_engine, "_should_sell", lambda position, latest, holding_minutes, config: (False, ""))
+
+    state = state_store.load_bot_state()
+    state["bot_status"] = "RUNNING"
+    state["trader"]["watchlist"] = ["AAPL", "MSFT"]
+    state_store.save_bot_state(state)
+
+    trader_engine.run_trader_cycle()
+
+    updated_state = state_store.load_bot_state()
+    assert updated_state["market_data"]["status"] == "healthy"
+    assert updated_state["market_data"]["last_source"] == "market"

@@ -14,6 +14,7 @@ from core.state_store import (
     read_storage_table,
     replace_storage_table,
     save_bot_state,
+    update_market_data_status,
 )
 from core.trader_profiles import get_trader_profile_config
 from engines.quant_bridge import (
@@ -169,6 +170,7 @@ def run_trader_cycle() -> dict:
     ensure_paper_files(cfg)
 
     cycle_result = run_paper_cycle(cfg)
+    update_market_data_status(cycle_result.get("market_data_status"))
     _sync_trader_orders_into_storage()
     platform_state = sync_platform_positions_from_paper()
     report = build_paper_report(initial_capital=float(platform_state.get("wallet_value", cfg.initial_capital)))
