@@ -7,7 +7,7 @@ import streamlit as st
 from core.alerts import send_email_alert
 from core.auth.guards import render_auth_toolbar, require_admin
 from core.broker import broker_status_label, probe_broker_status
-from core.config import ALERT_EMAIL_ENABLED, PRODUCTION_MODE
+from core.config import ALERT_EMAIL_ENABLED, ALERT_EMAIL_FROM, ALERT_EMAIL_PROVIDER, PRODUCTION_MODE, SMTP_USERNAME
 from core.production_monitor import evaluate_production_health
 from core.state_store import (
     load_bot_state,
@@ -100,6 +100,8 @@ st.caption("Monitoramento de saude, alertas e diagnostico operacional. PAPER TRA
 
 production_mode_text = "Ativo" if PRODUCTION_MODE else "Inativo"
 alert_mode_text = "Ativo" if ALERT_EMAIL_ENABLED else "Inativo"
+alert_provider_text = str(production_state.get("alert_provider") or ALERT_EMAIL_PROVIDER or "smtp").upper()
+configured_sender = ALERT_EMAIL_FROM or SMTP_USERNAME or "Sem registro"
 health_level = str(production_state.get("health_level") or "healthy").lower()
 health_message = str(production_state.get("health_message") or "Sem mensagem.")
 
@@ -127,6 +129,10 @@ prod_c9.metric("Feed monitorado", market_data_status_label(production_state.get(
 prod_c10.metric("Broker monitorado", broker_status_label(production_state.get("broker_status")))
 prod_c11.metric("Ultimo alerta", production_state.get("last_alert_sent_at") or "Nenhum")
 prod_c12.metric("Proximo alerta elegivel", production_state.get("next_alert_eligible_at") or "Agora")
+
+st.caption(
+    f"Provider de alerta: {alert_provider_text} | Remetente configurado: {configured_sender}"
+)
 
 act_c1, act_c2 = st.columns(2)
 with act_c1:
