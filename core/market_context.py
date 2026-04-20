@@ -78,7 +78,11 @@ def get_market_context(data: dict[str, pd.DataFrame] | None) -> dict[str, Any]:
         if not crypto_frames:
             return _empty_context("Sem ativos cripto na watchlist desta rodada; contexto fica neutro.")
 
-        btc_frame = crypto_frames.get("BTC-USD") or next(iter(crypto_frames.values()))
+        btc_frame = crypto_frames.get("BTC-USD")
+        if btc_frame is None or btc_frame.empty:
+            btc_frame = next((frame for frame in crypto_frames.values() if frame is not None and not frame.empty), None)
+        if btc_frame is None:
+            return _empty_context()
         latest = _latest_row(btc_frame)
         if latest is None:
             return _empty_context()
