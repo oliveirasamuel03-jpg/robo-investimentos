@@ -50,6 +50,12 @@ def _resolve_storage_dir() -> Path:
 
 APP_TITLE = _env_str("APP_TITLE", "Trade Ops Desk") or "Trade Ops Desk"
 APP_ENV = _env_str("APP_ENV", _env_str("ENVIRONMENT", "development")) or "development"
+MARKET_DATA_PROVIDER = _env_str("MARKET_DATA_PROVIDER", "yahoo") or "yahoo"
+MARKET_DATA_CACHE_TTL_SECONDS = max(30, env_int("MARKET_DATA_CACHE_TTL_SECONDS", 300))
+MARKET_DATA_HISTORY_LIMIT = max(120, env_int("MARKET_DATA_HISTORY_LIMIT", 500))
+BROKER_PROVIDER = _env_str("BROKER_PROVIDER", "paper") or "paper"
+BROKER_MODE = _env_str("BROKER_MODE", "paper") or "paper"
+BROKER_ACCOUNT_ID = _env_str("BROKER_ACCOUNT_ID", "")
 
 STORAGE_DIR = _resolve_storage_dir()
 RUNTIME_DIR = STORAGE_DIR / "runtime"

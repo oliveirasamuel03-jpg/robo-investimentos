@@ -9,9 +9,15 @@ from uuid import uuid4
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
-import yfinance as yf
 
-from core.config import RUNTIME_DIR, ensure_app_directories
+from core.config import MARKET_DATA_HISTORY_LIMIT, RUNTIME_DIR, ensure_app_directories
+from core.market_data import (
+    fallback_data as build_fallback_market_data,
+    fetch_market_data_frame,
+    fetch_market_data_map,
+    frame_data_source as get_frame_data_source,
+    is_live_market_source,
+)
 from core.persistence import (
     append_json_row,
     database_enabled,
@@ -27,8 +33,6 @@ PAPER_STATE_FILE = RUNTIME_DIR / "paper_state.json"
 PAPER_TRADES_FILE = RUNTIME_DIR / "paper_trades.json"
 PAPER_STATE_NAMESPACE = "paper_state"
 PAPER_TRADES_NAMESPACE = "paper_trades"
-MARKET_DATA_CACHE_TTL_SECONDS = 300
-_MARKET_DATA_CACHE: dict[str, dict[str, Any]] = {}
 
 
 @dataclass
@@ -42,7 +46,7 @@ class PaperTradingConfig:
     min_trade_notional: float = 100.0
     max_open_positions: int = 3
     holding_minutes: int = 60
-    history_limit: int = 500
+    history_limit: int = MARKET_DATA_HISTORY_LIMIT
     allow_new_entries: bool = True
     min_signal_score: float = 0.62
     min_atr_pct: float = 0.003
@@ -174,177 +178,36 @@ def read_paper_equity(limit: int | None = None) -> pd.DataFrame:
     return df
 
 
-def _fallback_seed(symbol: str) -> int:
-    return sum(ord(ch) for ch in symbol) % 17
-
-
 def fallback_data(symbol: str, rows: int = 240) -> pd.DataFrame:
-    seed = _fallback_seed(symbol)
-    idx = np.arange(rows, dtype=float)
-    base = 100 + seed + idx * 0.12 + np.sin(idx / 8 + seed) * 2.4
-    close = np.maximum(base, 1.0)
-    open_ = close + np.sin(idx / 5 + seed) * 0.35
-    high = np.maximum(open_, close) + 0.6
-    low = np.minimum(open_, close) - 0.6
-    volume = 1000 + ((idx + seed) % 30) * 25
+    return build_fallback_market_data(symbol, rows=rows)
 
-    df = pd.DataFrame(
-        {
-            "datetime": pd.date_range(end=pd.Timestamp.utcnow(), periods=rows, freq="h"),
-            "open": open_,
-            "high": high,
-            "low": low,
-            "close": close,
-            "volume": volume,
-            "data_source": "fallback",
-        }
+
+def load_market_data_result(symbols: list[str], config: PaperTradingConfig, requested_by: str = "worker_cycle") -> dict[str, Any]:
+    result = fetch_market_data_map(
+        symbols,
+        period=config.period,
+        interval=config.interval,
+        history_limit=int(config.history_limit),
+        allow_stale=True,
+        requested_by=requested_by,
     )
-    return df
-
-
-def _normalize_downloaded_prices(df: pd.DataFrame, config: PaperTradingConfig) -> pd.DataFrame:
-    if df is None or df.empty:
-        return pd.DataFrame()
-
-    if isinstance(df.columns, pd.MultiIndex):
-        df.columns = [c[0] for c in df.columns]
-
-    df = df.reset_index().rename(
-        columns={
-            "Date": "datetime",
-            "Datetime": "datetime",
-            "Open": "open",
-            "High": "high",
-            "Low": "low",
-            "Close": "close",
-            "Adj Close": "adj_close",
-            "Volume": "volume",
-        }
-    )
-
-    if "close" not in df.columns:
-        return pd.DataFrame()
-
-    if "volume" not in df.columns:
-        df["volume"] = 0.0
-    df["data_source"] = "market"
-
-    keep = [c for c in ["datetime", "open", "high", "low", "close", "volume", "data_source"] if c in df.columns]
-    return df[keep].tail(config.history_limit).copy()
-
-
-def _market_cache_key(symbols: list[str], config: PaperTradingConfig) -> str:
-    normalized = [str(symbol).strip().upper() for symbol in symbols if str(symbol).strip()]
-    return "|".join(
-        [
-            config.period,
-            config.interval,
-            str(int(config.history_limit)),
-            *normalized,
-        ]
-    )
-
-
-def _clone_market_frames(frames: dict[str, pd.DataFrame], source: str | None = None) -> dict[str, pd.DataFrame]:
-    cloned: dict[str, pd.DataFrame] = {}
-    for symbol, frame in frames.items():
-        if frame is None or frame.empty:
-            continue
-        copy = frame.copy()
-        if source:
-            copy["data_source"] = source
-        cloned[str(symbol).upper()] = copy
-    return cloned
-
-
-def _cached_market_frames(
-    symbols: list[str],
-    config: PaperTradingConfig,
-    *,
-    allow_stale: bool,
-) -> dict[str, pd.DataFrame]:
-    key = _market_cache_key(symbols, config)
-    cache_entry = _MARKET_DATA_CACHE.get(key)
-    if not cache_entry:
-        return {}
-
-    cached_frames = cache_entry.get("frames", {}) or {}
-    fetched_at = cache_entry.get("fetched_at")
-    if not isinstance(fetched_at, datetime):
-        return {}
-
-    age_seconds = (_utc_now() - fetched_at).total_seconds()
-    if not allow_stale and age_seconds > MARKET_DATA_CACHE_TTL_SECONDS:
-        return {}
-
-    source = "cached" if allow_stale and age_seconds > MARKET_DATA_CACHE_TTL_SECONDS else "market"
-    return _clone_market_frames(cached_frames, source=source)
-
-
-def _extract_symbol_download(batch_df: pd.DataFrame, symbol: str) -> pd.DataFrame:
-    if batch_df is None or batch_df.empty:
-        return pd.DataFrame()
-
-    if isinstance(batch_df.columns, pd.MultiIndex):
-        top_level = {str(value).upper() for value in batch_df.columns.get_level_values(0)}
-        if str(symbol).upper() not in top_level:
-            return pd.DataFrame()
-        return batch_df.xs(str(symbol).upper(), axis=1, level=0, drop_level=True).copy()
-
-    return batch_df.copy()
+    return {"frames": result.frames, "status": result.status}
 
 
 def load_market_data_map(symbols: list[str], config: PaperTradingConfig) -> dict[str, pd.DataFrame]:
-    normalized_symbols = [str(symbol).strip().upper() for symbol in symbols if str(symbol).strip()]
-    if not normalized_symbols:
-        normalized_symbols = ["AAPL"]
-
-    cached_frames = _cached_market_frames(normalized_symbols, config, allow_stale=False)
-    if cached_frames:
-        return cached_frames
-
-    try:
-        download_target: str | list[str]
-        download_target = normalized_symbols if len(normalized_symbols) > 1 else normalized_symbols[0]
-        batch_df = yf.download(
-            tickers=download_target,
-            period=config.period,
-            interval=config.interval,
-            auto_adjust=False,
-            progress=False,
-            threads=False,
-            group_by="ticker",
-        )
-    except Exception:
-        batch_df = pd.DataFrame()
-
-    frames: dict[str, pd.DataFrame] = {}
-    for symbol in normalized_symbols:
-        normalized_frame = _normalize_downloaded_prices(_extract_symbol_download(batch_df, symbol), config)
-        if not normalized_frame.empty:
-            frames[symbol] = normalized_frame
-
-    if frames:
-        _MARKET_DATA_CACHE[_market_cache_key(normalized_symbols, config)] = {
-            "fetched_at": _utc_now(),
-            "frames": _clone_market_frames(frames),
-        }
-
-    stale_frames = _cached_market_frames(normalized_symbols, config, allow_stale=True)
-
-    for symbol in normalized_symbols:
-        if symbol in frames:
-            continue
-        if symbol in stale_frames:
-            frames[symbol] = stale_frames[symbol]
-        else:
-            frames[symbol] = fallback_data(symbol, rows=max(180, config.history_limit))
-
-    return frames
+    return load_market_data_result(symbols, config)["frames"]
 
 
 def load_prices(symbol: str, config: PaperTradingConfig) -> pd.DataFrame:
-    return load_market_data_map([symbol], config).get(str(symbol).upper(), pd.DataFrame())
+    frame, _status = fetch_market_data_frame(
+        symbol,
+        period=config.period,
+        interval=config.interval,
+        history_limit=int(config.history_limit),
+        allow_stale=True,
+        requested_by="trader_chart",
+    )
+    return frame
 
 
 def _calculate_rsi(series: pd.Series, period: int = 14) -> pd.Series:
@@ -423,17 +286,11 @@ def _normalize_symbol_list(config: PaperTradingConfig) -> list[str]:
 
 
 def _frame_data_source(data: pd.DataFrame | None) -> str:
-    if data is None or data.empty or "data_source" not in data.columns:
-        return "market"
-    series = data["data_source"].astype("string").dropna()
-    if series.empty:
-        return "market"
-    value = str(series.iloc[-1]).strip().lower()
-    return value or "market"
+    return get_frame_data_source(data if data is not None else pd.DataFrame())
 
 
 def _is_live_market_source(data_source: str) -> bool:
-    return str(data_source).strip().lower() == "market"
+    return is_live_market_source(data_source)
 
 
 def _compute_buy_score(latest: pd.Series) -> float:
@@ -642,7 +499,9 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[s
         state["cash"] = round(float(config.initial_capital), 2)
 
     symbols = _normalize_symbol_list(config)
-    raw_market_data = load_market_data_map(symbols, config)
+    market_data_result = load_market_data_result(symbols, config, requested_by="worker_cycle")
+    raw_market_data = market_data_result["frames"]
+    market_data_status = market_data_result["status"]
     market_data: dict[str, pd.DataFrame] = {}
 
     for symbol in symbols:
@@ -857,4 +716,5 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[s
         "report": report,
         "signals": signals,
         "trades_executed": len(trades_executed),
+        "market_data_status": market_data_status,
     }

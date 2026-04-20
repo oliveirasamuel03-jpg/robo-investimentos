@@ -9,6 +9,9 @@ from core.config import (
     BOT_LOG_COLUMNS,
     BOT_LOG_FILE,
     BOT_STATE_FILE,
+    BROKER_MODE,
+    BROKER_PROVIDER,
+    MARKET_DATA_PROVIDER,
     TRADER_REPORTS_COLUMNS,
     TRADER_REPORTS_FILE,
     TRADER_ORDERS_COLUMNS,
@@ -38,6 +41,25 @@ DEFAULT_STATE = {
     "next_run_at": "",
     "worker_status": "offline",
     "worker_heartbeat": "",
+    "market_data": {
+        "provider": MARKET_DATA_PROVIDER,
+        "status": "unknown",
+        "last_sync_at": "",
+        "last_success_at": "",
+        "last_error": "",
+        "last_source": "",
+        "source_breakdown": {},
+        "symbols": [],
+        "requested_by": "",
+    },
+    "broker": {
+        "provider": BROKER_PROVIDER,
+        "mode": BROKER_MODE,
+        "status": "paper",
+        "last_sync_at": "",
+        "last_error": "",
+        "account_id": "",
+    },
     "security": {
         "real_mode_enabled": False,
         "real_mode_enabled_by": "",
@@ -137,3 +159,49 @@ def update_worker_heartbeat(status: str = "online") -> None:
     state["worker_status"] = status
     state["worker_heartbeat"] = datetime.utcnow().isoformat()
     save_bot_state(state)
+
+
+def update_market_data_status(status_payload: dict | None) -> dict:
+    state = load_bot_state()
+    market_state = state.get("market_data", {}) or {}
+    payload = status_payload or {}
+
+    if payload.get("provider"):
+        market_state["provider"] = str(payload.get("provider"))
+    if payload.get("status"):
+        market_state["status"] = str(payload.get("status"))
+    if payload.get("last_sync_at"):
+        market_state["last_sync_at"] = str(payload.get("last_sync_at"))
+    if payload.get("last_source"):
+        market_state["last_source"] = str(payload.get("last_source"))
+    if isinstance(payload.get("source_breakdown"), dict):
+        market_state["source_breakdown"] = dict(payload.get("source_breakdown") or {})
+    if payload.get("symbols") is not None:
+        market_state["symbols"] = [str(symbol).upper() for symbol in (payload.get("symbols") or [])]
+    if payload.get("requested_by"):
+        market_state["requested_by"] = str(payload.get("requested_by"))
+
+    source_breakdown = market_state.get("source_breakdown", {}) or {}
+    if int(source_breakdown.get("market", 0) or 0) > 0 or int(source_breakdown.get("cached", 0) or 0) > 0:
+        market_state["last_success_at"] = market_state.get("last_sync_at", "")
+        market_state["last_error"] = ""
+    elif payload.get("last_error"):
+        market_state["last_error"] = str(payload.get("last_error"))
+
+    state["market_data"] = market_state
+    save_bot_state(state)
+    return market_state
+
+
+def update_broker_status(status_payload: dict | None) -> dict:
+    state = load_bot_state()
+    broker_state = state.get("broker", {}) or {}
+    payload = status_payload or {}
+
+    for key in ("provider", "mode", "status", "last_sync_at", "last_error", "account_id"):
+        if payload.get(key) is not None:
+            broker_state[key] = payload.get(key)
+
+    state["broker"] = broker_state
+    save_bot_state(state)
+    return broker_state

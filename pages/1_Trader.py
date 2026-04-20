@@ -6,8 +6,6 @@ from datetime import datetime, timedelta, timezone
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
-import yfinance as yf
-from paper_trading_engine import PaperTradingConfig, load_prices as load_runtime_prices
 
 from core.auth.guards import is_admin, render_auth_toolbar, require_auth
 from core.auth.security import verify_password
@@ -18,6 +16,7 @@ from core.auth.users_store import (
     set_user_disabled,
     update_user_role,
 )
+from core.market_data import fetch_market_data_frame
 from core.config import (
     MAX_HOLDING_MINUTES,
     MAX_TICKET,
@@ -26,7 +25,7 @@ from core.config import (
     TRADER_ORDERS_COLUMNS,
     TRADER_ORDERS_FILE,
 )
-from core.state_store import load_bot_state, read_storage_table, save_bot_state
+from core.state_store import load_bot_state, read_storage_table, save_bot_state, update_market_data_status
 from core.trader_profiles import (
     get_trader_profile_config,
     list_trader_profiles,
@@ -50,44 +49,21 @@ from engines.trader_engine import (
     sync_platform_positions_from_paper,
 )
 
-
 @st.cache_data(ttl=60, show_spinner=False)
-def load_chart_data(ticker: str, period: str, interval: str, refresh_key: int | None = None) -> pd.DataFrame:
-    df = yf.download(
-        tickers=ticker,
+def load_chart_data(ticker: str, period: str, interval: str, refresh_key: int | None = None) -> dict:
+    df, market_data_status = fetch_market_data_frame(
+        ticker,
         period=period,
         interval=interval,
-        auto_adjust=False,
-        progress=False,
-        threads=False,
+        history_limit=300,
+        allow_stale=True,
+        requested_by="trader_chart",
     )
 
     if df is None or df.empty:
-        fallback_cfg = PaperTradingConfig(
-            custom_tickers=[ticker],
-            period=period,
-            interval=interval,
-            history_limit=300,
-        )
-        df = load_runtime_prices(ticker, fallback_cfg)
+        return {"frame": pd.DataFrame(), "market_data_status": market_data_status}
 
-    if df is None or df.empty:
-        return pd.DataFrame()
-
-    if isinstance(df.columns, pd.MultiIndex):
-        df.columns = [c[0] for c in df.columns]
-
-    df = df.rename(
-        columns={
-            "Open": "open",
-            "High": "high",
-            "Low": "low",
-            "Close": "close",
-            "Adj Close": "adj_close",
-            "Volume": "volume",
-        }
-    ).copy()
-
+    df = df.copy()
     if "datetime" in df.columns:
         df["datetime"] = pd.to_datetime(df["datetime"], errors="coerce")
         df = df.dropna(subset=["datetime"]).set_index("datetime")
@@ -100,14 +76,38 @@ def load_chart_data(ticker: str, period: str, interval: str, refresh_key: int | 
 
     for col in ["open", "high", "low", "close"]:
         if col not in df.columns:
-            return pd.DataFrame()
+            return {"frame": pd.DataFrame(), "market_data_status": market_data_status}
 
     if "volume" not in df.columns:
         df["volume"] = 0.0
 
     df["ma9"] = df["close"].rolling(9).mean()
     df["ma21"] = df["close"].rolling(21).mean()
-    return df
+    return {"frame": df, "market_data_status": market_data_status}
+
+
+def market_data_status_label(status: dict | None) -> str:
+    raw = str((status or {}).get("status", "unknown") or "unknown").lower()
+    labels = {
+        "healthy": "Saudavel",
+        "degraded": "Degradado",
+        "cached": "Cache",
+        "error": "Fallback",
+        "unknown": "Desconhecido",
+    }
+    return labels.get(raw, raw.title())
+
+
+def market_data_source_label(status: dict | None) -> str:
+    raw = str((status or {}).get("last_source", "unknown") or "unknown").lower()
+    labels = {
+        "market": "Mercado ao vivo",
+        "cached": "Cache reaproveitado",
+        "fallback": "Fallback sintetico",
+        "mixed": "Misto",
+        "unknown": "Desconhecido",
+    }
+    return labels.get(raw, raw.title())
 
 
 def load_trader_orders() -> pd.DataFrame:
@@ -558,10 +558,13 @@ def build_trader_snapshot(
 
     chart_df = pd.DataFrame()
     chart_error = ""
+    market_data_status = state.get("market_data", {}) or {}
     orders_df = load_trader_orders()
 
     try:
-        chart_df = load_chart_data(selected_ticker, period, interval, refresh_key=refresh_key)
+        chart_payload = load_chart_data(selected_ticker, period, interval, refresh_key=refresh_key)
+        chart_df = chart_payload.get("frame", pd.DataFrame())
+        market_data_status = update_market_data_status(chart_payload.get("market_data_status"))
     except Exception as exc:
         chart_error = str(exc)
 
@@ -611,6 +614,7 @@ def build_trader_snapshot(
         "worker_heartbeat": worker_heartbeat,
         "current_max": current_max,
         "current_min": current_min,
+        "market_data_status": market_data_status,
         "trade_reports_df": trade_reports_df,
         "trade_report_metrics": trade_report_metrics,
         "profile_summary_df": profile_summary_df,
@@ -759,6 +763,9 @@ def render_trader_snapshot(snapshot: dict, selected_ticker: str) -> None:
         st.write(f"**Ultima execucao:** {snapshot['last_execution'] or 'Ainda nao executado'}")
         st.write(f"**Proxima analise:** {snapshot['next_execution'] or 'Aguardando'}")
         st.write(f"**Heartbeat:** {snapshot['worker_heartbeat'] or 'Sem sinal'}")
+        st.write(f"**Provider de dados:** {str((snapshot.get('market_data_status') or {}).get('provider', 'yahoo')).upper()}")
+        st.write(f"**Status do feed:** {market_data_status_label(snapshot.get('market_data_status'))}")
+        st.write(f"**Fonte atual:** {market_data_source_label(snapshot.get('market_data_status'))}")
 
         for item in build_robot_log(signal_text, robot_label, snapshot["last_action"], open_positions):
             st.markdown(f"<div class='log-item'>{item}</div>", unsafe_allow_html=True)
@@ -999,6 +1006,7 @@ signal_color = page_snapshot["signal_color"]
 robot_status = page_snapshot["robot_status"]
 robot_label = page_snapshot["robot_label"]
 robot_class = page_snapshot["robot_class"]
+market_data_status = page_snapshot.get("market_data_status", {})
 
 selected_position = next((p for p in open_positions if p.get("asset") == selected_ticker), None)
 entry_price = float(selected_position.get("entry_price", 0.0)) if selected_position else None
@@ -1008,12 +1016,14 @@ orders_df = load_trader_orders()
 
 try:
     with st.spinner("Carregando gráfico..."):
-        chart_df = load_chart_data(
+        chart_payload = load_chart_data(
             selected_ticker,
             period,
             interval,
             refresh_key=make_chart_refresh_key(auto_refresh_fragment_supported, int(live_refresh_seconds)),
         )
+        chart_df = chart_payload.get("frame", pd.DataFrame())
+        market_data_status = update_market_data_status(chart_payload.get("market_data_status"))
 except Exception as e:
     st.error(f"Erro ao carregar gráfico: {e}")
 
@@ -1046,6 +1056,7 @@ signal_color = page_snapshot["signal_color"]
 robot_status = page_snapshot["robot_status"]
 robot_label = page_snapshot["robot_label"]
 robot_class = page_snapshot["robot_class"]
+market_data_status = page_snapshot.get("market_data_status", market_data_status)
 
 m1, m2, m3, m4 = st.columns(4)
 
@@ -1170,16 +1181,18 @@ if auto_refresh_fragment_supported:
             refresh_key=make_chart_refresh_key(True, int(live_refresh_seconds)),
         )
 
-        lm1, lm2, lm3, lm4 = st.columns(4)
+        lm1, lm2, lm3, lm4, lm5 = st.columns(5)
         lm1.metric("Preco ao vivo", f"{float(live_snapshot['last_price']):,.2f}")
         lm2.metric("Worker", str(live_snapshot["worker_status"]))
         lm3.metric("Posicoes", f"{len(live_snapshot['open_positions'])}")
         lm4.metric("Bot", str(live_snapshot["robot_label"]))
+        lm5.metric("Feed", market_data_status_label(live_snapshot.get("market_data_status")))
 
         st.caption(
             f"Ultima acao: {live_snapshot['last_action']} | "
             f"Ultima execucao: {live_snapshot['last_execution'] or 'Aguardando'} | "
-            f"Heartbeat: {live_snapshot['worker_heartbeat'] or 'Sem sinal'}"
+            f"Heartbeat: {live_snapshot['worker_heartbeat'] or 'Sem sinal'} | "
+            f"Fonte: {market_data_source_label(live_snapshot.get('market_data_status'))}"
         )
 
         live_chart_df = live_snapshot["chart_df"]
@@ -1270,6 +1283,9 @@ with side_col:
     st.write(f"**Última execução:** {last_execution or 'Ainda não executado'}")
     st.write(f"**Próxima análise:** {next_execution or 'Aguardando'}")
     st.write(f"**Heartbeat:** {worker_heartbeat or 'Sem sinal'}")
+    st.write(f"**Provider de dados:** {str((market_data_status or {}).get('provider', 'yahoo')).upper()}")
+    st.write(f"**Status do feed:** {market_data_status_label(market_data_status)}")
+    st.write(f"**Fonte atual:** {market_data_source_label(market_data_status)}")
 
     for item in build_robot_log(signal_text, robot_label, last_action, open_positions):
         st.markdown(f"<div class='log-item'>{item}</div>", unsafe_allow_html=True)
