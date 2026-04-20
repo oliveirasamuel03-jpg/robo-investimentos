@@ -9,8 +9,6 @@ from core.auth.guards import render_auth_toolbar, require_auth
 from core.config import (
     BOT_LOG_COLUMNS,
     BOT_LOG_FILE,
-    INVESTOR_ORDERS_COLUMNS,
-    INVESTOR_ORDERS_FILE,
     TRADER_ORDERS_COLUMNS,
     TRADER_ORDERS_FILE,
 )
@@ -25,14 +23,13 @@ from core.trader_reports import (
 require_auth()
 render_auth_toolbar()
 
-st.title("Historico")
+st.title("Historico Operacional")
 
 trader_orders = read_storage_table(TRADER_ORDERS_FILE, columns=TRADER_ORDERS_COLUMNS)
 trade_reports = read_trade_reports()
-investor_orders = read_storage_table(INVESTOR_ORDERS_FILE, columns=INVESTOR_ORDERS_COLUMNS)
 logs = read_storage_table(BOT_LOG_FILE, columns=BOT_LOG_COLUMNS)
 
-t1, t2, t3, t4 = st.tabs(["Ordens Trader", "Relatorios Trader", "Pesquisa", "Logs"])
+t1, t2, t3 = st.tabs(["Ordens", "Relatorios Trader", "Logs"])
 
 with t1:
     if not trader_orders.empty:
@@ -90,7 +87,7 @@ with t2:
 
         m1, m2, m3, m4 = st.columns(4)
         m1.metric("Trades fechados", f"{int(metrics['total_trades'])}")
-        m2.metric("Lucro acumulado", f"R$ {float(metrics['total_pnl'] or 0.0):,.2f}")
+        m2.metric("PnL acumulado", f"R$ {float(metrics['total_pnl'] or 0.0):,.2f}")
         m3.metric("Win rate", f"{float(metrics['win_rate'] or 0.0) * 100:.2f}%")
         m4.metric("Payoff", "-" if metrics["payoff"] is None else f"{float(metrics['payoff']):.2f}")
 
@@ -124,12 +121,6 @@ with t2:
             st.dataframe(display_df, use_container_width=True)
 
 with t3:
-    if not investor_orders.empty:
-        st.dataframe(investor_orders.iloc[::-1], use_container_width=True)
-    else:
-        st.info("Sem eventos de pesquisa.")
-
-with t4:
     if not logs.empty:
         st.dataframe(logs.iloc[::-1], use_container_width=True)
     else:

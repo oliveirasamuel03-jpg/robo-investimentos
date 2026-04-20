@@ -9,15 +9,12 @@ from core.config import (
     BOT_LOG_COLUMNS,
     BOT_LOG_FILE,
     BOT_STATE_FILE,
-    INVESTOR_ORDERS_COLUMNS,
-    INVESTOR_ORDERS_FILE,
     TRADER_REPORTS_COLUMNS,
     TRADER_REPORTS_FILE,
     TRADER_ORDERS_COLUMNS,
     TRADER_ORDERS_FILE,
     ensure_app_directories,
 )
-from core.trader_profiles import DEFAULT_TRADER_PROFILE
 from core.persistence import (
     append_table_row,
     database_enabled,
@@ -26,31 +23,17 @@ from core.persistence import (
     replace_table,
     save_json_state,
 )
+from core.trader_profiles import DEFAULT_TRADER_PROFILE
+
 
 DEFAULT_STATE = {
     "wallet_value": 10000.0,
     "cash": 10000.0,
     "bot_status": "PAUSED",
-    "bot_mode": "Automático",
-    "reserve_cash_pct": 0.10,
-    "start_date": "2019-01-01",
-    "probability_threshold": 0.60,
-    "top_n": 2,
-    "use_regime_filter": True,
-    "use_volatility_filter": False,
-    "vol_threshold": 0.03,
-    "cash_threshold": 0.50,
-    "target_portfolio_vol": 0.08,
-    "include_brazil_stocks": True,
-    "include_us_stocks": True,
-    "include_etfs": True,
-    "include_fiis": True,
-    "include_crypto": True,
-    "include_grains": True,
-    "custom_tickers": [],
+    "bot_mode": "Automatico",
     "realized_pnl": 0.0,
     "positions": [],
-    "last_action": "Nenhuma ação recente",
+    "last_action": "Nenhuma acao recente",
     "last_run_at": "",
     "next_run_at": "",
     "worker_status": "offline",
@@ -67,15 +50,6 @@ DEFAULT_STATE = {
         "holding_minutes": 60,
         "max_open_positions": 3,
         "watchlist": ["BTC-USD", "ETH-USD", "VALE3.SA", "PETR4.SA", "AAPL", "KC=F"],
-    },
-    "investment": {
-        "enabled": True,
-        "budget": 1000.0,
-        "rebalance_days": 7,
-        "max_positions": 5,
-        "watchlist": ["SPY", "QQQ", "WEGE3.SA", "HGLG11.SA", "IVVB11.SA"],
-        "last_report": {},
-        "last_dashboard": {},
     },
 }
 
@@ -97,7 +71,6 @@ def ensure_storage() -> None:
 
     _ensure_csv(TRADER_ORDERS_FILE, TRADER_ORDERS_COLUMNS)
     _ensure_csv(TRADER_REPORTS_FILE, TRADER_REPORTS_COLUMNS)
-    _ensure_csv(INVESTOR_ORDERS_FILE, INVESTOR_ORDERS_COLUMNS)
     _ensure_csv(BOT_LOG_FILE, BOT_LOG_COLUMNS)
 
 
@@ -133,7 +106,6 @@ def append_csv_row(file_path, row: dict) -> None:
     columns_map = {
         str(TRADER_ORDERS_FILE): TRADER_ORDERS_COLUMNS,
         str(TRADER_REPORTS_FILE): TRADER_REPORTS_COLUMNS,
-        str(INVESTOR_ORDERS_FILE): INVESTOR_ORDERS_COLUMNS,
         str(BOT_LOG_FILE): BOT_LOG_COLUMNS,
     }
     append_table_row(file_path, row, columns=columns_map.get(str(file_path)))

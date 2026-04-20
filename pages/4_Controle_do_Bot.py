@@ -10,15 +10,15 @@ from engines.trader_engine import run_trader_cycle
 current_user = require_admin()
 render_auth_toolbar()
 
-st.title("Controle do Bot")
-st.caption(f"Painel administrativo. Usuario: {current_user['username']}")
+st.title("Controle Operacional")
+st.caption(f"Painel administrativo do trader. Usuario: {current_user['username']}")
 
 state = load_bot_state()
 if bool((state.get("security", {}) or {}).get("real_mode_enabled", False)):
     st.warning("Real trading enabled")
 
 status_options = ["RUNNING", "PAUSED", "STOPPED"]
-mode_options = ["Automático", "Semi-automático"]
+mode_options = ["Automatico", "Semi-automatico"]
 
 status_index = status_options.index(state["bot_status"]) if state.get("bot_status") in status_options else 1
 mode_index = mode_options.index(state["bot_mode"]) if state.get("bot_mode") in mode_options else 0
@@ -35,7 +35,7 @@ with c1:
         log_event("INFO", f"Status atualizado para {status} / {mode}")
         st.success("Status salvo.")
 with c2:
-    if st.button("Rodar Trader", use_container_width=True):
+    if st.button("Rodar trader", use_container_width=True):
         result = run_trader_cycle()
         st.write(result)
 with c3:
@@ -48,4 +48,4 @@ with c4:
         reset_state()
         st.error("Estado resetado.")
 
-st.info("RUNNING abre e gerencia posições. PAUSED não abre novas posições. STOPPED paralisa tudo.")
+st.info("RUNNING abre e gerencia posicoes. PAUSED nao abre novas posicoes. STOPPED paralisa tudo.")

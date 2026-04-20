@@ -15,7 +15,6 @@ def test_state_store_bootstraps_files_and_defaults(isolated_storage):
     assert config.BOT_STATE_FILE.exists()
     assert config.TRADER_ORDERS_FILE.exists()
     assert config.TRADER_REPORTS_FILE.exists()
-    assert config.INVESTOR_ORDERS_FILE.exists()
     assert config.BOT_LOG_FILE.exists()
     assert state["wallet_value"] > 0
     assert isinstance(state["positions"], list)

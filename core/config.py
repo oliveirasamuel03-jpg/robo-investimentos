@@ -48,7 +48,7 @@ def _resolve_storage_dir() -> Path:
     return (BASE_DIR / candidate).resolve()
 
 
-APP_TITLE = _env_str("APP_TITLE", "Invest Pro Desk") or "Invest Pro Desk"
+APP_TITLE = _env_str("APP_TITLE", "Trade Ops Desk") or "Trade Ops Desk"
 APP_ENV = _env_str("APP_ENV", _env_str("ENVIRONMENT", "development")) or "development"
 
 STORAGE_DIR = _resolve_storage_dir()
@@ -59,7 +59,6 @@ REPORTS_DIR = STORAGE_DIR / "reports"
 BOT_STATE_FILE = RUNTIME_DIR / "bot_state.json"
 TRADER_ORDERS_FILE = RUNTIME_DIR / "trader_orders.csv"
 TRADER_REPORTS_FILE = RUNTIME_DIR / "trade_reports.csv"
-INVESTOR_ORDERS_FILE = RUNTIME_DIR / "investor_orders.csv"
 BOT_LOG_FILE = RUNTIME_DIR / "bot_log.csv"
 AUTH_USERS_FILE = RUNTIME_DIR / "auth_users.json"
 
@@ -107,13 +106,6 @@ TRADER_REPORTS_COLUMNS = [
     "trailing_stop_final",
     "holding_minutes_limit",
     "status_final",
-]
-
-INVESTOR_ORDERS_COLUMNS = [
-    "timestamp",
-    "metric",
-    "value",
-    "notes",
 ]
 
 BOT_LOG_COLUMNS = [
