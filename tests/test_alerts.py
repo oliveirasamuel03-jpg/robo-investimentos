@@ -97,6 +97,7 @@ def test_send_email_alert_uses_resend_provider(isolated_storage, monkeypatch):
     def fake_urlopen(request, timeout=0):
         calls["url"] = request.full_url
         calls["auth"] = request.headers.get("Authorization")
+        calls["user_agent"] = request.headers.get("User-agent")
         calls["body"] = request.data.decode("utf-8")
         return FakeResponse()
 
@@ -114,4 +115,5 @@ def test_send_email_alert_uses_resend_provider(isolated_storage, monkeypatch):
     assert result["provider"] == "resend"
     assert calls["url"] == "https://api.resend.com/emails"
     assert "Bearer re_test_key" in str(calls["auth"])
+    assert calls["user_agent"]
     assert "Teste Resend" in calls["body"]

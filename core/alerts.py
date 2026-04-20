@@ -57,6 +57,12 @@ def _smtp_from_address() -> str:
     return ALERT_EMAIL_FROM or SMTP_USERNAME or ALERT_EMAIL_TO
 
 
+def _resend_user_agent() -> str:
+    app_name = str(APP_TITLE or "Trade Ops Desk").strip() or "Trade Ops Desk"
+    safe_name = app_name.replace(" ", "-")
+    return f"{safe_name}/1.0"
+
+
 def _next_alert_eligible_at(last_alert_sent_at: object, now: datetime | None = None) -> str:
     sent_at = parse_iso_datetime(last_alert_sent_at)
     if sent_at is None:
@@ -148,6 +154,7 @@ def _send_via_resend(subject: str, body: str) -> str:
         headers={
             "Authorization": f"Bearer {RESEND_API_KEY}",
             "Content-Type": "application/json",
+            "User-Agent": _resend_user_agent(),
         },
         method="POST",
     )
