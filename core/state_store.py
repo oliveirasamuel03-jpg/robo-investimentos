@@ -6,12 +6,14 @@ from datetime import datetime
 import pandas as pd
 
 from core.config import (
+    ALERT_EMAIL_ENABLED,
     BOT_LOG_COLUMNS,
     BOT_LOG_FILE,
     BOT_STATE_FILE,
     BROKER_MODE,
     BROKER_PROVIDER,
     MARKET_DATA_PROVIDER,
+    PRODUCTION_MODE,
     TRADER_REPORTS_COLUMNS,
     TRADER_REPORTS_FILE,
     TRADER_ORDERS_COLUMNS,
@@ -48,6 +50,7 @@ DEFAULT_STATE = {
         "last_success_at": "",
         "last_error": "",
         "last_source": "",
+        "fallback_since_at": "",
         "source_breakdown": {},
         "symbols": [],
         "requested_by": "",
@@ -74,6 +77,31 @@ DEFAULT_STATE = {
         "real_mode_enabled": False,
         "real_mode_enabled_by": "",
         "real_mode_enabled_at": "",
+    },
+    "production": {
+        "enabled": PRODUCTION_MODE,
+        "alert_email_enabled": ALERT_EMAIL_ENABLED,
+        "heartbeat_age_seconds": None,
+        "last_execution_at": "",
+        "last_success_at": "",
+        "feed_status": "unknown",
+        "broker_status": "paper",
+        "consecutive_errors": 0,
+        "health_level": "healthy",
+        "health_reason": "healthy",
+        "health_message": "Sistema saudavel. Broker em modo simulado (paper). Nenhuma ordem real sera enviada.",
+        "last_health_at": "",
+        "last_error": "",
+        "last_error_at": "",
+        "last_exception": "",
+        "fallback_since_at": "",
+        "fallback_age_minutes": 0,
+        "last_alert_sent_at": "",
+        "last_alert_type": "",
+        "last_alert_subject": "",
+        "last_alert_error": "",
+        "next_alert_eligible_at": "",
+        "last_recovery_email_at": "",
     },
     "trader": {
         "enabled": True,
@@ -119,6 +147,10 @@ def load_bot_state() -> dict:
     ensure_storage()
     state = load_json_state("bot_state", lambda: deepcopy(DEFAULT_STATE), BOT_STATE_FILE)
     state = _merge_missing_keys(state, deepcopy(DEFAULT_STATE))
+    production_state = state.get("production", {}) or {}
+    production_state["enabled"] = PRODUCTION_MODE
+    production_state["alert_email_enabled"] = ALERT_EMAIL_ENABLED
+    state["production"] = production_state
     return state
 
 
@@ -197,8 +229,15 @@ def update_market_data_status(status_payload: dict | None) -> dict:
     if int(source_breakdown.get("market", 0) or 0) > 0 or int(source_breakdown.get("cached", 0) or 0) > 0:
         context_state["last_success_at"] = context_state.get("last_sync_at", "")
         context_state["last_error"] = ""
+        context_state["fallback_since_at"] = ""
     elif payload.get("last_error"):
         context_state["last_error"] = str(payload.get("last_error"))
+        context_state["fallback_since_at"] = str(
+            context_state.get("fallback_since_at") or context_state.get("last_sync_at") or ""
+        )
+
+    if str(context_state.get("last_source") or "").lower() != "fallback" and str(context_state.get("status") or "").lower() != "error":
+        context_state["fallback_since_at"] = ""
 
     contexts[context_name] = context_state
     market_state["contexts"] = contexts
@@ -212,6 +251,7 @@ def update_market_data_status(status_payload: dict | None) -> dict:
             "last_success_at",
             "last_error",
             "last_source",
+            "fallback_since_at",
             "source_breakdown",
             "symbols",
             "requested_by",
@@ -252,3 +292,17 @@ def update_broker_status(status_payload: dict | None) -> dict:
     state["broker"] = broker_state
     save_bot_state(state)
     return broker_state
+
+
+def update_production_status(status_payload: dict | None) -> dict:
+    state = load_bot_state()
+    production_state = state.get("production", {}) or {}
+    payload = status_payload or {}
+
+    for key, value in payload.items():
+        if value is not None:
+            production_state[key] = value
+
+    state["production"] = production_state
+    save_bot_state(state)
+    return production_state

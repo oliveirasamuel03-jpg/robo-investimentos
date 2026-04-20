@@ -12,6 +12,8 @@ MODULES_TO_CLEAR = [
     "core.state_store",
     "core.market_data",
     "core.broker",
+    "core.production_monitor",
+    "core.alerts",
     "core.trader_profiles",
     "core.trader_reports",
     "core.auth.users_store",

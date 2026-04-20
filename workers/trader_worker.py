@@ -3,7 +3,16 @@ from __future__ import annotations
 import time
 from datetime import datetime, timedelta, timezone
 
-from core.state_store import load_bot_state, save_bot_state, log_event, update_worker_heartbeat
+from core.alerts import send_email_alert, send_recovery_email
+from core.config import ALERT_EMAIL_ENABLED, PRODUCTION_MODE
+from core.production_monitor import evaluate_production_health
+from core.state_store import (
+    load_bot_state,
+    log_event,
+    save_bot_state,
+    update_production_status,
+    update_worker_heartbeat,
+)
 from engines.trader_engine import run_trader_cycle
 
 SLEEP_SECONDS = 60
@@ -49,7 +58,89 @@ def build_action_text(result: dict) -> str:
     if trades_executed > 0:
         return f"{trades_executed} trade(s) executado(s) nesta rodada"
 
-    return "Rodada concluída sem novas operações"
+    return "Rodada concluida sem novas operacoes"
+
+
+def _send_health_alert(state: dict, health_payload: dict, *, alert_type: str, current_time: datetime) -> None:
+    subject = f"[Trade Ops Desk] Alerta de producao: {alert_type}"
+    body = (
+        "O monitoramento do trader detectou uma condicao de atencao.\n\n"
+        f"Health level: {health_payload.get('health_level')}\n"
+        f"Motivo: {health_payload.get('health_reason')}\n"
+        f"Mensagem: {health_payload.get('health_message')}\n"
+        f"Worker: {health_payload.get('worker_status')}\n"
+        f"Heartbeat age (s): {health_payload.get('heartbeat_age_seconds')}\n"
+        f"Feed: {health_payload.get('feed_status')}\n"
+        f"Broker: {health_payload.get('broker_status')}\n"
+        f"Falhas consecutivas: {health_payload.get('consecutive_errors')}\n"
+        f"Ultima execucao: {health_payload.get('last_execution_at')}\n"
+        f"Ultimo sucesso: {health_payload.get('last_success_at')}\n"
+        f"Data UTC: {current_time.isoformat()}\n"
+    )
+    send_email_alert(subject, body, alert_type=alert_type, state=state, now=current_time)
+
+
+def _refresh_production_monitor(*, cycle_success: bool, exception_message: str = "") -> dict:
+    current_time = datetime.now(timezone.utc)
+    state = load_bot_state()
+    previous_production = state.get("production", {}) or {}
+    previous_health_level = str(previous_production.get("health_level") or "healthy").lower()
+
+    updates = {
+        "enabled": PRODUCTION_MODE,
+        "alert_email_enabled": ALERT_EMAIL_ENABLED,
+        "last_execution_at": current_time.isoformat(),
+    }
+
+    if cycle_success:
+        updates.update(
+            {
+                "last_success_at": current_time.isoformat(),
+                "consecutive_errors": 0,
+                "last_error": "",
+                "last_error_at": "",
+                "last_exception": "",
+            }
+        )
+    else:
+        updates.update(
+            {
+                "consecutive_errors": max(0, int(previous_production.get("consecutive_errors", 0) or 0)) + 1,
+                "last_error": exception_message,
+                "last_error_at": current_time.isoformat(),
+                "last_exception": exception_message,
+            }
+        )
+
+    update_production_status(updates)
+    updated_state = load_bot_state()
+    health_payload = evaluate_production_health(updated_state, now=current_time)
+    update_production_status(health_payload)
+    monitored_state = load_bot_state()
+
+    if exception_message:
+        _send_health_alert(
+            monitored_state,
+            health_payload,
+            alert_type="critical_exception",
+            current_time=current_time,
+        )
+        return health_payload
+
+    if health_payload.get("health_level") in {"warning", "critical"} and health_payload.get("health_reason") not in {
+        "",
+        "healthy",
+    }:
+        _send_health_alert(
+            monitored_state,
+            health_payload,
+            alert_type=str(health_payload.get("health_reason") or "health_warning"),
+            current_time=current_time,
+        )
+    elif previous_health_level in {"warning", "critical"} and health_payload.get("health_level") == "healthy":
+        send_recovery_email(monitored_state, health_payload=health_payload, now=current_time)
+
+    return health_payload
 
 
 def worker_loop() -> None:
@@ -62,9 +153,10 @@ def worker_loop() -> None:
 
             if state.get("bot_status") != "RUNNING":
                 update_runtime_state(
-                    last_action="Robô pausado. Aguardando ativação.",
+                    last_action="Robo pausado. Aguardando ativacao.",
                     next_run_delta_seconds=PAUSED_SLEEP_SECONDS,
                 )
+                _refresh_production_monitor(cycle_success=True)
                 time.sleep(PAUSED_SLEEP_SECONDS)
                 continue
 
@@ -77,11 +169,13 @@ def worker_loop() -> None:
             )
 
             log_event("INFO", action_text)
+            _refresh_production_monitor(cycle_success=True)
 
-        except Exception as e:
-            error_msg = str(e)
+        except Exception as exc:
+            error_msg = str(exc)
             log_event("ERROR", f"Erro no worker: {error_msg}")
             mark_error(error_msg)
+            _refresh_production_monitor(cycle_success=False, exception_message=error_msg)
 
         time.sleep(SLEEP_SECONDS)
 

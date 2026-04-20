@@ -21,6 +21,7 @@ def test_state_store_bootstraps_files_and_defaults(isolated_storage):
     assert state["trader"]["profile"] == "Equilibrado"
     assert state["market_data"]["provider"] == config.MARKET_DATA_PROVIDER
     assert state["broker"]["provider"] == config.BROKER_PROVIDER
+    assert state["production"]["health_level"] == "healthy"
 
     logs = state_store.read_storage_table(config.BOT_LOG_FILE, columns=config.BOT_LOG_COLUMNS)
     assert isinstance(logs, pd.DataFrame)
@@ -116,3 +117,20 @@ def test_update_broker_status_tracks_readiness_fields(isolated_storage):
     assert broker_state["status"] == "guarded"
     assert broker_state["api_key_configured"] is True
     assert broker_state["execution_enabled"] is False
+
+
+def test_update_production_status_tracks_health_fields(isolated_storage):
+    state_store = load_module("core.state_store")
+
+    production_state = state_store.update_production_status(
+        {
+            "health_level": "warning",
+            "health_message": "Heartbeat atrasado.",
+            "consecutive_errors": 2,
+            "last_alert_sent_at": "2026-04-20T04:00:00+00:00",
+        }
+    )
+
+    assert production_state["health_level"] == "warning"
+    assert production_state["consecutive_errors"] == 2
+    assert production_state["last_alert_sent_at"] == "2026-04-20T04:00:00+00:00"

@@ -58,6 +58,26 @@ No service `web` e no service `worker`, configure:
 ```env
 APP_ENV=production
 AUTH_REQUIRED=true
+PRODUCTION_MODE=true
+BROKER_PROVIDER=paper
+BROKER_MODE=paper
+```
+
+Se quiser alertas por email no Railway, configure tambem no `web` e no `worker`:
+
+```env
+ALERT_EMAIL_ENABLED=true
+ALERT_EMAIL_TO=oliveirasamuel03@gmail.com
+SMTP_HOST=seu_smtp
+SMTP_PORT=587
+SMTP_USERNAME=seu_usuario
+SMTP_PASSWORD=sua_senha
+SMTP_USE_TLS=true
+ALERT_HEARTBEAT_MAX_DELAY_SECONDS=180
+ALERT_MAX_CONSECUTIVE_ERRORS=3
+ALERT_FEED_FALLBACK_MAX_MINUTES=15
+ALERT_COOLDOWN_MINUTES=30
+ALERT_SEND_RECOVERY_EMAIL=true
 ```
 
 Opcional para bootstrap do primeiro admin:
@@ -72,6 +92,8 @@ Observacoes:
 - se `ADMIN_USERNAME` e `ADMIN_PASSWORD` nao forem definidos, o app permite criar o primeiro admin na tela de login
 - `DATABASE_URL` deve estar presente no `web` e no `worker`
 - `ROBO_STORAGE_DIR` e opcional; em producao com Postgres o estado principal vem do banco
+- `BROKER_PROVIDER=paper` e `BROKER_MODE=paper` mantem a etapa em simulacao
+- `PRODUCTION_MODE=true` ativa monitoramento e alertas, mas nao libera ordem real
 
 ## Passo 6. Fazer deploy
 
@@ -97,6 +119,9 @@ Observacoes:
    - `worker_heartbeat` atualizado
    - `cash` e `equity` carregando
    - ordens e historico sendo atualizados
+   - `Controle do Bot` mostrando `Modo producao`
+   - broker em `Simulado`
+   - email de teste funcionando, se SMTP estiver configurado
 
 ## Troubleshooting
 

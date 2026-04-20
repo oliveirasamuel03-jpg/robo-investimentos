@@ -4,9 +4,19 @@ import json
 
 import streamlit as st
 
+from core.alerts import send_email_alert
 from core.auth.guards import render_auth_toolbar, require_admin
 from core.broker import broker_status_label, probe_broker_status
-from core.state_store import load_bot_state, log_event, reset_state, save_bot_state, update_broker_status
+from core.config import ALERT_EMAIL_ENABLED, PRODUCTION_MODE
+from core.production_monitor import evaluate_production_health
+from core.state_store import (
+    load_bot_state,
+    log_event,
+    reset_state,
+    save_bot_state,
+    update_broker_status,
+    update_production_status,
+)
 from engines.trader_engine import run_trader_cycle
 
 
@@ -49,6 +59,15 @@ def bot_status_label(raw_status: str | None) -> str:
     return labels.get(str(raw_status or "").upper(), str(raw_status or "Desconhecido"))
 
 
+def health_level_label(raw_level: str | None) -> str:
+    labels = {
+        "healthy": "Saudavel",
+        "warning": "Atencao",
+        "critical": "Critico",
+    }
+    return labels.get(str(raw_level or "healthy").strip().lower(), str(raw_level or "healthy").title())
+
+
 current_user = require_admin()
 render_auth_toolbar()
 
@@ -62,9 +81,71 @@ market_contexts = market_data_state.get("contexts", {}) or {}
 operational_market_state = market_contexts.get("worker_cycle") or market_data_state
 chart_market_state = market_contexts.get("trader_chart") or {}
 broker_state = update_broker_status(probe_broker_status(security_state, requested_by="admin_panel"))
+state = load_bot_state()
+production_state = update_production_status(evaluate_production_health(state))
+state = load_bot_state()
+production_state = state.get("production", {}) or {}
+operational_market_state = (state.get("market_data", {}) or {}).get("contexts", {}).get("worker_cycle") or state.get(
+    "market_data",
+    {},
+)
+chart_market_state = (state.get("market_data", {}) or {}).get("contexts", {}).get("trader_chart") or {}
+broker_state = state.get("broker", {}) or broker_state
 
 if bool(security_state.get("real_mode_enabled", False)):
     st.warning("Real trading enabled")
+
+st.subheader("Modo producao")
+st.caption("Monitoramento de saude, alertas e diagnostico operacional. PAPER TRADING permanece como padrao nesta etapa.")
+
+production_mode_text = "Ativo" if PRODUCTION_MODE else "Inativo"
+alert_mode_text = "Ativo" if ALERT_EMAIL_ENABLED else "Inativo"
+health_level = str(production_state.get("health_level") or "healthy").lower()
+health_message = str(production_state.get("health_message") or "Sem mensagem.")
+
+if health_level == "healthy":
+    st.success(f"{health_level_label(health_level)}: {health_message}")
+elif health_level == "warning":
+    st.warning(f"{health_level_label(health_level)}: {health_message}")
+else:
+    st.error(f"{health_level_label(health_level)}: {health_message}")
+
+prod_c1, prod_c2, prod_c3, prod_c4 = st.columns(4)
+prod_c1.metric("Status geral", health_level_label(health_level))
+prod_c2.metric("Heartbeat age (s)", str(production_state.get("heartbeat_age_seconds") or 0))
+prod_c3.metric("Falhas consecutivas", str(production_state.get("consecutive_errors") or 0))
+prod_c4.metric("Alertas por email", alert_mode_text)
+
+prod_c5, prod_c6, prod_c7, prod_c8 = st.columns(4)
+prod_c5.metric("Modo producao", production_mode_text)
+prod_c6.metric("Ultimo heartbeat", state.get("worker_heartbeat") or "Sem registro")
+prod_c7.metric("Ultima execucao", production_state.get("last_execution_at") or "Sem registro")
+prod_c8.metric("Ultimo sucesso", production_state.get("last_success_at") or "Sem registro")
+
+prod_c9, prod_c10, prod_c11, prod_c12 = st.columns(4)
+prod_c9.metric("Feed monitorado", market_data_status_label(production_state.get("feed_status")))
+prod_c10.metric("Broker monitorado", broker_status_label(production_state.get("broker_status")))
+prod_c11.metric("Ultimo alerta", production_state.get("last_alert_sent_at") or "Nenhum")
+prod_c12.metric("Proximo alerta elegivel", production_state.get("next_alert_eligible_at") or "Agora")
+
+act_c1, act_c2 = st.columns(2)
+with act_c1:
+    if st.button("Testar email", use_container_width=True):
+        result = send_email_alert(
+            "[Trade Ops Desk] Teste de alerta",
+            "Email de teste do modo producao.\nNenhuma ordem real foi habilitada.\nBroker atual: PAPER.",
+            alert_type="manual_test",
+            force=True,
+        )
+        if result.get("sent"):
+            st.success("Email de teste enviado.")
+        else:
+            st.warning(f"Email de teste nao enviado: {result.get('reason') or 'bloqueado'}")
+
+with act_c2:
+    if st.button("Recalcular saude", use_container_width=True):
+        production_state = update_production_status(evaluate_production_health(load_bot_state()))
+        st.info(f"Saude recalculada: {health_level_label(production_state.get('health_level'))}")
 
 status_label = market_data_status_label(operational_market_state.get("status"))
 if str(operational_market_state.get("status", "")).lower() == "healthy":
@@ -101,6 +182,8 @@ if operational_market_state.get("last_error"):
     st.caption(f"Ultimo alerta de mercado: {operational_market_state.get('last_error')}")
 if broker_state.get("warning"):
     st.caption(f"Observacao do broker: {broker_state.get('warning')}")
+if production_state.get("last_alert_error"):
+    st.caption(f"Ultima falha no envio de alerta: {production_state.get('last_alert_error')}")
 
 with st.expander("Diagnostico do feed"):
     st.write("**Contexto operacional (worker):**")
