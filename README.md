@@ -29,6 +29,8 @@ O produto agora e orientado apenas ao fluxo de trading:
 - `core/config.py`: configuracao central e caminhos de runtime
 - `core/persistence.py`: leitura e escrita local ou em PostgreSQL
 - `core/state_store.py`: estado operacional do bot e do trader
+- `core/production_monitor.py`: saude operacional, heartbeat, feed e broker
+- `core/alerts.py`: envio de alertas por email com cooldown
 - `core/trader_profiles.py`: perfis Reservado, Equilibrado e Agressivo
 - `core/trader_reports.py`: relatorios fechados e analytics
 - `core/auth/`: autenticacao, sessao e autorizacao
@@ -96,6 +98,19 @@ Variaveis suportadas:
 - `AUTH_SESSION_TIMEOUT_MINUTES`
 - `ADMIN_USERNAME`
 - `ADMIN_PASSWORD`
+- `PRODUCTION_MODE`
+- `ALERT_EMAIL_ENABLED`
+- `ALERT_EMAIL_TO`
+- `SMTP_HOST`
+- `SMTP_PORT`
+- `SMTP_USERNAME`
+- `SMTP_PASSWORD`
+- `SMTP_USE_TLS`
+- `ALERT_HEARTBEAT_MAX_DELAY_SECONDS`
+- `ALERT_MAX_CONSECUTIVE_ERRORS`
+- `ALERT_FEED_FALLBACK_MAX_MINUTES`
+- `ALERT_COOLDOWN_MINUTES`
+- `ALERT_SEND_RECOVERY_EMAIL`
 
 ## Instalacao local
 
@@ -174,6 +189,40 @@ O deploy recomendado usa:
 - `Postgres`: persistencia compartilhada
 
 Veja o passo a passo em [`DEPLOY_RAILWAY.md`](DEPLOY_RAILWAY.md).
+
+## Modo producao
+
+O app continua em `paper trading` por padrao. O modo producao desta etapa adiciona observabilidade e alertas sem liberar ordens reais.
+
+Para ativar:
+
+```env
+PRODUCTION_MODE=true
+ALERT_EMAIL_ENABLED=true
+ALERT_EMAIL_TO=oliveirasamuel03@gmail.com
+SMTP_HOST=seu_smtp
+SMTP_PORT=587
+SMTP_USERNAME=seu_usuario
+SMTP_PASSWORD=sua_senha
+SMTP_USE_TLS=true
+ALERT_HEARTBEAT_MAX_DELAY_SECONDS=180
+ALERT_MAX_CONSECUTIVE_ERRORS=3
+ALERT_FEED_FALLBACK_MAX_MINUTES=15
+ALERT_COOLDOWN_MINUTES=30
+ALERT_SEND_RECOVERY_EMAIL=true
+BROKER_PROVIDER=paper
+BROKER_MODE=paper
+```
+
+Como validar:
+
+- abrir `Controle do Bot`
+- conferir o bloco `Modo producao`
+- usar `Recalcular saude`
+- usar `Testar email`
+- confirmar que o broker permanece `Simulado`
+
+Mesmo com `PRODUCTION_MODE=true`, a etapa atual nao habilita envio de ordem real.
 
 ## Seguranca
 
