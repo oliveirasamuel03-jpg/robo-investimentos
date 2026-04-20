@@ -117,3 +117,48 @@ def test_send_email_alert_uses_resend_provider(isolated_storage, monkeypatch):
     assert "Bearer re_test_key" in str(calls["auth"])
     assert calls["user_agent"]
     assert "Teste Resend" in calls["body"]
+
+
+def test_send_final_validation_email_uses_generic_alert_path(isolated_storage, monkeypatch):
+    alerts = load_module("core.alerts")
+
+    captured = {}
+
+    def fake_send_email_alert(subject, body, **kwargs):
+        captured["subject"] = subject
+        captured["body"] = body
+        captured["kwargs"] = kwargs
+        return {"sent": True, "reason": "sent", "provider": "resend"}
+
+    monkeypatch.setattr(alerts, "send_email_alert", fake_send_email_alert)
+
+    result = alerts.send_final_validation_email(
+        {
+            "validation_mode": "swing_10d",
+            "validation_started_at": "2026-04-20T00:00:00+00:00",
+            "validation_window_end_at": "2026-04-30T00:00:00+00:00",
+            "validation_status": "completed",
+            "verdict_message": "Aprovado para continuar em paper trading com a configuracao atual.",
+            "final_validation_reason": "Ciclo estavel e consistente.",
+            "metrics": {
+                "trades_closed": 8,
+                "avg_duration_minutes": 4320,
+                "fallback_cycle_pct": 10.0,
+                "operational_errors": 1,
+            },
+            "performance": {
+                "win_rate": 0.5,
+                "payoff": 1.4,
+                "pnl_total": 120.0,
+            },
+            "best_assets": [{"asset": "AAPL"}],
+            "worst_assets": [{"asset": "MSFT"}],
+            "errors": ["Feed instavel em parte do ciclo."],
+            "successes": ["Boa relacao risco/retorno."],
+        }
+    )
+
+    assert result["sent"] is True
+    assert captured["subject"] == "Resultado do Robo - Validacao Swing 10 Dias"
+    assert "Trades fechados: 8" in captured["body"]
+    assert captured["kwargs"]["alert_type"] == "final_validation"

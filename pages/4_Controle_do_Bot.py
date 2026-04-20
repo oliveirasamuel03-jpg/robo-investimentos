@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 
+import pandas as pd
 import streamlit as st
 
 from core.alerts import send_email_alert
@@ -17,6 +18,7 @@ from core.state_store import (
     update_broker_status,
     update_production_status,
 )
+from core.swing_validation import refresh_swing_validation_cycle, reset_swing_validation_cycle
 from engines.trader_engine import run_trader_cycle
 
 
@@ -68,6 +70,16 @@ def health_level_label(raw_level: str | None) -> str:
     return labels.get(str(raw_level or "healthy").strip().lower(), str(raw_level or "healthy").title())
 
 
+def market_context_label(raw_status: str | None) -> str:
+    labels = {
+        "FAVORAVEL": "Favoravel",
+        "NEUTRO": "Neutro",
+        "DESFAVORAVEL": "Desfavoravel",
+        "CRITICO": "Critico",
+    }
+    return labels.get(str(raw_status or "NEUTRO").strip().upper(), str(raw_status or "NEUTRO").title())
+
+
 current_user = require_admin()
 render_auth_toolbar()
 
@@ -91,6 +103,10 @@ operational_market_state = (state.get("market_data", {}) or {}).get("contexts", 
 )
 chart_market_state = (state.get("market_data", {}) or {}).get("contexts", {}).get("trader_chart") or {}
 broker_state = state.get("broker", {}) or broker_state
+validation_report = refresh_swing_validation_cycle()
+state = load_bot_state()
+validation_state = state.get("validation", {}) or {}
+market_context_state = state.get("market_context", {}) or {}
 
 if bool(security_state.get("real_mode_enabled", False)):
     st.warning("Real trading enabled")
@@ -152,6 +168,171 @@ with act_c2:
     if st.button("Recalcular saude", use_container_width=True):
         production_state = update_production_status(evaluate_production_health(load_bot_state()))
         st.info(f"Saude recalculada: {health_level_label(production_state.get('health_level'))}")
+
+st.subheader("Validacao swing 10 dias")
+st.caption("Camada de validacao paper para swing profissional. Nenhuma ordem real e liberada nesta etapa.")
+
+validation_status = str(validation_report.get("validation_status") or "running")
+validation_phase = str(validation_report.get("validation_phase") or validation_state.get("validation_phase") or "Coleta e observacao")
+final_grade = str(validation_report.get("final_validation_grade") or validation_state.get("final_validation_grade") or "").strip()
+verdict_message = str(validation_report.get("verdict_message") or "").strip()
+phase_conclusion = str(validation_report.get("phase_conclusion") or "Sem conclusao")
+
+if final_grade == "APROVADO":
+    st.success(verdict_message or "Ciclo aprovado.")
+elif final_grade == "APROVADO_COM_AJUSTES":
+    st.warning(verdict_message or "Ciclo aprovado com ajustes.")
+elif final_grade in {"REPROVADO_ESTRATEGIA", "REPROVADO_INSTABILIDADE"}:
+    st.error(verdict_message or "Ciclo reprovado.")
+else:
+    st.info(f"Fase atual: {validation_phase} | Conclusao parcial: {phase_conclusion}")
+
+val_metrics = dict(validation_report.get("metrics", {}) or {})
+val_perf = dict(validation_report.get("performance", {}) or {})
+
+val_c1, val_c2, val_c3, val_c4 = st.columns(4)
+val_c1.metric("Dia atual", str(int(validation_report.get("validation_day_number", 1) or 1)))
+val_c2.metric("Fase", validation_phase)
+val_c3.metric("Status do ciclo", "Finalizado" if validation_status == "completed" else "Em validacao")
+val_c4.metric("Timeframe", str(validation_report.get("timeframe_label") or validation_state.get("timeframe_label") or "Diario (1D)"))
+
+val_c5, val_c6, val_c7, val_c8 = st.columns(4)
+val_c5.metric("Trades fechados", str(int(val_metrics.get("trades_closed", 0) or 0)))
+val_c6.metric("Win rate", f"{float(val_perf.get('win_rate', 0.0) or 0.0) * 100:.2f}%")
+val_c7.metric("Payoff", "-" if val_perf.get("payoff") is None else f"{float(val_perf.get('payoff') or 0.0):.2f}")
+val_c8.metric("PnL total", f"R$ {float(val_perf.get('pnl_total', 0.0) or 0.0):,.2f}")
+
+val_c9, val_c10, val_c11, val_c12 = st.columns(4)
+val_c9.metric("Sinais aprovados", str(int(val_metrics.get("signals_approved", 0) or 0)))
+val_c10.metric("Sinais rejeitados", str(int(val_metrics.get("signals_rejected", 0) or 0)))
+val_c11.metric(
+    "Fallback do ciclo",
+    "-" if val_metrics.get("fallback_cycle_pct") is None else f"{float(val_metrics.get('fallback_cycle_pct') or 0.0):.2f}%",
+)
+val_c12.metric("Erros operacionais", str(int(val_metrics.get("operational_errors", 0) or 0)))
+
+val_actions1, val_actions2 = st.columns(2)
+with val_actions1:
+    if st.button("Recalcular validacao swing", use_container_width=True):
+        validation_report = refresh_swing_validation_cycle()
+        st.info("Validacao swing recalculada.")
+with val_actions2:
+    if st.button("Reiniciar ciclo swing 10 dias", use_container_width=True):
+        validation_report = reset_swing_validation_cycle()
+        st.warning("Novo ciclo swing iniciado a partir de agora.")
+
+validation_state = load_bot_state().get("validation", {}) or {}
+st.caption(
+    f"Inicio do ciclo: {validation_report.get('validation_started_at') or 'Sem registro'} | "
+    f"Email final enviado: {'Sim' if validation_state.get('final_email_sent') else 'Nao'}"
+)
+
+if validation_report.get("final_validation_reason"):
+    st.caption(f"Motivo final: {validation_report.get('final_validation_reason')}")
+
+panel_c1, panel_c2 = st.columns(2)
+with panel_c1:
+    st.write("**Erros identificados**")
+    errors = validation_report.get("errors", []) or []
+    if errors:
+        for item in errors:
+            st.caption(f"- {item}")
+    else:
+        st.caption("Sem erros relevantes ate aqui.")
+
+    st.write("**Ativos em destaque**")
+    best_assets = pd.DataFrame(validation_report.get("best_assets", []) or [])
+    if best_assets.empty:
+        st.info("Sem ativos consistentes suficientes ate o momento.")
+    else:
+        st.dataframe(best_assets, use_container_width=True)
+
+with panel_c2:
+    st.write("**Acertos identificados**")
+    successes = validation_report.get("successes", []) or []
+    if successes:
+        for item in successes:
+            st.caption(f"- {item}")
+    else:
+        st.caption("Sem acertos destacados ate aqui.")
+
+    st.write("**Ativos problematicos**")
+    worst_assets = pd.DataFrame(validation_report.get("worst_assets", []) or [])
+    if worst_assets.empty:
+        st.info("Sem ativos problematicos suficientes ate o momento.")
+    else:
+        st.dataframe(worst_assets, use_container_width=True)
+
+st.write("**Sugestoes analiticas**")
+suggestions = validation_report.get("suggestions", []) or []
+if suggestions:
+    for suggestion in suggestions:
+        st.caption(f"- {suggestion.get('message')}")
+else:
+    st.caption("Sem sugestoes novas neste momento.")
+
+before_after = validation_report.get("before_after_comparison", {}) or {}
+if before_after:
+    before_after_c1, before_after_c2 = st.columns(2)
+    before_payload = before_after.get("before", {}) or {}
+    after_payload = before_after.get("after", {}) or {}
+    with before_after_c1:
+        st.write("**Antes da fase de ajuste**")
+        st.caption(
+            f"Trades: {int(before_payload.get('trades', 0) or 0)} | "
+            f"Win rate: {float(before_payload.get('win_rate', 0.0) or 0.0) * 100:.2f}% | "
+            f"PnL: R$ {float(before_payload.get('pnl', 0.0) or 0.0):,.2f}"
+        )
+    with before_after_c2:
+        st.write("**Depois da fase de ajuste**")
+        st.caption(
+            f"Trades: {int(after_payload.get('trades', 0) or 0)} | "
+            f"Win rate: {float(after_payload.get('win_rate', 0.0) or 0.0) * 100:.2f}% | "
+            f"PnL: R$ {float(after_payload.get('pnl', 0.0) or 0.0):,.2f}"
+        )
+    notes = before_after.get("notes", []) or []
+    if notes:
+        for note in notes:
+            st.caption(f"- {note}")
+
+st.subheader("Contexto de mercado cripto")
+st.caption("Filtro auxiliar de PAPER TRADING. O contexto nao dispara ordens; ele apenas endurece sinais fracos de cripto.")
+
+context_c1, context_c2, context_c3, context_c4 = st.columns(4)
+context_c1.metric("Status atual", market_context_label(market_context_state.get("market_context_status")))
+context_c2.metric("Score", f"{float(market_context_state.get('market_context_score', 50.0) or 50.0):.1f}")
+context_c3.metric(
+    "Sinais bloqueados",
+    str(int(val_metrics.get("context_blocked_signals", 0) or 0)),
+)
+context_c4.metric("PAPER", "Ativo")
+
+st.caption(f"Motivo: {market_context_state.get('market_context_reason') or 'Sem motivo registrado.'}")
+st.caption(f"Impacto no robo: {market_context_state.get('market_context_impact') or 'Sem impacto adicional.'}")
+if validation_report.get("context_impact_estimate"):
+    st.caption(f"Impacto estimado no periodo: {validation_report.get('context_impact_estimate')}")
+
+context_status_counts = dict(val_metrics.get("context_status_counts", {}) or {})
+if context_status_counts:
+    st.caption(
+        "Contexto por periodo: "
+        f"FAVORAVEL={int(context_status_counts.get('FAVORAVEL', 0) or 0)} | "
+        f"NEUTRO={int(context_status_counts.get('NEUTRO', 0) or 0)} | "
+        f"DESFAVORAVEL={int(context_status_counts.get('DESFAVORAVEL', 0) or 0)} | "
+        f"CRITICO={int(context_status_counts.get('CRITICO', 0) or 0)}"
+    )
+if market_context_state.get("market_context_regime"):
+    watchlist_consistency = market_context_state.get("watchlist_consistency")
+    watchlist_consistency_label = (
+        "-"
+        if watchlist_consistency is None
+        else f"{float(watchlist_consistency or 0.0) * 100:.1f}%"
+    )
+    st.caption(
+        "Regime observado: "
+        f"{str(market_context_state.get('market_context_regime') or 'indefinido').capitalize()} | "
+        f"Consistencia da watchlist: {watchlist_consistency_label}"
+    )
 
 status_label = market_data_status_label(operational_market_state.get("status"))
 if str(operational_market_state.get("status", "")).lower() == "healthy":

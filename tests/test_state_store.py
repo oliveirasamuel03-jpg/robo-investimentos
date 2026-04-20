@@ -22,6 +22,11 @@ def test_state_store_bootstraps_files_and_defaults(isolated_storage):
     assert state["market_data"]["provider"] == config.MARKET_DATA_PROVIDER
     assert state["broker"]["provider"] == config.BROKER_PROVIDER
     assert state["production"]["health_level"] == "healthy"
+    assert state["retention"]["retention_days"] == config.RETENTION_DAYS
+    assert state["retention"]["weekly_reports_index"] == []
+    assert state["validation"]["validation_mode"] == "swing_10d"
+    assert state["validation"]["final_email_sent"] is False
+    assert state["trader"]["watchlist"] == config.SWING_VALIDATION_RECOMMENDED_WATCHLIST
 
     logs = state_store.read_storage_table(config.BOT_LOG_FILE, columns=config.BOT_LOG_COLUMNS)
     assert isinstance(logs, pd.DataFrame)
@@ -134,3 +139,44 @@ def test_update_production_status_tracks_health_fields(isolated_storage):
     assert production_state["health_level"] == "warning"
     assert production_state["consecutive_errors"] == 2
     assert production_state["last_alert_sent_at"] == "2026-04-20T04:00:00+00:00"
+
+
+def test_update_validation_status_tracks_cycle_fields(isolated_storage):
+    state_store = load_module("core.state_store")
+
+    validation_state = state_store.update_validation_status(
+        {
+            "validation_day_number": 7,
+            "validation_phase": "Ajuste controlado",
+            "final_validation_grade": "APROVADO_COM_AJUSTES",
+        }
+    )
+
+    assert validation_state["validation_day_number"] == 7
+    assert validation_state["validation_phase"] == "Ajuste controlado"
+    assert validation_state["final_validation_grade"] == "APROVADO_COM_AJUSTES"
+
+
+def test_state_store_migrates_legacy_default_watchlist_to_crypto_only_default(isolated_storage):
+    config = load_module("core.config")
+    state_store = load_module("core.state_store")
+
+    state = state_store.load_bot_state()
+    state["trader"]["watchlist"] = list(config.LEGACY_MIXED_DEFAULT_WATCHLIST)
+    state_store.save_bot_state(state)
+
+    reloaded = state_store.load_bot_state()
+
+    assert reloaded["trader"]["watchlist"] == config.SWING_VALIDATION_RECOMMENDED_WATCHLIST
+
+
+def test_state_store_preserves_custom_watchlist_outside_recommended_default(isolated_storage):
+    state_store = load_module("core.state_store")
+
+    state = state_store.load_bot_state()
+    state["trader"]["watchlist"] = ["BTC-USD", "ETH-USD", "DOGE-USD"]
+    state_store.save_bot_state(state)
+
+    reloaded = state_store.load_bot_state()
+
+    assert reloaded["trader"]["watchlist"] == ["BTC-USD", "ETH-USD", "DOGE-USD"]

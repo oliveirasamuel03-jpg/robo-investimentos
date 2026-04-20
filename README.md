@@ -31,6 +31,7 @@ O produto agora e orientado apenas ao fluxo de trading:
 - `core/state_store.py`: estado operacional do bot e do trader
 - `core/production_monitor.py`: saude operacional, heartbeat, feed e broker
 - `core/alerts.py`: envio de alertas por email com cooldown
+- `core/retention.py`: retencao automatica, arquivamento e resumos semanais
 - `core/trader_profiles.py`: perfis Reservado, Equilibrado e Agressivo
 - `core/trader_reports.py`: relatorios fechados e analytics
 - `core/auth/`: autenticacao, sessao e autorizacao
@@ -57,9 +58,14 @@ O produto agora e orientado apenas ao fluxo de trading:
 |-- engines/
 |-- pages/
 |-- storage/
+|   |-- archive/
+|   |   |-- logs/
+|   |   |-- reports/
+|   |   `-- weekly_reports/
 |   |-- cache/
 |   |-- reports/
 |   `-- runtime/
+|       `-- weekly_reports/
 |-- tests/
 |-- workers/
 |-- requirements.txt
@@ -79,6 +85,13 @@ Arquivos de runtime principais:
 - `storage/runtime/trade_reports.csv`
 - `storage/runtime/bot_log.csv`
 - `storage/runtime/auth_users.json`
+
+Arquivamento automatico:
+
+- `storage/archive/reports/trade_reports_YYYY_MM.csv`
+- `storage/archive/logs/bot_log_YYYY_MM.csv`
+- `storage/runtime/weekly_reports/`
+- `storage/archive/weekly_reports/`
 
 ## Variaveis de ambiente
 
@@ -115,6 +128,11 @@ Variaveis suportadas:
 - `ALERT_FEED_FALLBACK_MAX_MINUTES`
 - `ALERT_COOLDOWN_MINUTES`
 - `ALERT_SEND_RECOVERY_EMAIL`
+- `RETENTION_ENABLED`
+- `RETENTION_DAYS`
+- `RETENTION_RUN_INTERVAL_HOURS`
+- `RETENTION_ARCHIVE_TRADER_ORDERS`
+- `WEEKLY_REPORT_RUNTIME_WEEKS`
 
 ## Instalacao local
 
@@ -248,6 +266,133 @@ Como validar:
 - confirmar que o broker permanece `Simulado`
 
 Mesmo com `PRODUCTION_MODE=true`, a etapa atual nao habilita envio de ordem real.
+
+## Contexto de mercado cripto
+
+O app agora possui uma camada leve de contexto de mercado para cripto, pensada apenas como filtro auxiliar em `paper trading`.
+
+O contexto considera:
+
+- movimento recente do `BTC`
+- volatilidade do ambiente cripto
+- regime predominante (`tendencia`, `lateral`, `baixa`)
+- consistencia da watchlist cripto observada
+
+Status possiveis:
+
+- `FAVORAVEL`
+- `NEUTRO`
+- `DESFAVORAVEL`
+- `CRITICO`
+
+Como influencia os sinais:
+
+- o contexto **nao gera ordem**
+- o contexto **nao usa noticia como gatilho**
+- quando o ambiente fica `DESFAVORAVEL`, o robo endurece o score minimo para entradas de cripto
+- quando o ambiente fica `CRITICO`, novas entradas fracas de cripto podem ser bloqueadas
+- se o calculo do contexto falhar, o sistema volta para `NEUTRO` sem travar o worker
+
+Onde acompanhar:
+
+- `Trader`: painel simples com contexto atual, motivo, impacto e sinais barrados
+- `Controle do Bot`: painel administrativo com status, regime, contexto por periodo e impacto estimado
+
+Observacao importante:
+
+- esta camada serve apenas para filtrar ou endurecer sinais
+- ordens reais continuam desabilitadas
+- o broker permanece em `paper`
+
+## Watchlist padrao da validacao swing
+
+Para a fase atual de validacao swing em `paper trading`, a watchlist padrao foi consolidada para um escopo `CRYPTO ONLY` com cinco ativos:
+
+- `BTC-USD`
+- `ETH-USD`
+- `BNB-USD`
+- `SOL-USD`
+- `LINK-USD`
+
+Motivo da selecao:
+
+- reduzir ruido e excesso de comparacoes irrelevantes
+- melhorar a coerencia dos testes e dos relatorios
+- alinhar a watchlist com o modulo de contexto de mercado cripto
+- priorizar liquidez, leitura tecnica e estabilidade operacional
+
+Justificativa objetiva por ativo:
+
+- `BTC-USD`: referencia principal do mercado, maior liquidez e melhor leitura estrutural. Risco principal: pode ficar mais lento em algumas janelas. Perfil: consistencia / tendencia.
+- `ETH-USD`: segundo ativo-base da watchlist, muito liquido e com excelente relevancia. Risco principal: costuma ampliar movimentos do BTC em periodos de stress. Perfil: consistencia / tendencia com mais amplitude.
+- `BNB-USD`: ativo intermediario entre estabilidade e oportunidade, com boa liquidez e leitura relativamente organizada. Risco principal: impacto especifico do ecossistema relacionado. Perfil: consistencia moderada / tendencia.
+- `SOL-USD`: ativo de maior oportunidade, com swings mais fortes e boa chance de tendencia. Risco principal: volatilidade mais alta e ruido maior. Perfil: volatilidade / tendencia.
+- `LINK-USD`: diversificacao tatica dentro da watchlist, com leitura tecnica util em varios ciclos. Risco principal: pode perder tracao em alguns periodos. Perfil: tendencia / oportunidade moderada.
+
+Ativos desaconselhados nesta fase:
+
+- memecoins
+- altcoins de baixa liquidez
+- ativos com feed instavel
+- ativos excessivamente erraticos para uma validacao inicial de 10 dias
+
+Como alterar no app:
+
+- abrir `Trader`
+- entrar em `Modo avancado`
+- editar `Lista de ativos`
+- ou usar `Aplicar watchlist recomendada`
+
+Compatibilidade da etapa:
+
+- a ETAPA 3 continua intacta
+- o modo segue 100% `paper`
+- o contexto de mercado cripto reaproveita esta watchlist sem duplicar logica
+- nao ha habilitacao de ordens reais nesta etapa
+
+## Retencao e validacao semanal
+
+O historico operacional agora aplica uma politica segura de retencao:
+
+- mantem no runtime os ultimos `60 dias` por padrao
+- arquiva automaticamente relatorios e logs mais antigos por mes
+- nao apaga diretamente nada antes de arquivar
+- executa a rotina uma vez por dia dentro do worker
+- continua compativel com local e com `DATABASE_URL`
+
+Arquivos que entram na retencao:
+
+- `storage/runtime/trade_reports.csv`
+- `storage/runtime/bot_log.csv`
+
+`trader_orders.csv` permanece no runtime por padrao nesta etapa para preservar a aba `Ordens` sem alterar seu comportamento. Se quiser avaliar essa expansao depois, existe a flag `RETENTION_ARCHIVE_TRADER_ORDERS`.
+
+Resumos semanais:
+
+- quantidade de trades
+- win rate semanal
+- payoff semanal
+- pnl semanal
+- melhores e piores ativos
+- trades fechados cedo demais
+- trades mantidos tempo demais
+- erros operacionais
+- percentual de ciclos em fallback
+- sugestoes analiticas
+- observacao final de estabilidade
+
+Como acessar:
+
+- abrir `Historico`
+- entrar na aba `Validacao Semanal`
+- selecionar a semana
+- exportar o consolidado semanal em CSV quando necessario
+
+Como validar que o historico nao foi quebrado:
+
+- a aba `Relatorios Trader` continua lendo o runtime recente normalmente
+- a aba `Logs` continua mostrando o runtime atual
+- o resumo semanal passa a mostrar os dados arquivados de forma consolidada
 
 ## Seguranca
 

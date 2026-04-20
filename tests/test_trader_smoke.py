@@ -36,7 +36,22 @@ def test_run_trader_cycle_smoke_with_synthetic_prices(isolated_storage, monkeypa
         "load_market_data_map",
         lambda symbols, config: {str(symbol).upper(): _fake_prices() for symbol in symbols},
     )
-    monkeypatch.setattr(paper_engine, "_should_buy", lambda latest, config: (True, 0.95))
+    monkeypatch.setattr(
+        paper_engine,
+        "_evaluate_buy_signal",
+        lambda latest, config: {
+            "buy": True,
+            "score": 0.95,
+            "trend_ok": True,
+            "score_ok": True,
+            "rsi_ok": True,
+            "atr_ok": True,
+            "structure_ok": True,
+            "momentum_ok": True,
+            "trend_alignment": "aligned",
+            "rejection_reasons": [],
+        },
+    )
     monkeypatch.setattr(paper_engine, "_should_sell", lambda position, latest, holding_minutes, config: (False, ""))
 
     state = state_store.load_bot_state()
@@ -89,7 +104,22 @@ def test_run_paper_cycle_skips_new_entries_when_prices_are_fallback(isolated_sto
         "load_market_data_map",
         lambda symbols, config: {str(symbol).upper(): fallback_prices() for symbol in symbols},
     )
-    monkeypatch.setattr(paper_engine, "_should_buy", lambda latest, config: (True, 0.95))
+    monkeypatch.setattr(
+        paper_engine,
+        "_evaluate_buy_signal",
+        lambda latest, config: {
+            "buy": True,
+            "score": 0.95,
+            "trend_ok": True,
+            "score_ok": True,
+            "rsi_ok": True,
+            "atr_ok": True,
+            "structure_ok": True,
+            "momentum_ok": True,
+            "trend_alignment": "aligned",
+            "rejection_reasons": [],
+        },
+    )
 
     result = paper_engine.run_paper_cycle(
         paper_engine.PaperTradingConfig(
@@ -209,7 +239,22 @@ def test_run_trader_cycle_updates_market_data_state(isolated_storage, monkeypatc
             },
         },
     )
-    monkeypatch.setattr(paper_engine, "_should_buy", lambda latest, config: (False, 0.55))
+    monkeypatch.setattr(
+        paper_engine,
+        "_evaluate_buy_signal",
+        lambda latest, config: {
+            "buy": False,
+            "score": 0.55,
+            "trend_ok": False,
+            "score_ok": False,
+            "rsi_ok": True,
+            "atr_ok": True,
+            "structure_ok": True,
+            "momentum_ok": True,
+            "trend_alignment": "countertrend",
+            "rejection_reasons": ["against_trend", "weak_score"],
+        },
+    )
     monkeypatch.setattr(paper_engine, "_should_sell", lambda position, latest, holding_minutes, config: (False, ""))
 
     state = state_store.load_bot_state()
