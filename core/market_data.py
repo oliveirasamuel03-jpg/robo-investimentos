@@ -347,6 +347,7 @@ def _build_twelvedata_diagnostic(symbol: str, *, interval: str, history_limit: i
     normalized_base = str(TWELVEDATA_API_BASE or "").strip() or "https://api.twelvedata.com"
     parsed_base = urllib_parse.urlparse(normalized_base)
     base_host = parsed_base.netloc or ""
+    normalized_interval = _normalize_twelvedata_interval(interval)
     return {
         "diagnostic_version": MARKET_DATA_DIAGNOSTIC_VERSION,
         "build_label": MARKET_DATA_BUILD_LABEL,
@@ -359,7 +360,8 @@ def _build_twelvedata_diagnostic(symbol: str, *, interval: str, history_limit: i
         "endpoint_path": "/time_series",
         "symbol": str(symbol or "").strip().upper(),
         "normalized_symbol": _normalize_twelvedata_symbol(symbol),
-        "interval": str(interval or "1h"),
+        "interval_raw": str(interval or "1h"),
+        "interval": normalized_interval,
         "outputsize": min(max(int(history_limit), 30), 5000),
         "request_built": False,
         "request_attempted": False,
@@ -454,6 +456,23 @@ def _normalize_twelvedata_symbol(symbol: str) -> str:
     return normalized
 
 
+def _normalize_twelvedata_interval(interval: str | None) -> str:
+    raw = str(interval or "").strip().lower()
+    if not raw:
+        return "1h"
+
+    aliases = {
+        "1d": "1day",
+        "1day": "1day",
+        "1w": "1week",
+        "1wk": "1week",
+        "1week": "1week",
+        "1mo": "1month",
+        "1month": "1month",
+    }
+    return aliases.get(raw, raw)
+
+
 def _twelvedata_error_message(payload: dict[str, Any] | None, fallback_message: str) -> str:
     body = payload or {}
     status = str(body.get("status") or "").strip()
@@ -530,6 +549,7 @@ def _summarize_provider_diagnostics(provider: str, symbols: list[str], errors: l
 
 def _fetch_twelvedata_frame(symbol: str, *, interval: str, history_limit: int) -> tuple[pd.DataFrame, str, dict[str, Any]]:
     diagnostic = _build_twelvedata_diagnostic(symbol, interval=interval, history_limit=history_limit)
+    normalized_interval = str(diagnostic.get("interval") or _normalize_twelvedata_interval(interval))
     if not TWELVEDATA_API_KEY:
         diagnostic["last_stage"] = "missing_api_key"
         diagnostic["last_error"] = "TWELVEDATA_API_KEY nao configurada"
@@ -537,7 +557,7 @@ def _fetch_twelvedata_frame(symbol: str, *, interval: str, history_limit: int) -
 
     params = {
         "symbol": diagnostic["normalized_symbol"],
-        "interval": str(interval or "1h"),
+        "interval": normalized_interval,
         "outputsize": min(max(int(history_limit), 30), 5000),
         "timezone": "UTC",
         "order": "asc",

@@ -372,6 +372,60 @@ def test_load_market_data_map_reuses_cache_between_cycles(isolated_storage, monk
     assert calls["count"] == 1
 
 
+def test_normalize_twelvedata_interval_maps_provider_specific_aliases(isolated_storage):
+    market_data = load_module("core.market_data")
+
+    assert market_data._normalize_twelvedata_interval("1d") == "1day"
+    assert market_data._normalize_twelvedata_interval("1w") == "1week"
+    assert market_data._normalize_twelvedata_interval("1wk") == "1week"
+    assert market_data._normalize_twelvedata_interval("1mo") == "1month"
+    assert market_data._normalize_twelvedata_interval("1h") == "1h"
+
+
+def test_fetch_market_data_map_normalizes_daily_interval_for_twelvedata_request(isolated_storage, monkeypatch):
+    market_data = load_module("core.market_data")
+
+    captured = {"url": ""}
+
+    def fake_urlopen(request, timeout=20):
+        captured["url"] = request.full_url
+        return _FakeUrlopenResponse(
+            {
+                "status": "ok",
+                "meta": {"symbol": "BTC/USD", "interval": "1day", "type": "Digital Currency"},
+                "values": [
+                    {
+                        "datetime": "2026-04-22 00:00:00",
+                        "open": "100.0",
+                        "high": "101.0",
+                        "low": "99.5",
+                        "close": "100.5",
+                        "volume": "1200",
+                    }
+                ],
+            }
+        )
+
+    monkeypatch.setattr(market_data, "TWELVEDATA_API_KEY", "td-demo")
+    monkeypatch.setattr(market_data.urllib_request, "urlopen", fake_urlopen)
+    monkeypatch.setattr(market_data.yf, "download", lambda *args, **kwargs: pd.DataFrame())
+
+    result = market_data.fetch_market_data_map(
+        ["BTC-USD"],
+        period="6mo",
+        interval="1d",
+        history_limit=50,
+        provider="twelvedata",
+        allow_stale=False,
+        requested_by="worker_cycle",
+    )
+
+    assert "interval=1day" in captured["url"]
+    assert result.status["provider"] == "twelvedata"
+    assert result.status["feed_status"] == "LIVE"
+    assert result.status["provider_diagnostics"]["twelvedata"]["last_stage"] == "success"
+
+
 def test_fetch_market_data_map_uses_twelvedata_as_primary_provider(isolated_storage, monkeypatch):
     market_data = load_module("core.market_data")
 
