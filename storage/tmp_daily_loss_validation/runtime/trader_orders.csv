@@ -1,0 +1,3 @@
+timestamp,asset,side,quantity,price,gross_value,cost,cash_after,source
+2026-04-21T20:32:45.057128+00:00,BTC-USD,BUY,0.90755,110.186746,100.0,0.0,900.0,paper_trading_engine
+2026-04-21T20:32:45+00:00,BTC-USD,SELL,1.0,100.0,100.0,0.0,0.0,paper_trading_engine

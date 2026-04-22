@@ -37,6 +37,16 @@ def env_int(name: str, default: int) -> int:
         return default
 
 
+def env_float(name: str, default: float) -> float:
+    raw = _env_str(name)
+    if not raw:
+        return default
+    try:
+        return float(raw)
+    except ValueError:
+        return default
+
+
 def _resolve_storage_dir() -> Path:
     raw = _env_str("ROBO_STORAGE_DIR")
     if not raw:
@@ -50,8 +60,26 @@ def _resolve_storage_dir() -> Path:
 
 APP_TITLE = _env_str("APP_TITLE", "Trade Ops Desk") or "Trade Ops Desk"
 APP_ENV = _env_str("APP_ENV", _env_str("ENVIRONMENT", "development")) or "development"
+SERVICE_NAME = _env_str("SERVICE_NAME", "") or _env_str("RAILWAY_SERVICE_NAME", "")
+RAILWAY_SERVICE_NAME = _env_str("RAILWAY_SERVICE_NAME", "")
+RAILWAY_GIT_COMMIT_SHA = _env_str("RAILWAY_GIT_COMMIT_SHA", "")
+RAILWAY_DEPLOYMENT_ID = _env_str("RAILWAY_DEPLOYMENT_ID", "")
+BUILD_TIMESTAMP = _env_str("BUILD_TIMESTAMP", _env_str("RAILWAY_BUILD_TIMESTAMP", ""))
+STATE_SCHEMA_VERSION = _env_str("STATE_SCHEMA_VERSION", "worker-audit-v1")
+MARKET_DATA_DIAGNOSTIC_VERSION = _env_str("MARKET_DATA_DIAGNOSTIC_VERSION", "td-request-trace-v1")
+_raw_market_data_build = (
+    _env_str("MARKET_DATA_BUILD_LABEL", "")
+    or RAILWAY_GIT_COMMIT_SHA
+    or RAILWAY_DEPLOYMENT_ID
+    or APP_ENV
+)
+MARKET_DATA_BUILD_LABEL = _raw_market_data_build[:12] if _raw_market_data_build else APP_ENV
 PRODUCTION_MODE = env_flag("PRODUCTION_MODE", False)
-MARKET_DATA_PROVIDER = _env_str("MARKET_DATA_PROVIDER", "yahoo") or "yahoo"
+MARKET_DATA_PROVIDER = _env_str("MARKET_DATA_PROVIDER", "twelvedata") or "twelvedata"
+MARKET_DATA_FALLBACK_PROVIDER = _env_str("MARKET_DATA_FALLBACK_PROVIDER", "yahoo") or "yahoo"
+TWELVEDATA_API_KEY = _env_str("TWELVEDATA_API_KEY", "")
+TWELVEDATA_API_BASE = _env_str("TWELVEDATA_API_BASE", "https://api.twelvedata.com") or "https://api.twelvedata.com"
+TWELVEDATA_MIN_CACHE_TTL_SECONDS = max(300, env_int("TWELVEDATA_MIN_CACHE_TTL_SECONDS", 900))
 MARKET_DATA_CACHE_TTL_SECONDS = max(30, env_int("MARKET_DATA_CACHE_TTL_SECONDS", 300))
 MARKET_DATA_HISTORY_LIMIT = max(120, env_int("MARKET_DATA_HISTORY_LIMIT", 500))
 BROKER_PROVIDER = _env_str("BROKER_PROVIDER", "paper") or "paper"
@@ -160,6 +188,7 @@ LEGACY_VALIDATION_INITIAL_CAPITAL_BRL = 10000.0
 VALIDATION_INITIAL_CAPITAL_BRL = 1000.0
 VALIDATION_DEFAULT_ENTRY_AMOUNT_BRL = 100.0
 VALIDATION_DEFAULT_MAX_OPEN_POSITIONS = 2
+DAILY_LOSS_LIMIT_BRL_DEFAULT = max(1.0, env_float("DAILY_LOSS_LIMIT_BRL", 100.0))
 VALIDATION_MODE_DISPLAY = "swing_10d_crypto"
 VALIDATION_TRADING_MODE = "paper"
 VALIDATION_LIVE_TRADING_ENABLED = False

@@ -1,0 +1,126 @@
+timestamp,level,message
+2026-04-12T00:00:00+00:00,INFO,[cycle_health] health_level=healthy;feed_status=healthy;broker_status=paper;worker_status=online;consecutive_errors=0;fallback=0
+2026-04-21T20:48:41.502977,INFO,Worker 24h iniciado
+2026-04-21T20:48:44.456502,WARNING,Limite de perda diaria atingido: R$ 130.00 consumidos de R$ 100.00 no dia UTC 2026-04-21. Novas entradas bloqueadas.
+2026-04-21T20:48:44.724690,INFO,Rodada concluida sem novas operacoes
+2026-04-21T20:48:44.789741,INFO,[cycle_health] health_level=warning;feed_status=fallback;broker_status=paper;worker_status=online;consecutive_errors=0;fallback=1
+2026-04-21T20:48:45.022568,INFO,"Retencao executada com sucesso: relatorios=0, logs=0, weeklies=2"
+2026-04-21T20:48:45.150519,INFO,[validation_signal] day=10;phase=consolidacao;approved=2;rejected=6;against_trend=0;weak_score=4;feed_unreliable=2;context=NEUTRO;context_blocked=0
+2026-04-21T20:48:45.180164,WARNING,Email final da validacao swing nao enviado: smtp_not_configured
+2026-04-21T20:48:52.364244,INFO,Worker 24h iniciado
+2026-04-21T20:48:55.501134,INFO,Entradas bloqueadas por limite de perda diaria
+2026-04-21T20:48:55.566703,INFO,[cycle_health] health_level=warning;feed_status=fallback;broker_status=paper;worker_status=online;consecutive_errors=0;fallback=1
+2026-04-21T20:48:55.717228,INFO,[validation_signal] day=10;phase=consolidacao;approved=2;rejected=8;against_trend=0;weak_score=6;feed_unreliable=4;context=NEUTRO;context_blocked=0
+2026-04-21T20:48:55.736515,WARNING,Email final da validacao swing nao enviado: smtp_not_configured
+2026-04-21T20:55:01.380727,INFO,Worker 24h iniciado
+2026-04-21T20:55:04.566454,INFO,Entradas bloqueadas por limite de perda diaria
+2026-04-21T20:55:04.633988,INFO,[cycle_health] health_level=warning;feed_status=fallback;broker_status=paper;worker_status=online;consecutive_errors=0;fallback=1
+2026-04-21T20:55:04.768160,INFO,[validation_signal] day=10;phase=consolidacao;approved=2;rejected=10;against_trend=0;weak_score=8;feed_unreliable=6;context=NEUTRO;context_blocked=0
+2026-04-21T20:55:04.801441,WARNING,Email final da validacao swing nao enviado: smtp_not_configured
+2026-04-21T20:55:10.941679,INFO,Worker 24h iniciado
+2026-04-21T20:55:14.093838,INFO,Entradas bloqueadas por limite de perda diaria
+2026-04-21T20:55:14.162442,INFO,[cycle_health] health_level=warning;feed_status=fallback;broker_status=paper;worker_status=online;consecutive_errors=0;fallback=1
+2026-04-21T20:55:14.311954,INFO,[validation_signal] day=10;phase=consolidacao;approved=2;rejected=12;against_trend=0;weak_score=10;feed_unreliable=8;context=NEUTRO;context_blocked=0
+2026-04-21T20:55:14.343118,WARNING,Email final da validacao swing nao enviado: smtp_not_configured
+2026-04-21T20:56:01.127514,INFO,Worker 24h iniciado
+2026-04-21T20:56:05.945212,INFO,Entradas bloqueadas por limite de perda diaria
+2026-04-21T20:56:06.014957,INFO,[cycle_health] health_level=healthy;feed_status=live;broker_status=paper;worker_status=online;consecutive_errors=0;fallback=0
+2026-04-21T20:56:06.163202,INFO,[validation_signal] day=10;phase=consolidacao;approved=2;rejected=14;against_trend=0;weak_score=12;feed_unreliable=8;context=NEUTRO;context_blocked=0
+2026-04-21T20:56:06.190834,WARNING,Email final da validacao swing nao enviado: smtp_not_configured
+2026-04-21T20:56:42.602613,INFO,Worker 24h iniciado
+2026-04-21T20:56:43.971117,INFO,Entradas bloqueadas por limite de perda diaria
+2026-04-21T20:56:44.056820,INFO,[cycle_health] health_level=healthy;feed_status=live;broker_status=paper;worker_status=online;consecutive_errors=0;fallback=0
+2026-04-21T20:56:44.208689,INFO,[validation_signal] day=10;phase=consolidacao;approved=2;rejected=14;against_trend=0;weak_score=12;feed_unreliable=8;context=NEUTRO;context_blocked=0
+2026-04-21T20:56:44.240687,WARNING,Email final da validacao swing nao enviado: smtp_not_configured
+2026-04-21T20:59:27.425137,INFO,Worker 24h iniciado
+2026-04-21T20:59:28.708902,INFO,Entradas bloqueadas por limite de perda diaria
+2026-04-21T20:59:28.758812,INFO,[cycle_health] health_level=healthy;feed_status=live;broker_status=paper;worker_status=online;consecutive_errors=0;fallback=0
+2026-04-21T20:59:28.908848,INFO,[validation_signal] day=10;phase=consolidacao;approved=2;rejected=14;against_trend=0;weak_score=12;feed_unreliable=8;context=NEUTRO;context_blocked=0
+2026-04-21T20:59:28.942773,WARNING,Email final da validacao swing nao enviado: smtp_not_configured
+2026-04-21T20:59:31.811942,INFO,Worker 24h iniciado
+2026-04-21T20:59:33.347979,INFO,Entradas bloqueadas por limite de perda diaria
+2026-04-21T20:59:33.397063,INFO,[cycle_health] health_level=healthy;feed_status=live;broker_status=paper;worker_status=online;consecutive_errors=0;fallback=0
+2026-04-21T20:59:33.535082,INFO,[validation_signal] day=10;phase=consolidacao;approved=2;rejected=14;against_trend=0;weak_score=12;feed_unreliable=8;context=NEUTRO;context_blocked=0
+2026-04-21T20:59:33.563783,WARNING,Email final da validacao swing nao enviado: smtp_not_configured
+2026-04-21T21:07:59.757442,INFO,Worker 24h iniciado
+2026-04-21T21:08:00.884172,INFO,Entradas bloqueadas por limite de perda diaria
+2026-04-21T21:08:00.943075,INFO,[cycle_health] health_level=healthy;feed_status=live;broker_status=paper;worker_status=online;consecutive_errors=0;fallback=0
+2026-04-21T21:08:01.092209,INFO,[validation_signal] day=10;phase=consolidacao;approved=2;rejected=14;against_trend=0;weak_score=12;feed_unreliable=8;context=NEUTRO;context_blocked=0
+2026-04-21T21:08:01.125565,WARNING,Email final da validacao swing nao enviado: smtp_not_configured
+2026-04-21T21:08:04.340404,INFO,Worker 24h iniciado
+2026-04-21T21:08:05.463221,INFO,Entradas bloqueadas por limite de perda diaria
+2026-04-21T21:08:05.513331,INFO,[cycle_health] health_level=healthy;feed_status=live;broker_status=paper;worker_status=online;consecutive_errors=0;fallback=0
+2026-04-21T21:08:05.643705,INFO,[validation_signal] day=10;phase=consolidacao;approved=2;rejected=14;against_trend=0;weak_score=12;feed_unreliable=8;context=NEUTRO;context_blocked=0
+2026-04-21T21:08:05.663303,WARNING,Email final da validacao swing nao enviado: smtp_not_configured
+2026-04-21T21:32:31.323282,INFO,Worker 24h iniciado
+2026-04-21T21:32:33.040746,INFO,Entradas bloqueadas por limite de perda diaria
+2026-04-21T21:32:33.113569,INFO,[cycle_health] health_level=critical;feed_status=fallback;broker_status=paper;worker_status=online;consecutive_errors=0;fallback=1
+2026-04-21T21:32:33.250132,INFO,[validation_signal] day=10;phase=consolidacao;approved=2;rejected=14;against_trend=0;weak_score=12;feed_unreliable=8;context=NEUTRO;context_blocked=0
+2026-04-21T21:32:33.279307,WARNING,Email final da validacao swing nao enviado: smtp_not_configured
+2026-04-21T21:37:08.043783,INFO,Worker 24h iniciado
+2026-04-21T21:37:08.993677,INFO,Entradas bloqueadas por limite de perda diaria
+2026-04-21T21:37:09.065632,INFO,[cycle_health] health_level=healthy;feed_status=live;broker_status=paper;worker_status=online;consecutive_errors=0;fallback=0
+2026-04-21T21:37:09.195304,INFO,[validation_signal] day=10;phase=consolidacao;approved=2;rejected=14;against_trend=0;weak_score=12;feed_unreliable=8;context=NEUTRO;context_blocked=0
+2026-04-21T21:37:09.228802,WARNING,Email final da validacao swing nao enviado: smtp_not_configured
+2026-04-21T21:38:09.474398,INFO,Entradas bloqueadas por limite de perda diaria
+2026-04-21T21:38:09.526770,INFO,[cycle_health] health_level=healthy;feed_status=live;broker_status=paper;worker_status=online;consecutive_errors=0;fallback=0
+2026-04-21T21:38:09.660126,INFO,[validation_signal] day=10;phase=consolidacao;approved=2;rejected=14;against_trend=0;weak_score=12;feed_unreliable=8;context=NEUTRO;context_blocked=0
+2026-04-21T21:38:09.693252,WARNING,Email final da validacao swing nao enviado: smtp_not_configured
+2026-04-21T21:39:09.920614,INFO,Entradas bloqueadas por limite de perda diaria
+2026-04-21T21:39:09.971167,INFO,[cycle_health] health_level=healthy;feed_status=live;broker_status=paper;worker_status=online;consecutive_errors=0;fallback=0
+2026-04-21T21:39:10.104965,INFO,[validation_signal] day=10;phase=consolidacao;approved=2;rejected=14;against_trend=0;weak_score=12;feed_unreliable=8;context=NEUTRO;context_blocked=0
+2026-04-21T21:39:10.137919,WARNING,Email final da validacao swing nao enviado: smtp_not_configured
+2026-04-21T21:40:10.368154,INFO,Entradas bloqueadas por limite de perda diaria
+2026-04-21T21:40:10.432653,INFO,[cycle_health] health_level=healthy;feed_status=live;broker_status=paper;worker_status=online;consecutive_errors=0;fallback=0
+2026-04-21T21:40:10.550895,INFO,[validation_signal] day=10;phase=consolidacao;approved=2;rejected=14;against_trend=0;weak_score=12;feed_unreliable=8;context=NEUTRO;context_blocked=0
+2026-04-21T21:40:10.583744,WARNING,Email final da validacao swing nao enviado: smtp_not_configured
+2026-04-21T21:41:10.836997,INFO,Entradas bloqueadas por limite de perda diaria
+2026-04-21T21:41:10.904884,INFO,[cycle_health] health_level=healthy;feed_status=live;broker_status=paper;worker_status=online;consecutive_errors=0;fallback=0
+2026-04-21T21:41:11.036639,INFO,[validation_signal] day=10;phase=consolidacao;approved=2;rejected=14;against_trend=0;weak_score=12;feed_unreliable=8;context=NEUTRO;context_blocked=0
+2026-04-21T21:41:11.069241,WARNING,Email final da validacao swing nao enviado: smtp_not_configured
+2026-04-21T21:42:11.576869,INFO,Entradas bloqueadas por limite de perda diaria
+2026-04-21T21:42:11.643130,INFO,[cycle_health] health_level=healthy;feed_status=live;broker_status=paper;worker_status=online;consecutive_errors=0;fallback=0
+2026-04-21T21:42:11.762043,INFO,[validation_signal] day=10;phase=consolidacao;approved=2;rejected=14;against_trend=0;weak_score=12;feed_unreliable=8;context=NEUTRO;context_blocked=0
+2026-04-21T21:42:11.795471,WARNING,Email final da validacao swing nao enviado: smtp_not_configured
+2026-04-21T21:55:14.142829,INFO,Worker 24h iniciado
+2026-04-21T21:55:15.759101,INFO,Trava diaria liberada. Novas entradas permitidas novamente.
+2026-04-21T21:55:15.797036,INFO,Entradas bloqueadas por limite de perda diaria
+2026-04-21T21:55:15.859161,INFO,[cycle_health] health_level=healthy;feed_status=live;broker_status=paper;worker_status=online;consecutive_errors=0;fallback=0
+2026-04-21T21:55:16.009341,INFO,[validation_signal] day=10;phase=consolidacao;approved=2;rejected=14;against_trend=0;weak_score=12;feed_unreliable=8;context=FAVORAVEL;context_blocked=0
+2026-04-21T21:55:16.042556,WARNING,Email final da validacao swing nao enviado: smtp_not_configured
+2026-04-21T21:56:16.739911,INFO,Rodada concluida sem novas operacoes
+2026-04-21T21:56:16.808072,INFO,[cycle_health] health_level=healthy;feed_status=live;broker_status=paper;worker_status=online;consecutive_errors=0;fallback=0
+2026-04-21T21:56:16.938856,INFO,[validation_signal] day=10;phase=consolidacao;approved=2;rejected=14;against_trend=0;weak_score=12;feed_unreliable=8;context=NEUTRO;context_blocked=0
+2026-04-21T21:56:16.956759,WARNING,Email final da validacao swing nao enviado: smtp_not_configured
+2026-04-21T21:57:17.203412,INFO,Rodada concluida sem novas operacoes
+2026-04-21T21:57:17.254047,INFO,[cycle_health] health_level=healthy;feed_status=live;broker_status=paper;worker_status=online;consecutive_errors=0;fallback=0
+2026-04-21T21:57:17.386554,INFO,[validation_signal] day=10;phase=consolidacao;approved=2;rejected=14;against_trend=0;weak_score=12;feed_unreliable=8;context=NEUTRO;context_blocked=0
+2026-04-21T21:57:17.420734,WARNING,Email final da validacao swing nao enviado: smtp_not_configured
+2026-04-21T21:58:17.649054,INFO,Rodada concluida sem novas operacoes
+2026-04-21T21:58:17.698867,INFO,[cycle_health] health_level=healthy;feed_status=live;broker_status=paper;worker_status=online;consecutive_errors=0;fallback=0
+2026-04-21T21:58:17.841015,INFO,[validation_signal] day=10;phase=consolidacao;approved=2;rejected=14;against_trend=0;weak_score=12;feed_unreliable=8;context=NEUTRO;context_blocked=0
+2026-04-21T21:58:17.865795,WARNING,Email final da validacao swing nao enviado: smtp_not_configured
+2026-04-21T21:59:18.095154,INFO,Rodada concluida sem novas operacoes
+2026-04-21T21:59:18.161616,INFO,[cycle_health] health_level=healthy;feed_status=live;broker_status=paper;worker_status=online;consecutive_errors=0;fallback=0
+2026-04-21T21:59:18.294958,INFO,[validation_signal] day=10;phase=consolidacao;approved=2;rejected=14;against_trend=0;weak_score=12;feed_unreliable=8;context=NEUTRO;context_blocked=0
+2026-04-21T21:59:18.313693,WARNING,Email final da validacao swing nao enviado: smtp_not_configured
+2026-04-21T22:00:18.559611,INFO,Rodada concluida sem novas operacoes
+2026-04-21T22:00:18.610395,INFO,[cycle_health] health_level=healthy;feed_status=live;broker_status=paper;worker_status=online;consecutive_errors=0;fallback=0
+2026-04-21T22:00:18.741621,INFO,[validation_signal] day=10;phase=consolidacao;approved=2;rejected=14;against_trend=0;weak_score=12;feed_unreliable=8;context=NEUTRO;context_blocked=0
+2026-04-21T22:00:18.776625,WARNING,Email final da validacao swing nao enviado: smtp_not_configured
+2026-04-21T22:01:19.453371,INFO,Rodada concluida sem novas operacoes
+2026-04-21T22:01:19.525259,INFO,[cycle_health] health_level=healthy;feed_status=live;broker_status=paper;worker_status=online;consecutive_errors=0;fallback=0
+2026-04-21T22:01:19.660255,INFO,[validation_signal] day=10;phase=consolidacao;approved=2;rejected=14;against_trend=0;weak_score=12;feed_unreliable=8;context=NEUTRO;context_blocked=0
+2026-04-21T22:01:19.696069,WARNING,Email final da validacao swing nao enviado: smtp_not_configured
+2026-04-21T22:02:19.917055,INFO,Rodada concluida sem novas operacoes
+2026-04-21T22:02:19.983653,INFO,[cycle_health] health_level=healthy;feed_status=live;broker_status=paper;worker_status=online;consecutive_errors=0;fallback=0
+2026-04-21T22:02:20.107796,INFO,[validation_signal] day=10;phase=consolidacao;approved=2;rejected=14;against_trend=0;weak_score=12;feed_unreliable=8;context=NEUTRO;context_blocked=0
+2026-04-21T22:02:20.134195,WARNING,Email final da validacao swing nao enviado: smtp_not_configured
+2026-04-21T22:03:21.638319,INFO,Rodada concluida sem novas operacoes
+2026-04-21T22:03:21.730596,INFO,[cycle_health] health_level=healthy;feed_status=live;broker_status=paper;worker_status=online;consecutive_errors=0;fallback=0
+2026-04-21T22:03:21.905100,INFO,[validation_signal] day=10;phase=consolidacao;approved=2;rejected=14;against_trend=0;weak_score=12;feed_unreliable=8;context=NEUTRO;context_blocked=0
+2026-04-21T22:03:21.945047,WARNING,Email final da validacao swing nao enviado: smtp_not_configured
+2026-04-21T22:04:22.160894,INFO,Rodada concluida sem novas operacoes
+2026-04-21T22:04:22.229642,INFO,[cycle_health] health_level=healthy;feed_status=live;broker_status=paper;worker_status=online;consecutive_errors=0;fallback=0
+2026-04-21T22:04:22.346522,INFO,[validation_signal] day=10;phase=consolidacao;approved=2;rejected=14;against_trend=0;weak_score=12;feed_unreliable=8;context=NEUTRO;context_blocked=0
+2026-04-21T22:04:22.377931,WARNING,Email final da validacao swing nao enviado: smtp_not_configured

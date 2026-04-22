@@ -1,0 +1,421 @@
+{
+  "wallet_value": 1000.0,
+  "cash": 1000.0,
+  "bot_status": "RUNNING",
+  "bot_mode": "Automatico",
+  "realized_pnl": 0.0,
+  "positions": [],
+  "last_action": "Rodada concluida sem novas operacoes",
+  "last_run_at": "2026-04-22T00:52:33.733977+00:00",
+  "next_run_at": "2026-04-22T00:53:33.733977+00:00",
+  "worker_status": "online",
+  "worker_heartbeat": "2026-04-22T00:52:33.733977+00:00",
+  "market_data": {
+    "provider": "yahoo",
+    "status": "error",
+    "last_sync_at": "2026-04-22T00:52:33.552025+00:00",
+    "last_success_at": "2026-04-21T22:04:22.044357+00:00",
+    "last_error": "Failed to get ticker 'BTC-USD' reason: Failed to perform, curl: (7) Failed to connect to fc.yahoo.com port 443 after 37 ms: Could not connect to server. See https://curl.se/libcurl/c/libcurl-errors.html first for more details.\nFailed to get ticker 'SOL-USD' reason: Failed to perform, curl: (7) Failed to connect to fc.yahoo.com port 443 after 22 ms: Could not connect to server. See https://curl.se/libcurl/c/libcurl-errors.html first for more details.\nFailed to get ticker 'LINK-USD' reason: Failed to perform, curl: (7) Failed to connect to fc.yahoo.com port 443 after 13 ms: Could not connect to server. See https://curl.se/libcurl/c/libcurl-errors.html first for more details.\n$LINK-USD: possibly delisted; no price data found  (period=2y)\nFailed to get ticker 'BNB-USD' reason: Failed to perform, curl: (7) Failed to connect to fc.yahoo.com port 443 after 29 ms: Could not connect to server. See https://curl.se/libcurl/c/libcurl-errors.html first for more details.\n$BNB-USD: possibly delisted; no price data found  (period=2y)\nFailed to get ticker 'ETH-USD' reason: Failed to perform, curl: (7) Failed to connect to fc.yahoo.com port 443 after 1 ms: Could not connect to server. See https://curl.se/libcurl/c/libcurl-errors.html first for more details.\n$ETH-USD: possibly delisted; no price data found  (period=2y)\n\n5 Failed downloads:\n['BTC-USD']: ConnectionError('Failed to perform, curl: (7) Failed to connect to fc.yahoo.com port 443 after 16 ms: Could not connect to server. See https://curl.se/libcurl/c/libcurl-errors.html first for more details.')\n['SOL-USD']: ConnectionError('Failed to perform, curl: (7) Failed to connect to fc.yahoo.com port 443 after 30 ms: Could not connect to server. See https://curl.se/libcurl/c/libcurl-errors.html first for more details.')\n['LINK-USD', 'BNB-USD', 'ETH-USD']: possibly delisted; no price data found  (period=2y)",
+    "last_source": "fallback",
+    "source_breakdown": {
+      "market": 0,
+      "cached": 0,
+      "fallback": 5,
+      "unknown": 0
+    },
+    "symbols": [
+      "BTC-USD",
+      "ETH-USD",
+      "BNB-USD",
+      "SOL-USD",
+      "LINK-USD"
+    ],
+    "requested_by": "worker_cycle",
+    "contexts": {
+      "worker_cycle": {
+        "provider": "yahoo",
+        "status": "error",
+        "last_sync_at": "2026-04-22T00:52:33.552025+00:00",
+        "last_source": "fallback",
+        "source_breakdown": {
+          "market": 0,
+          "cached": 0,
+          "fallback": 5,
+          "unknown": 0
+        },
+        "symbols": [
+          "BTC-USD",
+          "ETH-USD",
+          "BNB-USD",
+          "SOL-USD",
+          "LINK-USD"
+        ],
+        "requested_by": "worker_cycle",
+        "last_success_at": "2026-04-21T22:04:22.044357+00:00",
+        "last_error": "Failed to get ticker 'BTC-USD' reason: Failed to perform, curl: (7) Failed to connect to fc.yahoo.com port 443 after 37 ms: Could not connect to server. See https://curl.se/libcurl/c/libcurl-errors.html first for more details.\nFailed to get ticker 'SOL-USD' reason: Failed to perform, curl: (7) Failed to connect to fc.yahoo.com port 443 after 22 ms: Could not connect to server. See https://curl.se/libcurl/c/libcurl-errors.html first for more details.\nFailed to get ticker 'LINK-USD' reason: Failed to perform, curl: (7) Failed to connect to fc.yahoo.com port 443 after 13 ms: Could not connect to server. See https://curl.se/libcurl/c/libcurl-errors.html first for more details.\n$LINK-USD: possibly delisted; no price data found  (period=2y)\nFailed to get ticker 'BNB-USD' reason: Failed to perform, curl: (7) Failed to connect to fc.yahoo.com port 443 after 29 ms: Could not connect to server. See https://curl.se/libcurl/c/libcurl-errors.html first for more details.\n$BNB-USD: possibly delisted; no price data found  (period=2y)\nFailed to get ticker 'ETH-USD' reason: Failed to perform, curl: (7) Failed to connect to fc.yahoo.com port 443 after 1 ms: Could not connect to server. See https://curl.se/libcurl/c/libcurl-errors.html first for more details.\n$ETH-USD: possibly delisted; no price data found  (period=2y)\n\n5 Failed downloads:\n['BTC-USD']: ConnectionError('Failed to perform, curl: (7) Failed to connect to fc.yahoo.com port 443 after 16 ms: Could not connect to server. See https://curl.se/libcurl/c/libcurl-errors.html first for more details.')\n['SOL-USD']: ConnectionError('Failed to perform, curl: (7) Failed to connect to fc.yahoo.com port 443 after 30 ms: Could not connect to server. See https://curl.se/libcurl/c/libcurl-errors.html first for more details.')\n['LINK-USD', 'BNB-USD', 'ETH-USD']: possibly delisted; no price data found  (period=2y)",
+        "status_legacy": "error",
+        "feed_status": "FALLBACK",
+        "fallback_since_at": "2026-04-22T00:38:10.953688+00:00"
+      },
+      "trader_chart": {
+        "provider": "yahoo",
+        "status": "healthy",
+        "last_sync_at": "2026-04-21T21:41:08.197028+00:00",
+        "last_source": "market",
+        "source_breakdown": {
+          "market": 1,
+          "cached": 0,
+          "fallback": 0,
+          "unknown": 0
+        },
+        "symbols": [
+          "AAPL"
+        ],
+        "requested_by": "trader_chart",
+        "last_error": "",
+        "status_legacy": "healthy",
+        "feed_status": "LIVE",
+        "last_success_at": "2026-04-21T21:41:08.197028+00:00",
+        "fallback_since_at": ""
+      }
+    },
+    "fallback_since_at": "2026-04-22T00:38:10.953688+00:00",
+    "status_legacy": "error",
+    "feed_status": "FALLBACK"
+  },
+  "broker": {
+    "provider": "paper",
+    "mode": "paper",
+    "status": "paper",
+    "last_sync_at": "2026-04-22T00:52:33.317429+00:00",
+    "last_error": "",
+    "account_id": "",
+    "requested_by": "worker_cycle",
+    "configured_mode": "paper",
+    "effective_mode": "paper",
+    "base_url": "",
+    "api_key_configured": false,
+    "api_secret_configured": false,
+    "execution_enabled": false,
+    "can_submit_orders": false,
+    "warning": "Broker em modo simulado. Nenhuma ordem real sera enviada."
+  },
+  "security": {
+    "real_mode_enabled": false,
+    "real_mode_enabled_by": "",
+    "real_mode_enabled_at": ""
+  },
+  "trader": {
+    "enabled": true,
+    "profile": "Equilibrado",
+    "ticket_value": 100.0,
+    "holding_minutes": 60,
+    "max_open_positions": 2,
+    "watchlist": [
+      "BTC-USD",
+      "ETH-USD",
+      "BNB-USD",
+      "SOL-USD",
+      "LINK-USD"
+    ]
+  },
+  "production": {
+    "enabled": false,
+    "alert_email_enabled": false,
+    "alert_provider": "smtp",
+    "heartbeat_age_seconds": 0,
+    "last_execution_at": "2026-04-22T00:52:33.749755+00:00",
+    "last_success_at": "2026-04-22T00:52:33.749755+00:00",
+    "feed_status": "FALLBACK",
+    "broker_status": "paper",
+    "consecutive_errors": 0,
+    "health_level": "warning",
+    "health_reason": "feed_fallback",
+    "health_message": "Feed em fallback recente. Broker em modo simulado (paper). Nenhuma ordem real sera enviada.",
+    "last_health_at": "2026-04-22T00:52:33.749755+00:00",
+    "last_error": "",
+    "last_error_at": "",
+    "last_exception": "",
+    "fallback_since_at": "2026-04-22T00:38:10.953688+00:00",
+    "fallback_age_minutes": 14,
+    "last_alert_sent_at": "2026-04-20T08:38:56.560425+00:00",
+    "last_alert_type": "manual_test",
+    "last_alert_subject": "Teste Resend",
+    "last_alert_provider": "smtp",
+    "last_alert_error": "",
+    "next_alert_eligible_at": "",
+    "last_recovery_email_at": "",
+    "feed_status_legacy": "error",
+    "worker_status": "online"
+  },
+  "retention": {
+    "enabled": true,
+    "retention_days": 60,
+    "run_interval_hours": 24,
+    "archive_trader_orders": false,
+    "last_run_at": "2026-04-21T20:48:44.805448+00:00",
+    "last_success_at": "2026-04-21T20:48:44.805448+00:00",
+    "last_error": "",
+    "last_error_at": "",
+    "last_summary": {
+      "trade_reports_archived_rows": 0,
+      "bot_logs_archived_rows": 0,
+      "trader_orders_archived_rows": 0,
+      "runtime_trade_reports_rows": 1,
+      "runtime_bot_log_rows": 5,
+      "runtime_trader_orders_rows": 3,
+      "archived_files_updated": [],
+      "weekly_reports_generated": 2,
+      "oldest_runtime_report_at": "2026-04-17T00:00:00+00:00",
+      "oldest_runtime_log_at": "2026-04-12T00:00:00+00:00",
+      "oldest_runtime_order_at": ""
+    },
+    "archive_catalog": {
+      "reports": [],
+      "logs": [],
+      "orders": [],
+      "weekly_reports": [
+        "C:\\Users\\User\\Documents\\Codex\\2026-04-18-tenho-um-rob-trader-em-streamlit\\robo-investimentos-hardening\\storage\\runtime\\weekly_reports\\weekly_validation_2026_W15.csv",
+        "C:\\Users\\User\\Documents\\Codex\\2026-04-18-tenho-um-rob-trader-em-streamlit\\robo-investimentos-hardening\\storage\\runtime\\weekly_reports\\weekly_validation_2026_W15.json",
+        "C:\\Users\\User\\Documents\\Codex\\2026-04-18-tenho-um-rob-trader-em-streamlit\\robo-investimentos-hardening\\storage\\runtime\\weekly_reports\\weekly_validation_2026_W16.csv",
+        "C:\\Users\\User\\Documents\\Codex\\2026-04-18-tenho-um-rob-trader-em-streamlit\\robo-investimentos-hardening\\storage\\runtime\\weekly_reports\\weekly_validation_2026_W16.json"
+      ]
+    },
+    "weekly_reports_index": [
+      {
+        "week_key": "2026_W16",
+        "week_label": "2026-W16",
+        "week_start_at": "2026-04-13T00:00:00+00:00",
+        "week_end_at": "2026-04-20T00:00:00+00:00",
+        "generated_at": "2026-04-21T20:48:44.805448+00:00",
+        "location": "runtime",
+        "csv_path": "C:\\Users\\User\\Documents\\Codex\\2026-04-18-tenho-um-rob-trader-em-streamlit\\robo-investimentos-hardening\\storage\\runtime\\weekly_reports\\weekly_validation_2026_W16.csv",
+        "summary_path": "C:\\Users\\User\\Documents\\Codex\\2026-04-18-tenho-um-rob-trader-em-streamlit\\robo-investimentos-hardening\\storage\\runtime\\weekly_reports\\weekly_validation_2026_W16.json",
+        "summary_namespace": "weekly_validation_summary:runtime:2026_W16",
+        "trades_count": 1,
+        "pnl": 4.0,
+        "win_rate": 1.0,
+        "observation_final": "apto para continuar em simulacao"
+      },
+      {
+        "week_key": "2026_W15",
+        "week_label": "2026-W15",
+        "week_start_at": "2026-04-06T00:00:00+00:00",
+        "week_end_at": "2026-04-13T00:00:00+00:00",
+        "generated_at": "2026-04-21T20:48:44.805448+00:00",
+        "location": "runtime",
+        "csv_path": "C:\\Users\\User\\Documents\\Codex\\2026-04-18-tenho-um-rob-trader-em-streamlit\\robo-investimentos-hardening\\storage\\runtime\\weekly_reports\\weekly_validation_2026_W15.csv",
+        "summary_path": "C:\\Users\\User\\Documents\\Codex\\2026-04-18-tenho-um-rob-trader-em-streamlit\\robo-investimentos-hardening\\storage\\runtime\\weekly_reports\\weekly_validation_2026_W15.json",
+        "summary_namespace": "weekly_validation_summary:runtime:2026_W15",
+        "trades_count": 0,
+        "pnl": 0.0,
+        "win_rate": 0.0,
+        "observation_final": "apto para continuar em simulacao"
+      }
+    ]
+  },
+  "validation": {
+    "validation_mode": "swing_10d",
+    "validation_mode_label": "swing_10d_crypto",
+    "validation_started_at": "2026-04-22T00:38:03.628163+00:00",
+    "validation_day_number": 1,
+    "validation_phase": "Coleta e observacao",
+    "validation_status": "running",
+    "final_validation_grade": "",
+    "final_validation_reason": "",
+    "final_validation_generated_at": "",
+    "final_email_sent": false,
+    "final_email_sent_at": "",
+    "timeframe": "1d",
+    "timeframe_label": "Diario (1D)",
+    "period_label": "2y",
+    "trading_mode": "paper",
+    "live_trading_enabled": false,
+    "paper_only": true,
+    "last_evaluated_at": "2026-04-22T00:52:33.267428+00:00",
+    "last_reset_at": "2026-04-22T00:38:03.628163+00:00",
+    "last_report": {
+      "validation_mode": "swing_10d",
+      "paper_only": true,
+      "timeframe": "1d",
+      "timeframe_label": "Diario (1D)",
+      "period": "2y",
+      "current_market_context": {
+        "market_context_status": "NEUTRO",
+        "market_context_reason": "BTC em tendencia de alta. Volatilidade sob controle.",
+        "market_context_updated_at": "2026-04-22T00:52:33.619706+00:00",
+        "market_context_score": 74.0,
+        "market_context_impact": "Sinais de cripto seguem com filtro base, sem penalidade adicional.",
+        "market_context_regime": "tendencia",
+        "watchlist_consistency": 0.6,
+        "btc_move_pct": 0.04354,
+        "btc_volatility_pct": 0.00899
+      },
+      "validation_started_at": "2026-04-22T00:38:03.628163+00:00",
+      "validation_window_end_at": "2026-04-22T00:52:33.267428+00:00",
+      "validation_day_number": 1,
+      "validation_phase": "Coleta e observacao",
+      "validation_status": "running",
+      "metrics": {
+        "trades_opened": 0,
+        "trades_closed": 0,
+        "signals_total": 10,
+        "signals_approved": 0,
+        "signals_rejected": 10,
+        "against_trend_entries": 0,
+        "signal_rejections": {
+          "against_trend": 4,
+          "weak_score": 6,
+          "rsi_filter": 6,
+          "atr_filter": 0,
+          "structure_filter": 4,
+          "momentum_filter": 6,
+          "feed_unreliable": 10,
+          "context_blocked": 0,
+          "daily_loss_guard": 0
+        },
+        "context_status_counts": {
+          "FAVORAVEL": 0,
+          "NEUTRO": 10,
+          "DESFAVORAVEL": 0,
+          "CRITICO": 0
+        },
+        "context_blocked_signals": 0,
+        "open_positions": 0,
+        "avg_duration_minutes": null,
+        "fallback_cycle_pct": null,
+        "operational_errors": 0,
+        "worker_status": "online",
+        "heartbeat_age_seconds": 0,
+        "consecutive_errors": 0,
+        "early_closed_trades": 0,
+        "late_held_trades": 0,
+        "max_drawdown_brl": 0.0,
+        "max_drawdown_pct": 0.0
+      },
+      "performance": {
+        "pnl_total": 0.0,
+        "win_rate": 0.0,
+        "payoff": null,
+        "avg_win": null,
+        "avg_loss": null,
+        "best_trade": null,
+        "worst_trade": null
+      },
+      "most_used_assets": [],
+      "best_assets": [],
+      "worst_assets": [],
+      "before_after_comparison": {},
+      "suggestions": [],
+      "errors": [],
+      "successes": [
+        "Estabilidade operacional consistente, com fallback sob controle.",
+        "Nao foram registradas entradas contra a tendencia dominante."
+      ],
+      "context_impact_estimate": "O contexto permaneceu neutro ou pouco relevante, sem impacto material nas entradas desta janela.",
+      "phase_conclusion": "poucos sinais",
+      "consistency": {
+        "sample_quality_label": "Baixa",
+        "sample_quality_message": "A amostra ainda e pequena demais para concluir qualidade estrategica com confianca.",
+        "signal_approval_rate": 0.0,
+        "operational_posture_label": "Conservador",
+        "operational_posture_message": "O filtro esta bem seletivo para esta fase, com poucas aprovacoes por janela.",
+        "watchlist_phase_aligned": true,
+        "watchlist_message": "A watchlist ativa segue coerente com a fase cripto-only atual.",
+        "current_watchlist": [
+          "BTC-USD",
+          "ETH-USD",
+          "BNB-USD",
+          "SOL-USD",
+          "LINK-USD"
+        ],
+        "recommended_watchlist": [
+          "BTC-USD",
+          "ETH-USD",
+          "BNB-USD",
+          "SOL-USD",
+          "LINK-USD"
+        ],
+        "non_recommended_assets": [],
+        "managed_assets_outside_watchlist": [],
+        "capital_phase_aligned": true,
+        "capital_message": "Capital do runtime alinhado ao capital-base recomendado da fase.",
+        "effective_profile_name": "Equilibrado",
+        "effective_ticket_value": 100.0,
+        "effective_holding_minutes": 8640,
+        "effective_max_open_positions": 2,
+        "effective_min_signal_score": 0.74,
+        "max_drawdown_brl": 0.0,
+        "max_drawdown_pct": 0.0
+      },
+      "final_validation_grade": "",
+      "final_validation_reason": "",
+      "verdict_message": "",
+      "final_validation_generated_at": ""
+    },
+    "signal_counters": {
+      "signals_total": 10,
+      "signals_approved": 0,
+      "signals_rejected": 10,
+      "entries_against_trend": 0,
+      "rejections": {
+        "against_trend": 4,
+        "weak_score": 6,
+        "rsi_filter": 6,
+        "atr_filter": 0,
+        "structure_filter": 4,
+        "momentum_filter": 6,
+        "feed_unreliable": 10,
+        "context_blocked": 0,
+        "daily_loss_guard": 0
+      },
+      "assets_observed": {
+        "BTC-USD": 2,
+        "ETH-USD": 2,
+        "BNB-USD": 2,
+        "SOL-USD": 2,
+        "LINK-USD": 2
+      },
+      "assets_approved": {},
+      "context_status_counts": {
+        "FAVORAVEL": 0,
+        "NEUTRO": 10,
+        "DESFAVORAVEL": 0,
+        "CRITICO": 0
+      },
+      "context_blocked_signals": 0
+    },
+    "last_signal_keys": {
+      "BTC-USD": "BTC-USD|2026-04-22T00:52:33.552025+00:00|fallback",
+      "ETH-USD": "ETH-USD|2026-04-22T00:52:33.552025+00:00|fallback",
+      "BNB-USD": "BNB-USD|2026-04-22T00:52:33.552025+00:00|fallback",
+      "SOL-USD": "SOL-USD|2026-04-22T00:52:33.552025+00:00|fallback",
+      "LINK-USD": "LINK-USD|2026-04-22T00:52:33.552025+00:00|fallback"
+    }
+  },
+  "market_context": {
+    "market_context_status": "NEUTRO",
+    "market_context_reason": "BTC em tendencia de alta. Volatilidade sob controle.",
+    "market_context_updated_at": "2026-04-22T00:52:33.619706+00:00",
+    "market_context_score": 74.0,
+    "market_context_impact": "Sinais de cripto seguem com filtro base, sem penalidade adicional.",
+    "market_context_regime": "tendencia",
+    "watchlist_consistency": 0.6,
+    "btc_move_pct": 0.04354,
+    "btc_volatility_pct": 0.00899
+  },
+  "risk": {
+    "daily_loss_limit_brl": 100.0,
+    "daily_loss_day_key": "2026-04-22",
+    "daily_realized_pnl_brl": 0.0,
+    "daily_loss_consumed_brl": 0.0,
+    "daily_loss_remaining_brl": 100.0,
+    "daily_loss_block_active": false,
+    "daily_loss_block_reason": "",
+    "daily_loss_blocked_at": "",
+    "daily_loss_blocked_value_brl": 0.0,
+    "daily_loss_reset_at": "2026-04-22T00:38:03.628163+00:00",
+    "last_transition": "none",
+    "last_updated_at": "2026-04-22T00:52:33.716395+00:00"
+  }
+}

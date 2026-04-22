@@ -59,3 +59,21 @@ def test_closed_trade_report_is_generated_after_position_exit(isolated_storage, 
     assert pd.notna(reports_df.iloc[0]["opened_at"])
     assert pd.notna(reports_df.iloc[0]["closed_at"])
     assert pd.notna(reports_df.iloc[0]["realized_pnl"])
+
+
+def test_calculate_equity_curve_metrics_reports_drawdown(isolated_storage):
+    reports = load_module("core.trader_reports")
+
+    equity_df = pd.DataFrame(
+        {
+            "timestamp": pd.date_range("2026-04-01", periods=5, freq="D"),
+            "equity": [1000.0, 1050.0, 990.0, 1010.0, 1030.0],
+        }
+    )
+
+    metrics = reports.calculate_equity_curve_metrics(equity_df)
+
+    assert metrics["current_equity"] == 1030.0
+    assert metrics["peak_equity"] == 1050.0
+    assert metrics["max_drawdown_brl"] == 60.0
+    assert round(float(metrics["max_drawdown_pct"] or 0.0), 6) == round(60.0 / 1050.0, 6)

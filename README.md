@@ -112,6 +112,11 @@ Variaveis suportadas:
 - `ADMIN_USERNAME`
 - `ADMIN_PASSWORD`
 - `PRODUCTION_MODE`
+- `MARKET_DATA_PROVIDER`
+- `MARKET_DATA_FALLBACK_PROVIDER`
+- `TWELVEDATA_API_KEY`
+- `TWELVEDATA_API_BASE`
+- `DAILY_LOSS_LIMIT_BRL`
 - `ALERT_EMAIL_ENABLED`
 - `ALERT_EMAIL_PROVIDER`
 - `ALERT_EMAIL_TO`
@@ -133,6 +138,36 @@ Variaveis suportadas:
 - `RETENTION_RUN_INTERVAL_HOURS`
 - `RETENTION_ARCHIVE_TRADER_ORDERS`
 - `WEEKLY_REPORT_RUNTIME_WEEKS`
+
+## Dados de mercado
+
+Na FASE 2, a camada de dados pode operar com cadeia de providers para manter o paper trading resiliente sem mascarar degradacao:
+
+- provider principal: `Twelve Data`
+- fallback secundario: `Yahoo`
+- ultimo recurso: fallback sintetico ja existente
+
+Configuracao recomendada para o modo gratis do Twelve Data:
+
+```env
+MARKET_DATA_PROVIDER=twelvedata
+MARKET_DATA_FALLBACK_PROVIDER=yahoo
+TWELVEDATA_API_KEY=sua_chave_do_twelve_data
+TWELVEDATA_API_BASE=https://api.twelvedata.com
+TWELVEDATA_MIN_CACHE_TTL_SECONDS=900
+```
+
+Observacoes importantes:
+
+- a watchlist cripto da fase continua `BTC-USD`, `ETH-USD`, `BNB-USD`, `SOL-USD`, `LINK-USD`
+- o runtime limpo da FASE 2 continua com capital-base de `R$ 1.000,00`
+- o app mostra separadamente o provider efetivo e a natureza da fonte usada no ciclo
+- `LIVE` indica dado fresco de provider real
+- `DELAYED` indica reaproveitamento de cache ou mistura de fontes nao totalmente frescas
+- `FALLBACK` indica uso do fallback sintetico e nao deve ser tratado como dado ao vivo
+- `TWELVEDATA_MIN_CACHE_TTL_SECONDS=900` reduz a cadencia do provider principal para caber melhor no plano gratis com a watchlist atual de 5 ativos
+
+Pelos docs oficiais do Twelve Data, o plano gratis inclui cripto em tempo real e o endpoint `time_series` consome `1` credito por simbolo. Isso torna a camada mais resiliente, mas ainda exige monitorar a franquia diaria e o comportamento do worker.
 
 ## Instalacao local
 
@@ -266,6 +301,22 @@ Como validar:
 - confirmar que o broker permanece `Simulado`
 
 Mesmo com `PRODUCTION_MODE=true`, a etapa atual nao habilita envio de ordem real.
+
+## Trava diaria de perda (paper trading)
+
+A plataforma agora possui uma trava explicita de limite de perda diaria no modo paper:
+
+- metrica usada: `PnL realizado do dia UTC` (somente trades `SELL` fechados)
+- quando a perda consumida atinge ou ultrapassa `DAILY_LOSS_LIMIT_BRL`, novas entradas ficam bloqueadas
+- posicoes ja abertas continuam com a gestao normal do robo
+- estado auditavel e persistente em `state.risk` com motivo, timestamp de bloqueio e valor observado
+- desbloqueio automatico na virada do dia UTC
+
+Variavel de ambiente:
+
+```env
+DAILY_LOSS_LIMIT_BRL=100
+```
 
 ## Contexto de mercado cripto
 

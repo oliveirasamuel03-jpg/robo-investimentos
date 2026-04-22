@@ -1,0 +1,43 @@
+
+  You can now view your Streamlit app in your browser.
+
+  URL: http://127.0.0.1:8502
+
++------------------------- Traceback (most recent call last) --------------------------+
+| C:\Users\User\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\Lib\si |
+| te-packages\streamlit\runtime\fragment.py:236 in wrapped_fragment                    |
+|                                                                                      |
+| C:\Users\User\Documents\Codex\2026-04-18-tenho-um-rob-trader-em-streamlit\robo-inves |
+| timentos-hardening\pages\1_Trader.py:1433 in render_live_monitor                     |
+|                                                                                      |
+|   1430                                                                               |
+|   1431         live_chart_df = live_snapshot["chart_df"]                             |
+|   1432         if not live_chart_df.empty:                                           |
+| > 1433             aligned_orders = align_orders_to_chart(live_snapshot["orders_df"] |
+|   1434             st.plotly_chart(                                                  |
+|   1435                 build_candle_chart(                                           |
+|   1436                     live_chart_df,                                            |
+|                                                                                      |
+| C:\Users\User\Documents\Codex\2026-04-18-tenho-um-rob-trader-em-streamlit\robo-inves |
+| timentos-hardening\pages\1_Trader.py:199 in align_orders_to_chart                    |
+|                                                                                      |
+|    196     if getattr(chart_index["chart_time"].dt, "tz", None) is not None:         |
+|    197         chart_index["chart_time"] = chart_index["chart_time"].dt.tz_convert(N |
+|    198                                                                               |
+| >  199     orders["ts_int"] = orders["timestamp"].view("int64")                      |
+|    200     chart_index["ts_int"] = chart_index["chart_time"].view("int64")           |
+|    201                                                                               |
+|    202     orders = orders.sort_values("ts_int")                                     |
+|                                                                                      |
+| C:\Users\User\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\Lib\si |
+| te-packages\pandas\core\generic.py:6206 in __getattr__                               |
+|                                                                                      |
+|    6203             and self._info_axis._can_hold_identifiers_and_holds_name(name)   |
+|    6204         ):                                                                   |
+|    6205             return self[name]                                                |
+| >  6206         return object.__getattribute__(self, name)                           |
+|    6207                                                                              |
+|    6208     @final                                                                   |
+|    6209     def __setattr__(self, name: str, value) -> None:                         |
++--------------------------------------------------------------------------------------+
+AttributeError: 'Series' object has no attribute 'view'

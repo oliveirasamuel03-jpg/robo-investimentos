@@ -1,0 +1,9 @@
+timestamp,asset,side,quantity,price,gross_value,cost,cash_after,source
+2026-04-12T00:00:00+00:00,AAPL,BUY,1.0,100.0,100.0,0.0,9900.0,paper
+2026-04-17T00:00:00+00:00,AAPL,SELL,1.0,104.0,104.0,0.0,10004.0,paper
+2026-04-21T20:48:44+00:00,BTC-USD,SELL,1.0,100.0,100.0,0.0,0.0,paper_trading_engine
+2026-04-21T20:55:03+00:00,BTC-USD,SELL,1.0,100.0,100.0,0.0,0.0,paper_trading_engine
+2026-04-21T20:59:29+00:00,BTC-USD,SELL,1.0,100.0,100.0,0.0,0.0,paper_trading_engine
+2026-04-21T21:01:29+00:00,AAPL,SELL,1.0,100.0,100.0,0.0,0.0,paper_trading_engine
+2026-04-21T21:08:01+00:00,AAPL,SELL,1.0,100.0,100.0,0.0,0.0,paper_trading_engine
+2026-04-21T21:55:15.625558+00:00,BTC-USD,SELL,0.5,75548.6875,37774.34,0.0,47774.34,paper_trading_engine

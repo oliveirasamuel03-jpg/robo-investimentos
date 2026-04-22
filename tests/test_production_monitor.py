@@ -24,6 +24,7 @@ def test_evaluate_production_health_marks_healthy_with_recent_heartbeat(isolated
     assert health["health_level"] == "healthy"
     assert health["heartbeat_age_seconds"] == 60
     assert health["broker_status"] == "paper"
+    assert health["feed_status"] == "LIVE"
 
 
 def test_evaluate_production_health_marks_critical_after_consecutive_errors(isolated_storage):
@@ -47,3 +48,28 @@ def test_evaluate_production_health_marks_critical_after_consecutive_errors(isol
     assert health["health_level"] == "critical"
     assert health["health_reason"] in {"worker_error", "consecutive_errors", "heartbeat_delayed", "feed_fallback"}
     assert health["fallback_age_minutes"] >= 40
+    assert health["feed_status"] == "FALLBACK"
+
+
+def test_evaluate_production_health_clears_stale_fallback_metadata_when_feed_is_live(isolated_storage):
+    state_store = load_module("core.state_store")
+    production_monitor = load_module("core.production_monitor")
+
+    state = state_store.load_bot_state()
+    state["worker_status"] = "online"
+    state["worker_heartbeat"] = "2026-04-20T03:00:00+00:00"
+    state["market_data"]["status"] = "healthy"
+    state["market_data"]["last_source"] = "market"
+    state["market_data"]["feed_status"] = "LIVE"
+    state["market_data"]["fallback_since_at"] = ""
+    state["production"]["fallback_since_at"] = "2026-04-20T02:30:00+00:00"
+    state_store.save_bot_state(state)
+
+    health = production_monitor.evaluate_production_health(
+        state_store.load_bot_state(),
+        now=production_monitor.parse_iso_datetime("2026-04-20T03:10:00+00:00"),
+    )
+
+    assert health["feed_status"] == "LIVE"
+    assert health["fallback_since_at"] == ""
+    assert health["fallback_age_minutes"] == 0
