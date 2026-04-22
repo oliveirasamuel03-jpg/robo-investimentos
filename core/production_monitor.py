@@ -7,6 +7,7 @@ from core.config import (
     ALERT_HEARTBEAT_MAX_DELAY_SECONDS,
     ALERT_MAX_CONSECUTIVE_ERRORS,
 )
+from core.market_data import classify_feed_status, legacy_market_status
 
 
 def utc_now() -> datetime:
@@ -53,12 +54,25 @@ def evaluate_production_health(state: dict | None, now: datetime | None = None) 
     heartbeat_age = heartbeat_age_seconds(payload.get("worker_heartbeat"), now=current_time)
     last_execution_at = str(production_state.get("last_execution_at") or payload.get("last_run_at") or "")
     last_success_at = str(production_state.get("last_success_at") or "")
-    feed_status = str(market_state.get("status") or "unknown").strip().lower()
+    provider = str(market_state.get("provider") or market_state.get("configured_provider") or "unknown").strip().lower()
+    feed_status = classify_feed_status(
+        status=market_state.get("feed_status") or market_state.get("status"),
+        last_source=market_state.get("last_source"),
+        source_breakdown=market_state.get("source_breakdown"),
+    )
+    feed_status_legacy = legacy_market_status(
+        status=market_state.get("status"),
+        last_source=market_state.get("last_source"),
+        source_breakdown=market_state.get("source_breakdown"),
+    )
     broker_status = str(broker_state.get("status") or "unknown").strip().lower()
     consecutive_errors = max(0, int(production_state.get("consecutive_errors", 0) or 0))
 
-    fallback_since_at = parse_iso_datetime(
-        production_state.get("fallback_since_at") or market_state.get("fallback_since_at")
+    is_feed_in_fallback = str(feed_status).upper() == "FALLBACK"
+    fallback_since_at = (
+        parse_iso_datetime(market_state.get("fallback_since_at") or production_state.get("fallback_since_at"))
+        if is_feed_in_fallback
+        else None
     )
     fallback_age_minutes = (
         max(0, int((current_time - fallback_since_at).total_seconds() // 60))
@@ -99,7 +113,6 @@ def evaluate_production_health(state: dict | None, now: datetime | None = None) 
     elif consecutive_errors > 0:
         raise_level("warning", "consecutive_errors", f"Falhas consecutivas atuais: {consecutive_errors}.")
 
-    is_feed_in_fallback = feed_status in {"error", "fallback"} or str(market_state.get("last_source") or "").lower() == "fallback"
     if is_feed_in_fallback and fallback_age_minutes >= ALERT_FEED_FALLBACK_MAX_MINUTES * 2:
         raise_level(
             "critical",
@@ -134,7 +147,9 @@ def evaluate_production_health(state: dict | None, now: datetime | None = None) 
         "heartbeat_age_seconds": heartbeat_age,
         "last_execution_at": last_execution_at,
         "last_success_at": last_success_at,
+        "provider": provider,
         "feed_status": feed_status,
+        "feed_status_legacy": feed_status_legacy,
         "broker_status": broker_status,
         "consecutive_errors": consecutive_errors,
         "fallback_since_at": isoformat_or_empty(fallback_since_at),

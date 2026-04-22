@@ -1,0 +1,303 @@
+{
+  "initial_capital": 10000.0,
+  "cash": 47774.34,
+  "equity": 47880.81,
+  "realized_pnl": 37724.34,
+  "positions": {
+    "AAPL": {
+      "trade_id": "hardening-open-aapl",
+      "profile": "Equilibrado",
+      "quantity": 0.4,
+      "entry_price": 100.0,
+      "avg_price": 100.0,
+      "last_price": 266.170013,
+      "peak_price": 266.170013,
+      "atr_pct": 0.023079,
+      "atr_pct_entry": 0.01,
+      "trailing_stop": 251.530663,
+      "gross_entry_value": 40.0,
+      "entry_score": 0.9,
+      "rsi_entry": 50.0,
+      "ma20_entry": 100.0,
+      "ma50_entry": 99.0,
+      "entry_trend_alignment": "aligned",
+      "entry_signal_key": "hardening-validation",
+      "entry_data_source": "market",
+      "holding_minutes_limit": 60,
+      "opened_at": "2026-04-21T21:08:01.659245+00:00",
+      "updated_at": "2026-04-21T22:04:22.045891+00:00"
+    }
+  },
+  "asset_cooldowns": {
+    "BTC-USD": "2026-04-21T21:55:15.625558+00:00"
+  },
+  "last_prices": {
+    "AAPL": 266.170013,
+    "MSFT": 424.160004,
+    "BTC-USD": 75548.6875
+  },
+  "history": [
+    {
+      "timestamp": "2026-04-20T00:06:27.010578+00:00",
+      "cash": 10000.0,
+      "equity": 10000.0,
+      "open_positions": 0,
+      "total_return": 0.0
+    },
+    {
+      "timestamp": "2026-04-20T03:38:22.667748+00:00",
+      "cash": 10000.0,
+      "equity": 10000.0,
+      "open_positions": 0,
+      "total_return": 0.0
+    },
+    {
+      "timestamp": "2026-04-21T20:48:47.409513+00:00",
+      "cash": 10000.0,
+      "equity": 10050.0,
+      "open_positions": 1,
+      "total_return": 0.005
+    },
+    {
+      "timestamp": "2026-04-21T20:48:50.478299+00:00",
+      "cash": 10000.0,
+      "equity": 10050.0,
+      "open_positions": 1,
+      "total_return": 0.005
+    },
+    {
+      "timestamp": "2026-04-21T20:48:55.383228+00:00",
+      "cash": 10000.0,
+      "equity": 10050.0,
+      "open_positions": 1,
+      "total_return": 0.005
+    },
+    {
+      "timestamp": "2026-04-21T20:55:06.120551+00:00",
+      "cash": 10000.0,
+      "equity": 10050.0,
+      "open_positions": 1,
+      "total_return": 0.005
+    },
+    {
+      "timestamp": "2026-04-21T20:55:09.156774+00:00",
+      "cash": 10000.0,
+      "equity": 10050.0,
+      "open_positions": 1,
+      "total_return": 0.005
+    },
+    {
+      "timestamp": "2026-04-21T20:55:13.977245+00:00",
+      "cash": 10000.0,
+      "equity": 10050.0,
+      "open_positions": 1,
+      "total_return": 0.005
+    },
+    {
+      "timestamp": "2026-04-21T20:56:05.797577+00:00",
+      "cash": 10000.0,
+      "equity": 10050.0,
+      "open_positions": 1,
+      "total_return": 0.005
+    },
+    {
+      "timestamp": "2026-04-21T20:56:43.782869+00:00",
+      "cash": 10000.0,
+      "equity": 10050.0,
+      "open_positions": 1,
+      "total_return": 0.005
+    },
+    {
+      "timestamp": "2026-04-21T20:59:28.576837+00:00",
+      "cash": 10000.0,
+      "equity": 10050.0,
+      "open_positions": 1,
+      "total_return": 0.005
+    },
+    {
+      "timestamp": "2026-04-21T20:59:29.894198+00:00",
+      "cash": 10000.0,
+      "equity": 10050.0,
+      "open_positions": 1,
+      "total_return": 0.005
+    },
+    {
+      "timestamp": "2026-04-21T20:59:30.076514+00:00",
+      "cash": 10000.0,
+      "equity": 10050.0,
+      "open_positions": 1,
+      "total_return": 0.005
+    },
+    {
+      "timestamp": "2026-04-21T20:59:33.219032+00:00",
+      "cash": 10000.0,
+      "equity": 10050.0,
+      "open_positions": 1,
+      "total_return": 0.005
+    },
+    {
+      "timestamp": "2026-04-21T21:01:30.837565+00:00",
+      "cash": 10000.0,
+      "equity": 10090.0,
+      "open_positions": 2,
+      "total_return": 0.009
+    },
+    {
+      "timestamp": "2026-04-21T21:01:32.471053+00:00",
+      "cash": 10000.0,
+      "equity": 10090.0,
+      "open_positions": 2,
+      "total_return": 0.009
+    },
+    {
+      "timestamp": "2026-04-21T21:08:00.743460+00:00",
+      "cash": 10000.0,
+      "equity": 10156.47,
+      "open_positions": 2,
+      "total_return": 0.015647
+    },
+    {
+      "timestamp": "2026-04-21T21:08:02.493080+00:00",
+      "cash": 10000.0,
+      "equity": 10156.47,
+      "open_positions": 2,
+      "total_return": 0.015647
+    },
+    {
+      "timestamp": "2026-04-21T21:08:02.660332+00:00",
+      "cash": 10000.0,
+      "equity": 10156.47,
+      "open_positions": 2,
+      "total_return": 0.015647
+    },
+    {
+      "timestamp": "2026-04-21T21:08:05.329672+00:00",
+      "cash": 10000.0,
+      "equity": 10156.47,
+      "open_positions": 2,
+      "total_return": 0.015647
+    },
+    {
+      "timestamp": "2026-04-21T21:32:32.917583+00:00",
+      "cash": 10000.0,
+      "equity": 10156.47,
+      "open_positions": 2,
+      "total_return": 0.015647
+    },
+    {
+      "timestamp": "2026-04-21T21:37:08.845046+00:00",
+      "cash": 10000.0,
+      "equity": 10156.47,
+      "open_positions": 2,
+      "total_return": 0.015647
+    },
+    {
+      "timestamp": "2026-04-21T21:38:09.341519+00:00",
+      "cash": 10000.0,
+      "equity": 10156.47,
+      "open_positions": 2,
+      "total_return": 0.015647
+    },
+    {
+      "timestamp": "2026-04-21T21:39:09.788375+00:00",
+      "cash": 10000.0,
+      "equity": 10156.47,
+      "open_positions": 2,
+      "total_return": 0.015647
+    },
+    {
+      "timestamp": "2026-04-21T21:40:10.234196+00:00",
+      "cash": 10000.0,
+      "equity": 10156.47,
+      "open_positions": 2,
+      "total_return": 0.015647
+    },
+    {
+      "timestamp": "2026-04-21T21:41:10.701357+00:00",
+      "cash": 10000.0,
+      "equity": 10156.47,
+      "open_positions": 2,
+      "total_return": 0.015647
+    },
+    {
+      "timestamp": "2026-04-21T21:42:11.461779+00:00",
+      "cash": 10000.0,
+      "equity": 10156.47,
+      "open_positions": 2,
+      "total_return": 0.015647
+    },
+    {
+      "timestamp": "2026-04-21T21:55:15.642296+00:00",
+      "cash": 47774.34,
+      "equity": 47880.81,
+      "open_positions": 1,
+      "total_return": 3.788081
+    },
+    {
+      "timestamp": "2026-04-21T21:56:16.624000+00:00",
+      "cash": 47774.34,
+      "equity": 47880.81,
+      "open_positions": 1,
+      "total_return": 3.788081
+    },
+    {
+      "timestamp": "2026-04-21T21:57:17.068917+00:00",
+      "cash": 47774.34,
+      "equity": 47880.81,
+      "open_positions": 1,
+      "total_return": 3.788081
+    },
+    {
+      "timestamp": "2026-04-21T21:58:17.521076+00:00",
+      "cash": 47774.34,
+      "equity": 47880.81,
+      "open_positions": 1,
+      "total_return": 3.788081
+    },
+    {
+      "timestamp": "2026-04-21T21:59:17.980220+00:00",
+      "cash": 47774.34,
+      "equity": 47880.81,
+      "open_positions": 1,
+      "total_return": 3.788081
+    },
+    {
+      "timestamp": "2026-04-21T22:00:18.424323+00:00",
+      "cash": 47774.34,
+      "equity": 47880.81,
+      "open_positions": 1,
+      "total_return": 3.788081
+    },
+    {
+      "timestamp": "2026-04-21T22:01:19.295715+00:00",
+      "cash": 47774.34,
+      "equity": 47880.81,
+      "open_positions": 1,
+      "total_return": 3.788081
+    },
+    {
+      "timestamp": "2026-04-21T22:02:19.807404+00:00",
+      "cash": 47774.34,
+      "equity": 47880.81,
+      "open_positions": 1,
+      "total_return": 3.788081
+    },
+    {
+      "timestamp": "2026-04-21T22:03:21.006262+00:00",
+      "cash": 47774.34,
+      "equity": 47880.81,
+      "open_positions": 1,
+      "total_return": 3.788081
+    },
+    {
+      "timestamp": "2026-04-21T22:04:22.045891+00:00",
+      "cash": 47774.34,
+      "equity": 47880.81,
+      "open_positions": 1,
+      "total_return": 3.788081
+    }
+  ],
+  "run_count": 37,
+  "updated_at": "2026-04-21T22:04:22.045891+00:00",
+  "last_trade_at": "2026-04-21T21:55:15.625558+00:00"
+}

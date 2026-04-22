@@ -1,0 +1,75 @@
+{
+  "reset_completed_at": "2026-04-22T00:38:11.221816+00:00",
+  "backup_dir": "C:\\Users\\User\\Documents\\Codex\\2026-04-18-tenho-um-rob-trader-em-streamlit\\robo-investimentos-hardening\\storage\\archive\\runtime_resets\\phase2_reset_20260422T003803Z",
+  "cycle_result_summary": {
+    "status": "PAUSED",
+    "trades_executed": 0,
+    "entries_blocked_by_daily_loss": false
+  },
+  "validation_status": "running",
+  "validation_day_number": 1,
+  "watchlist": [
+    "BTC-USD",
+    "ETH-USD",
+    "BNB-USD",
+    "SOL-USD",
+    "LINK-USD"
+  ],
+  "wallet_value": 1000.0,
+  "cash": 1000.0,
+  "realized_pnl": 0.0,
+  "paper_initial_capital": 1000.0,
+  "paper_cash": 1000.0,
+  "paper_equity": 1000.0,
+  "paper_positions": [],
+  "paper_history_rows": 1,
+  "paper_run_count": 1,
+  "paper_trades_rows": 0,
+  "worker_status": "online",
+  "worker_heartbeat": "2026-04-22T00:38:11.204157+00:00",
+  "feed_status": "FALLBACK",
+  "market_symbols": [
+    "BTC-USD",
+    "ETH-USD",
+    "BNB-USD",
+    "SOL-USD",
+    "LINK-USD"
+  ],
+  "daily_loss_block_active": false,
+  "daily_loss_limit_brl": 100.0,
+  "daily_loss_remaining_brl": 100.0,
+  "validation_report_consistency": {
+    "sample_quality_label": "Baixa",
+    "sample_quality_message": "A amostra ainda e pequena demais para concluir qualidade estrategica com confianca.",
+    "signal_approval_rate": null,
+    "operational_posture_label": "Equilibrado",
+    "operational_posture_message": "O robo esta seletivo sem aparentar permissividade excessiva para esta fase.",
+    "watchlist_phase_aligned": true,
+    "watchlist_message": "A watchlist ativa segue coerente com a fase cripto-only atual.",
+    "current_watchlist": [
+      "BTC-USD",
+      "ETH-USD",
+      "BNB-USD",
+      "SOL-USD",
+      "LINK-USD"
+    ],
+    "recommended_watchlist": [
+      "BTC-USD",
+      "ETH-USD",
+      "BNB-USD",
+      "SOL-USD",
+      "LINK-USD"
+    ],
+    "non_recommended_assets": [],
+    "managed_assets_outside_watchlist": [],
+    "capital_phase_aligned": true,
+    "capital_message": "Capital do runtime alinhado ao capital-base recomendado da fase.",
+    "effective_profile_name": "Equilibrado",
+    "effective_ticket_value": 100.0,
+    "effective_holding_minutes": 8640,
+    "effective_max_open_positions": 2,
+    "effective_min_signal_score": 0.74,
+    "max_drawdown_brl": 0.0,
+    "max_drawdown_pct": 0.0
+  }
+}

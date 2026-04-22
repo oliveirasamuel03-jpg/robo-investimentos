@@ -61,6 +61,7 @@ AUTH_REQUIRED=true
 PRODUCTION_MODE=true
 BROKER_PROVIDER=paper
 BROKER_MODE=paper
+DAILY_LOSS_LIMIT_BRL=100
 ```
 
 Se quiser alertas por email no Railway, configure tambem no `web` e no `worker`:
@@ -97,6 +98,7 @@ Observacoes:
 - `DATABASE_URL` deve estar presente no `web` e no `worker`
 - `ROBO_STORAGE_DIR` e opcional; em producao com Postgres o estado principal vem do banco
 - `BROKER_PROVIDER=paper` e `BROKER_MODE=paper` mantem a etapa em simulacao
+- `DAILY_LOSS_LIMIT_BRL` define a trava de perda diaria em paper (bloqueia novas entradas ao atingir o limite)
 - `PRODUCTION_MODE=true` ativa monitoramento e alertas, mas nao libera ordem real
 - em cloud, prefira `ALERT_EMAIL_PROVIDER=resend`; `smtp` continua disponivel como fallback
 - `RETENTION_ENABLED=true` ativa arquivamento automatico diario no worker

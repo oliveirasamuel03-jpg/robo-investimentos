@@ -1,0 +1,12 @@
+{
+  "trader": {
+    "screenshot": "C:\\Users\\User\\Documents\\Codex\\2026-04-18-tenho-um-rob-trader-em-streamlit\\robo-investimentos-hardening\\storage\\tmp_real_env_validation_hardening\\trader.png",
+    "has_trava": true,
+    "has_bloqueio": true
+  },
+  "controle": {
+    "screenshot": "C:\\Users\\User\\Documents\\Codex\\2026-04-18-tenho-um-rob-trader-em-streamlit\\robo-investimentos-hardening\\storage\\tmp_real_env_validation_hardening\\controle.png",
+    "has_trava": true,
+    "has_bloqueio": true
+  }
+}

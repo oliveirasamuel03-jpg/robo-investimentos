@@ -57,6 +57,11 @@ class PaperTradingConfig:
     holding_minutes: int = 60
     history_limit: int = MARKET_DATA_HISTORY_LIMIT
     allow_new_entries: bool = True
+    daily_loss_limit_brl: float = 0.0
+    daily_loss_day_key: str = ""
+    daily_realized_pnl_brl: float = 0.0
+    daily_loss_block_active: bool = False
+    daily_loss_block_reason: str = ""
     min_signal_score: float = 0.62
     min_atr_pct: float = 0.003
     max_atr_pct: float = 0.08
@@ -84,6 +89,10 @@ def _utc_now() -> datetime:
 
 def _utc_now_iso() -> str:
     return _utc_now().isoformat()
+
+
+def _utc_day_key() -> str:
+    return _utc_now().strftime("%Y-%m-%d")
 
 
 def _new_trade_id(asset: str) -> str:
@@ -325,6 +334,25 @@ def _enrich_indicators(df: pd.DataFrame) -> pd.DataFrame:
 def _normalize_symbol_list(config: PaperTradingConfig) -> list[str]:
     symbols = [str(symbol).strip().upper() for symbol in (config.custom_tickers or []) if str(symbol).strip()]
     return symbols or list(SWING_VALIDATION_RECOMMENDED_WATCHLIST)
+
+
+def _symbols_for_cycle(state: dict[str, Any], config: PaperTradingConfig) -> list[str]:
+    ordered_symbols: list[str] = []
+    seen: set[str] = set()
+
+    for symbol in _normalize_symbol_list(config):
+        if symbol not in seen:
+            seen.add(symbol)
+            ordered_symbols.append(symbol)
+
+    for asset in (state.get("positions", {}) or {}).keys():
+        normalized = str(asset).strip().upper()
+        if not normalized or normalized in seen:
+            continue
+        seen.add(normalized)
+        ordered_symbols.append(normalized)
+
+    return ordered_symbols
 
 
 def _frame_data_source(data: pd.DataFrame | None) -> str:
@@ -582,7 +610,7 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[s
     if int(state.get("run_count", 0)) == 0 and not state.get("positions") and float(state.get("cash", 0.0)) <= 0:
         state["cash"] = round(float(config.initial_capital), 2)
 
-    symbols = _normalize_symbol_list(config)
+    symbols = _symbols_for_cycle(state, config)
     market_data_result = load_market_data_result(symbols, config, requested_by="worker_cycle")
     raw_market_data = market_data_result["frames"]
     market_data_status = market_data_result["status"]
@@ -615,6 +643,7 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[s
             "momentum_filter": 0,
             "feed_unreliable": 0,
             "context_blocked": 0,
+            "daily_loss_guard": 0,
         },
     }
 
@@ -693,7 +722,27 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[s
             )
         )
 
-    slots_left = max(int(config.max_open_positions) - len(state.get("positions", {}) or {}), 0)
+    current_day_key = str(config.daily_loss_day_key or _utc_day_key()).strip() or _utc_day_key()
+    daily_realized_running = float(config.daily_realized_pnl_brl or 0.0)
+    for trade in trades_executed:
+        if str(trade.get("side") or "").upper() != "SELL":
+            continue
+        if str(trade.get("timestamp") or "").startswith(current_day_key):
+            daily_realized_running += float(trade.get("realized_pnl", 0.0) or 0.0)
+
+    daily_loss_limit = max(0.0, float(config.daily_loss_limit_brl or 0.0))
+    daily_loss_consumed = max(0.0, -daily_realized_running)
+    daily_loss_block_active = bool(config.daily_loss_block_active)
+    daily_loss_block_reason = str(config.daily_loss_block_reason or "")
+    if daily_loss_limit > 0 and daily_loss_consumed >= daily_loss_limit:
+        daily_loss_block_active = True
+        if not daily_loss_block_reason:
+            daily_loss_block_reason = (
+                f"Limite de perda diaria atingido ({daily_loss_consumed:.2f}/{daily_loss_limit:.2f}). "
+                "Novas entradas bloqueadas."
+            )
+
+    slots_left = 0 if daily_loss_block_active else max(int(config.max_open_positions) - len(state.get("positions", {}) or {}), 0)
     candidates: list[dict[str, Any]] = []
 
     for asset, data in market_data.items():
@@ -721,6 +770,10 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[s
             should_buy = False
             if "context_blocked" not in evaluation["rejection_reasons"]:
                 evaluation["rejection_reasons"] = [*evaluation["rejection_reasons"], "context_blocked"]
+        if daily_loss_block_active:
+            should_buy = False
+            if "daily_loss_guard" not in evaluation["rejection_reasons"]:
+                evaluation["rejection_reasons"] = [*evaluation["rejection_reasons"], "daily_loss_guard"]
         if not _is_live_market_source(data_source):
             should_buy = False
             if "feed_unreliable" not in evaluation["rejection_reasons"]:
@@ -869,6 +922,12 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[s
         "report": report,
         "signals": signals,
         "trades_executed": len(trades_executed),
+        "entries_blocked_by_daily_loss": daily_loss_block_active,
+        "entries_block_reason": daily_loss_block_reason,
+        "daily_loss_limit_brl": round(float(daily_loss_limit), 2),
+        "daily_loss_consumed_brl": round(float(daily_loss_consumed), 2),
+        "daily_realized_pnl_brl": round(float(daily_realized_running), 2),
+        "daily_loss_day_key": current_day_key,
         "market_data_status": market_data_status,
         "market_context": market_context,
         "validation_cycle": cycle_validation,

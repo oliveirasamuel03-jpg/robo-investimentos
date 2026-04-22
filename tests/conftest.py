@@ -15,6 +15,7 @@ MODULES_TO_CLEAR = [
     "core.broker",
     "core.production_monitor",
     "core.alerts",
+    "core.daily_risk",
     "core.retention",
     "core.swing_validation",
     "core.trader_profiles",

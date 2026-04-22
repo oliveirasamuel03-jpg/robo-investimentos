@@ -252,6 +252,42 @@ def calculate_trade_report_metrics(reports_df: pd.DataFrame) -> dict[str, float 
     }
 
 
+def calculate_equity_curve_metrics(equity_df: pd.DataFrame | None) -> dict[str, float | None]:
+    if equity_df is None or equity_df.empty or "equity" not in equity_df.columns:
+        return {
+            "current_equity": None,
+            "peak_equity": None,
+            "max_drawdown_brl": None,
+            "max_drawdown_pct": None,
+        }
+
+    frame = equity_df.copy()
+    frame["equity"] = pd.to_numeric(frame["equity"], errors="coerce")
+    frame = frame.dropna(subset=["equity"]).reset_index(drop=True)
+    if frame.empty:
+        return {
+            "current_equity": None,
+            "peak_equity": None,
+            "max_drawdown_brl": None,
+            "max_drawdown_pct": None,
+        }
+
+    running_peak = frame["equity"].cummax()
+    drawdown_brl = (running_peak - frame["equity"]).clip(lower=0.0)
+    drawdown_pct = drawdown_brl.div(running_peak.replace(0, pd.NA))
+
+    max_drawdown_brl = float(drawdown_brl.max()) if not drawdown_brl.empty else None
+    valid_drawdown_pct = drawdown_pct.dropna()
+    max_drawdown_pct = float(valid_drawdown_pct.max()) if not valid_drawdown_pct.empty else None
+
+    return {
+        "current_equity": float(frame["equity"].iloc[-1]),
+        "peak_equity": float(running_peak.max()),
+        "max_drawdown_brl": max_drawdown_brl,
+        "max_drawdown_pct": max_drawdown_pct,
+    }
+
+
 def summarize_reports_by_profile(reports_df: pd.DataFrame) -> pd.DataFrame:
     df = normalize_trade_reports_frame(reports_df)
     if df.empty:

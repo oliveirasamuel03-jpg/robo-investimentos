@@ -1,0 +1,23 @@
+{
+  "root": {
+    "url": "http://127.0.0.1:8502",
+    "screenshot": "C:\\Users\\User\\Documents\\Codex\\2026-04-18-tenho-um-rob-trader-em-streamlit\\robo-investimentos-hardening\\storage\\tmp_real_env_validation\\root.png",
+    "has_trava": false,
+    "has_trader": true,
+    "has_controle": true
+  },
+  "trader": {
+    "url": "http://127.0.0.1:8502/Trader",
+    "screenshot": "C:\\Users\\User\\Documents\\Codex\\2026-04-18-tenho-um-rob-trader-em-streamlit\\robo-investimentos-hardening\\storage\\tmp_real_env_validation\\trader.png",
+    "has_trava": true,
+    "has_trader": true,
+    "has_controle": true
+  },
+  "controle": {
+    "url": "http://127.0.0.1:8502/Controle_do_Bot",
+    "screenshot": "C:\\Users\\User\\Documents\\Codex\\2026-04-18-tenho-um-rob-trader-em-streamlit\\robo-investimentos-hardening\\storage\\tmp_real_env_validation\\controle.png",
+    "has_trava": true,
+    "has_trader": true,
+    "has_controle": true
+  }
+}

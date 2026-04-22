@@ -9,10 +9,12 @@ from core.alerts import send_email_alert
 from core.auth.guards import render_auth_toolbar, require_admin
 from core.broker import broker_status_label, probe_broker_status
 from core.config import ALERT_EMAIL_ENABLED, ALERT_EMAIL_FROM, ALERT_EMAIL_PROVIDER, PRODUCTION_MODE, SMTP_USERNAME
+from core.market_data import classify_feed_status, format_market_timestamp, legacy_market_status
 from core.production_monitor import evaluate_production_health
 from core.state_store import (
     load_bot_state,
     log_event,
+    resolve_market_data_views,
     reset_state,
     save_bot_state,
     update_broker_status,
@@ -23,17 +25,29 @@ from engines.trader_engine import run_trader_cycle
 
 
 def market_data_status_label(raw_status: str | None) -> str:
+    payload = raw_status if isinstance(raw_status, dict) else {"status": raw_status}
+    return classify_feed_status(
+        status=payload.get("feed_status") or payload.get("status"),
+        last_source=payload.get("last_source"),
+        source_breakdown=payload.get("source_breakdown"),
+    )
+
+
+def market_data_provider_label(raw_status: dict | None) -> str:
+    payload = raw_status if isinstance(raw_status, dict) else {"provider": raw_status}
+    provider = str(payload.get("provider") or "unknown").strip().lower()
     labels = {
-        "healthy": "Saudavel",
-        "degraded": "Degradado",
-        "cached": "Cache",
-        "error": "Fallback",
+        "twelvedata": "Twelve Data",
+        "yahoo": "Yahoo",
+        "synthetic": "Fallback sintetico",
+        "mixed": "Twelve Data + Yahoo",
         "unknown": "Desconhecido",
     }
-    return labels.get(str(raw_status or "unknown").strip().lower(), str(raw_status or "Desconhecido"))
+    return labels.get(provider, provider.upper())
 
 
 def market_data_source_label(raw_source: str | None) -> str:
+    payload = raw_source if isinstance(raw_source, dict) else {"last_source": raw_source}
     labels = {
         "market": "Mercado ao vivo",
         "cached": "Cache reaproveitado",
@@ -41,7 +55,48 @@ def market_data_source_label(raw_source: str | None) -> str:
         "mixed": "Misto",
         "unknown": "Desconhecido",
     }
-    return labels.get(str(raw_source or "unknown").strip().lower(), str(raw_source or "Desconhecido"))
+    source = str(payload.get("last_source") or "unknown").strip().lower()
+    base_label = labels.get(source, str(source or "Desconhecido"))
+    provider_label = market_data_provider_label(payload)
+    if source == "fallback":
+        return base_label
+    return f"{base_label} via {provider_label}"
+
+
+def twelvedata_diagnostic_payload(raw_status: dict | None) -> dict:
+    payload = raw_status if isinstance(raw_status, dict) else {}
+    diagnostics = payload.get("provider_diagnostics", {}) or {}
+    diagnostic = diagnostics.get("twelvedata", {}) if isinstance(diagnostics, dict) else {}
+    return dict(diagnostic or {})
+
+
+def audit_display_value(value: object) -> str:
+    if value is None:
+        return "NAO REGISTRADO NO ESTADO ATUAL"
+    if isinstance(value, str) and not value.strip():
+        return "NAO REGISTRADO NO ESTADO ATUAL"
+    if isinstance(value, bool):
+        return "Sim" if value else "Nao"
+    return str(value)
+
+
+def worker_instrumentation_confirmed(payload: dict | None) -> bool:
+    data = payload or {}
+    return (
+        str(data.get("process_role") or "").strip().lower() == "worker"
+        and str(data.get("state_writer") or "").strip().lower() == "worker"
+        and bool(str(data.get("build_active") or "").strip())
+        and bool(str(data.get("last_stage") or "").strip())
+    )
+
+
+def market_data_legacy_label(raw_status: dict | None) -> str:
+    payload = raw_status or {}
+    return legacy_market_status(
+        status=payload.get("status_legacy") or payload.get("status"),
+        last_source=payload.get("last_source"),
+        source_breakdown=payload.get("source_breakdown"),
+    )
 
 
 def broker_mode_label(raw_mode: str | None) -> str:
@@ -85,28 +140,31 @@ render_auth_toolbar()
 
 st.title("Controle Operacional")
 st.caption(f"Painel administrativo do trader. Usuario: {current_user['username']}")
+st.code("BUILD_UI_MARKER_20260422_A")
 
 state = load_bot_state()
 security_state = state.get("security", {}) or {}
-market_data_state = state.get("market_data", {}) or {}
-market_contexts = market_data_state.get("contexts", {}) or {}
-operational_market_state = market_contexts.get("worker_cycle") or market_data_state
-chart_market_state = market_contexts.get("trader_chart") or {}
+operational_market_state, chart_market_state = resolve_market_data_views(state)
 broker_state = update_broker_status(probe_broker_status(security_state, requested_by="admin_panel"))
 state = load_bot_state()
 production_state = update_production_status(evaluate_production_health(state))
 state = load_bot_state()
 production_state = state.get("production", {}) or {}
-operational_market_state = (state.get("market_data", {}) or {}).get("contexts", {}).get("worker_cycle") or state.get(
-    "market_data",
-    {},
-)
-chart_market_state = (state.get("market_data", {}) or {}).get("contexts", {}).get("trader_chart") or {}
+operational_market_state, chart_market_state = resolve_market_data_views(state)
 broker_state = state.get("broker", {}) or broker_state
 validation_report = refresh_swing_validation_cycle()
 state = load_bot_state()
 validation_state = state.get("validation", {}) or {}
 market_context_state = state.get("market_context", {}) or {}
+risk_state = state.get("risk", {}) or {}
+daily_loss_limit_brl = float(risk_state.get("daily_loss_limit_brl", 0.0) or 0.0)
+daily_loss_consumed_brl = float(risk_state.get("daily_loss_consumed_brl", 0.0) or 0.0)
+daily_loss_remaining_brl = float(risk_state.get("daily_loss_remaining_brl", 0.0) or 0.0)
+daily_realized_pnl_brl = float(risk_state.get("daily_realized_pnl_brl", 0.0) or 0.0)
+daily_loss_day_key = str(risk_state.get("daily_loss_day_key") or "-")
+daily_loss_block_active = bool(risk_state.get("daily_loss_block_active", False))
+daily_loss_blocked_at = str(risk_state.get("daily_loss_blocked_at") or "")
+daily_loss_block_reason = str(risk_state.get("daily_loss_block_reason") or "")
 
 if bool(security_state.get("real_mode_enabled", False)):
     st.warning("Real trading enabled")
@@ -150,6 +208,36 @@ st.caption(
     f"Provider de alerta: {alert_provider_text} | Remetente configurado: {configured_sender}"
 )
 
+st.subheader("Trava de perda diária (paper)")
+st.caption(
+    "Bloqueio operacional explícito: ao atingir o limite diário de perda, o robô não abre novas entradas. "
+    "Posições já abertas continuam sob gestão normal."
+)
+if daily_loss_block_active:
+    st.error("Trava diária ativa: novas entradas bloqueadas por perda diária.")
+else:
+    st.success("Trava diária pronta: novas entradas liberadas neste momento.")
+
+risk_c1, risk_c2, risk_c3, risk_c4 = st.columns(4)
+risk_c1.metric("Estado", "Bloqueado" if daily_loss_block_active else "Liberado")
+risk_c2.metric("Limite diário", f"R$ {daily_loss_limit_brl:,.2f}")
+risk_c3.metric("Perda consumida", f"R$ {daily_loss_consumed_brl:,.2f}")
+risk_c4.metric("Limite restante", f"R$ {daily_loss_remaining_brl:,.2f}")
+st.caption(
+    f"Dia operacional UTC: {daily_loss_day_key} | "
+    f"PnL realizado do dia (base da trava): R$ {daily_realized_pnl_brl:,.2f}"
+)
+if daily_loss_block_active:
+    st.caption(
+        f"Bloqueio ativado em: {format_market_timestamp(daily_loss_blocked_at)} | "
+        f"Motivo: {daily_loss_block_reason or 'Limite diário atingido.'}"
+    )
+if risk_state.get("daily_loss_reset_at"):
+    st.caption(
+        f"Último reset automático na virada do dia UTC: "
+        f"{format_market_timestamp(risk_state.get('daily_loss_reset_at'))}"
+    )
+
 act_c1, act_c2 = st.columns(2)
 with act_c1:
     if st.button("Testar email", use_container_width=True):
@@ -189,6 +277,7 @@ else:
 
 val_metrics = dict(validation_report.get("metrics", {}) or {})
 val_perf = dict(validation_report.get("performance", {}) or {})
+val_consistency = dict(validation_report.get("consistency", {}) or {})
 
 val_c1, val_c2, val_c3, val_c4 = st.columns(4)
 val_c1.metric("Dia atual", str(int(validation_report.get("validation_day_number", 1) or 1)))
@@ -210,6 +299,37 @@ val_c11.metric(
     "-" if val_metrics.get("fallback_cycle_pct") is None else f"{float(val_metrics.get('fallback_cycle_pct') or 0.0):.2f}%",
 )
 val_c12.metric("Erros operacionais", str(int(val_metrics.get("operational_errors", 0) or 0)))
+
+cons_c1, cons_c2, cons_c3, cons_c4 = st.columns(4)
+cons_c1.metric("Amostra atual", str(val_consistency.get("sample_quality_label") or "Sem leitura"))
+cons_c2.metric("Postura", str(val_consistency.get("operational_posture_label") or "Indefinida"))
+cons_c3.metric(
+    "Drawdown max",
+    "-"
+    if val_metrics.get("max_drawdown_pct") is None
+    else f"{float(val_metrics.get('max_drawdown_pct') or 0.0) * 100:.2f}%",
+)
+cons_c4.metric(
+    "Watchlist da fase",
+    "Coerente" if bool(val_consistency.get("watchlist_phase_aligned")) else "Fora da fase",
+)
+st.caption(
+    "Aprovacao de sinais no ciclo: "
+    + (
+        "-"
+        if val_consistency.get("signal_approval_rate") is None
+        else f"{float(val_consistency.get('signal_approval_rate') or 0.0) * 100:.1f}%"
+    )
+)
+if val_consistency.get("sample_quality_message"):
+    st.caption(f"Amostra: {val_consistency.get('sample_quality_message')}")
+if val_consistency.get("watchlist_message"):
+    st.caption(f"Watchlist: {val_consistency.get('watchlist_message')}")
+if val_consistency.get("capital_phase_aligned") is False:
+    st.warning(
+        "O capital atual do runtime nao coincide com o capital-base recomendado da fase. "
+        "Para um novo ciclo limpo, use o reset operacional do trader."
+    )
 
 val_actions1, val_actions2 = st.columns(2)
 with val_actions1:
@@ -334,17 +454,19 @@ if market_context_state.get("market_context_regime"):
         f"Consistencia da watchlist: {watchlist_consistency_label}"
     )
 
-status_label = market_data_status_label(operational_market_state.get("status"))
-if str(operational_market_state.get("status", "")).lower() == "healthy":
-    st.success(f"Feed de mercado saudavel via {str(operational_market_state.get('provider', 'yahoo')).upper()}.")
-elif str(operational_market_state.get("status", "")).lower() in {"cached", "degraded"}:
-    st.warning(
-        f"Feed degradado: usando {market_data_source_label(operational_market_state.get('last_source'))}. "
-        "Operacoes novas podem ser reduzidas ou bloqueadas conforme a estrategia."
+feed_status_label = market_data_status_label(operational_market_state)
+if feed_status_label == "LIVE":
+    st.success(
+        f"Feed classificado como LIVE via {market_data_provider_label(operational_market_state)}."
     )
-elif str(operational_market_state.get("status", "")).lower() == "error":
+elif feed_status_label == "DELAYED":
+    st.warning(
+        f"Feed classificado como DELAYED: usando {market_data_source_label(operational_market_state)}. "
+        "A UI deixa isso explicito e o worker nao trata dado atrasado como se fosse ao vivo."
+    )
+elif feed_status_label == "FALLBACK":
     st.error(
-        f"Feed em fallback via {str(operational_market_state.get('provider', 'yahoo')).upper()}. "
+        f"Feed classificado como FALLBACK via {market_data_provider_label(operational_market_state)}. "
         "O worker continua online, mas evita operar com dado nao confiavel."
     )
 else:
@@ -352,15 +474,19 @@ else:
 
 info_c1, info_c2, info_c3, info_c4, info_c5 = st.columns(5)
 info_c1.metric("Status do bot", bot_status_label(state.get("bot_status")))
-info_c2.metric("Provider de dados", str(operational_market_state.get("provider", "yahoo")).upper())
-info_c3.metric("Status do feed", status_label)
-info_c4.metric("Fonte atual", market_data_source_label(operational_market_state.get("last_source")))
+info_c2.metric("Provider de dados", market_data_provider_label(operational_market_state))
+info_c3.metric("Status do feed", feed_status_label)
+info_c4.metric("Fonte atual", market_data_source_label(operational_market_state))
 info_c5.metric("Modo do broker", broker_mode_label(broker_state.get("mode")))
 
 diag_c1, diag_c2 = st.columns(2)
 with diag_c1:
-    st.caption(f"Ultimo sync do feed: {operational_market_state.get('last_sync_at') or 'Sem registro'}")
-    st.caption(f"Ultimo sucesso: {operational_market_state.get('last_success_at') or 'Sem registro'}")
+    st.caption(
+        f"Ultimo sync do feed: {format_market_timestamp(operational_market_state.get('last_sync_at'))}"
+    )
+    st.caption(
+        f"Ultimo sucesso: {format_market_timestamp(operational_market_state.get('last_success_at'))}"
+    )
 with diag_c2:
     st.caption(f"Broker provider: {str(broker_state.get('provider', 'paper')).upper()}")
     st.caption(f"Status do broker: {broker_status_label(broker_state.get('status'))}")
@@ -374,20 +500,86 @@ if production_state.get("last_alert_error"):
 
 with st.expander("Diagnostico do feed"):
     st.write("**Contexto operacional (worker):**")
+    st.write(f"Classificacao atual: {market_data_status_label(operational_market_state)}")
+    st.write(f"Taxonomia legada: {market_data_legacy_label(operational_market_state)}")
     st.write(f"Solicitado por: {operational_market_state.get('requested_by') or 'Sem registro'}")
     st.write(f"Ativos monitorados: {', '.join(operational_market_state.get('symbols', []) or []) or 'Sem registro'}")
+    st.write(f"Ultimo sync: {format_market_timestamp(operational_market_state.get('last_sync_at'))}")
     st.code(
         json.dumps(operational_market_state.get("source_breakdown", {}) or {}, ensure_ascii=False, indent=2),
         language="json",
     )
+    td_diag = twelvedata_diagnostic_payload(operational_market_state)
+    if td_diag:
+        st.write("**Diagnostico Twelve Data (worker):**")
+        st.write(f"Build ativo: {td_diag.get('build_label') or 'Sem registro'}")
+        st.write(f"Servico: {td_diag.get('service_name') or 'Sem registro'}")
+        st.write(f"API key lida pelo processo: {'Sim' if td_diag.get('api_key_present') else 'Nao'}")
+        st.write(f"Tamanho da chave: {int(td_diag.get('api_key_length') or 0)}")
+        st.write(f"Base URL: {td_diag.get('api_base') or 'Sem registro'}")
+        st.write(f"Host resolvido: {td_diag.get('api_base_host') or 'Sem registro'}")
+        st.write(f"Base URL valida: {'Sim' if td_diag.get('api_base_valid') else 'Nao'}")
+        st.write(f"Simbolo amostra: {td_diag.get('sample_symbol') or 'Sem registro'}")
+        st.write(f"Simbolo normalizado: {td_diag.get('sample_normalized_symbol') or 'Sem registro'}")
+        st.write(f"Request montado: {'Sim' if td_diag.get('request_built') else 'Nao'}")
+        st.write(f"Request saiu do processo: {'Sim' if td_diag.get('request_attempted') else 'Nao'}")
+        st.write(f"Resposta recebida: {'Sim' if td_diag.get('response_received') else 'Nao'}")
+        st.write(f"Sucessos Twelve Data no ciclo: {int(td_diag.get('success_count') or 0)}")
+        st.write(f"Ultimo estagio: {td_diag.get('last_stage') or 'Sem registro'}")
+        if td_diag.get("http_statuses"):
+            st.write(f"HTTP status observados: {', '.join(str(item) for item in (td_diag.get('http_statuses') or []))}")
+        if td_diag.get("payload_codes"):
+            st.write(f"Codigos retornados: {', '.join(str(item) for item in (td_diag.get('payload_codes') or []))}")
+        if td_diag.get("last_error"):
+            st.write(f"Ultimo erro Twelve Data: {td_diag.get('last_error')}")
+        st.code(json.dumps(td_diag, ensure_ascii=False, indent=2), language="json")
     if chart_market_state:
         st.write("**Ultimo contexto visual (Trader):**")
+        st.write(f"Classificacao atual: {market_data_status_label(chart_market_state)}")
+        st.write(f"Taxonomia legada: {market_data_legacy_label(chart_market_state)}")
         st.write(f"Solicitado por: {chart_market_state.get('requested_by') or 'Sem registro'}")
         st.write(f"Ativos monitorados: {', '.join(chart_market_state.get('symbols', []) or []) or 'Sem registro'}")
+        st.write(f"Ultimo sync: {format_market_timestamp(chart_market_state.get('last_sync_at'))}")
         st.code(
             json.dumps(chart_market_state.get("source_breakdown", {}) or {}, ensure_ascii=False, indent=2),
             language="json",
         )
+
+st.markdown("### AUDITORIA DO WORKER")
+st.write("controle_bot_ui_version: audit_v2")
+worker_confirmed = worker_instrumentation_confirmed(operational_market_state)
+if worker_confirmed:
+    st.success("WORKER INSTRUMENTADO CONFIRMADO")
+else:
+    st.error("WORKER INSTRUMENTADO NAO COMPROVADO")
+
+audit_c1, audit_c2 = st.columns(2)
+with audit_c1:
+    st.write(f"ui_audit_probe: {audit_display_value(operational_market_state.get('ui_audit_probe'))}")
+    st.write(f"Build ativo: {audit_display_value(operational_market_state.get('build_active'))}")
+    st.write(f"Git SHA: {audit_display_value(operational_market_state.get('git_sha'))}")
+    st.write(f"Build timestamp: {audit_display_value(operational_market_state.get('build_timestamp'))}")
+    st.write(f"Runtime iniciado em: {audit_display_value(operational_market_state.get('runtime_started_at'))}")
+    st.write(f"Servico: {audit_display_value(operational_market_state.get('service_name'))}")
+    st.write(f"Papel do processo: {audit_display_value(operational_market_state.get('process_role'))}")
+    st.write(f"Ultima gravacao do estado: {audit_display_value(operational_market_state.get('state_written_at'))}")
+    st.write(f"Writer do estado: {audit_display_value(operational_market_state.get('state_writer'))}")
+    st.write(f"Build SHA do estado: {audit_display_value(operational_market_state.get('state_build_sha'))}")
+    st.write(f"Schema do estado: {audit_display_value(operational_market_state.get('state_schema_version'))}")
+with audit_c2:
+    st.write(f"API key presente: {audit_display_value(operational_market_state.get('api_key_present'))}")
+    st.write(f"Request preparado: {audit_display_value(operational_market_state.get('request_prepared'))}")
+    st.write(f"Request tentado: {audit_display_value(operational_market_state.get('request_attempted'))}")
+    st.write(f"Resposta recebida: {audit_display_value(operational_market_state.get('response_received'))}")
+    st.write(f"Status code: {audit_display_value(operational_market_state.get('response_status_code'))}")
+    st.write(f"Ultimo estagio: {audit_display_value(operational_market_state.get('last_stage'))}")
+    st.write(f"Ultimo erro: {audit_display_value(operational_market_state.get('last_error'))}")
+    requested_symbols = operational_market_state.get("requested_symbols") or operational_market_state.get("symbols") or []
+    st.write(
+        "Simbolos solicitados: "
+        f"{audit_display_value(', '.join(str(item) for item in requested_symbols) if requested_symbols else '')}"
+    )
+    st.write(f"Provider efetivo: {audit_display_value(operational_market_state.get('provider_effective') or operational_market_state.get('provider'))}")
 
 with st.expander("Diagnostico do broker"):
     st.write(f"**Provider:** {str(broker_state.get('provider', 'paper')).upper()}")
@@ -423,9 +615,12 @@ with c2:
     if st.button("Executar ciclo agora", use_container_width=True):
         result = run_trader_cycle()
         cycle = result.get("cycle_result", {}) or {}
+        risk = result.get("risk", {}) or {}
+        blocked = bool(risk.get("daily_loss_block_active", False))
         st.success(
             f"Ciclo executado. Trades feitos: {int(cycle.get('trades_executed', 0) or 0)} | "
-            f"Feed: {market_data_status_label((cycle.get('market_data_status') or {}).get('status'))}"
+            f"Feed: {market_data_status_label(cycle.get('market_data_status'))} | "
+            f"Trava diaria: {'BLOQUEADA' if blocked else 'LIBERADA'}"
         )
 
 with c3:

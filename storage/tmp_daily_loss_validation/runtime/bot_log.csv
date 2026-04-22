@@ -1,0 +1,2 @@
+timestamp,level,message
+2026-04-21T20:32:45.223892,WARNING,Limite de perda diaria atingido: R$ 130.00 consumidos de R$ 100.00 no dia UTC 2026-04-21. Novas entradas bloqueadas.

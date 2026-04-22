@@ -1,0 +1,61 @@
+{
+  "initial_capital": 1000.0,
+  "cash": 900.0,
+  "equity": 1000.0,
+  "realized_pnl": 0.0,
+  "positions": {
+    "BTC-USD": {
+      "trade_id": "BTC-USD-5bd7f683301b",
+      "profile": "Equilibrado",
+      "quantity": 0.90755,
+      "entry_price": 110.186746,
+      "avg_price": 110.186746,
+      "last_price": 110.186746,
+      "peak_price": 110.186746,
+      "atr_pct": 0.012706,
+      "atr_pct_entry": 0.0127,
+      "trailing_stop": 105.708757,
+      "gross_entry_value": 100.0,
+      "entry_score": 0.98,
+      "rsi_entry": 89.06,
+      "ma20_entry": 109.381128,
+      "ma50_entry": 108.166532,
+      "entry_trend_alignment": "aligned",
+      "entry_signal_key": "BTC-USD|2026-04-06T19:00:00|market",
+      "entry_data_source": "market",
+      "holding_minutes_limit": 8640,
+      "opened_at": "2026-04-21T20:32:45.057128+00:00",
+      "updated_at": "2026-04-21T20:33:18.707222+00:00"
+    }
+  },
+  "asset_cooldowns": {},
+  "last_prices": {
+    "BTC-USD": 110.186746
+  },
+  "history": [
+    {
+      "timestamp": "2026-04-21T20:32:45.057128+00:00",
+      "cash": 900.0,
+      "equity": 1000.0,
+      "open_positions": 1,
+      "total_return": 0.0
+    },
+    {
+      "timestamp": "2026-04-21T20:32:45.275467+00:00",
+      "cash": 900.0,
+      "equity": 1000.0,
+      "open_positions": 1,
+      "total_return": 0.0
+    },
+    {
+      "timestamp": "2026-04-21T20:33:18.707222+00:00",
+      "cash": 900.0,
+      "equity": 1000.0,
+      "open_positions": 1,
+      "total_return": 0.0
+    }
+  ],
+  "run_count": 3,
+  "updated_at": "2026-04-21T20:33:18.707222+00:00",
+  "last_trade_at": "2026-04-21T20:32:45.057128+00:00"
+}

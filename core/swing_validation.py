@@ -8,15 +8,19 @@ import pandas as pd
 from core.config import (
     BOT_LOG_COLUMNS,
     BOT_LOG_FILE,
+    SWING_VALIDATION_RECOMMENDED_WATCHLIST,
     TRADER_ORDERS_COLUMNS,
     TRADER_ORDERS_FILE,
     VALIDATION_DEFAULT_MAX_OPEN_POSITIONS,
+    VALIDATION_INITIAL_CAPITAL_BRL,
     VALIDATION_LIVE_TRADING_ENABLED,
     VALIDATION_MODE_DISPLAY,
     VALIDATION_TRADING_MODE,
 )
 from core.state_store import load_bot_state, read_storage_table, save_bot_state
+from core.trader_profiles import get_trader_profile_config, normalize_trader_profile
 from core.trader_reports import (
+    calculate_equity_curve_metrics,
     calculate_trade_report_metrics,
     generate_trade_suggestions,
     normalize_trade_reports_frame,
@@ -583,6 +587,177 @@ def _build_context_impact_estimate(report: dict[str, Any]) -> str:
     return "O contexto permaneceu neutro ou pouco relevante, sem impacto material nas entradas desta janela."
 
 
+def _normalized_watchlist(values: Any) -> list[str]:
+    normalized: list[str] = []
+    seen: set[str] = set()
+    for value in values or []:
+        asset = str(value).strip().upper()
+        if not asset or asset in seen:
+            continue
+        seen.add(asset)
+        normalized.append(asset)
+    return normalized
+
+
+def _load_runtime_equity_curve_metrics() -> dict[str, float | None]:
+    try:
+        from engines.quant_bridge import read_paper_equity
+
+        return calculate_equity_curve_metrics(read_paper_equity(limit=1000))
+    except Exception:
+        return {
+            "current_equity": None,
+            "peak_equity": None,
+            "max_drawdown_brl": None,
+            "max_drawdown_pct": None,
+        }
+
+
+def _sample_quality_payload(total_trades: int) -> dict[str, str]:
+    if total_trades < 3:
+        return {
+            "label": "Baixa",
+            "message": "A amostra ainda e pequena demais para concluir qualidade estrategica com confianca.",
+        }
+    if total_trades < 8:
+        return {
+            "label": "Parcial",
+            "message": "A amostra ja permite leitura inicial, mas ainda pede mais ciclos antes de ajuste fino.",
+        }
+    return {
+        "label": "Aceitavel",
+        "message": "A amostra ja sustenta uma leitura operacional mais confiavel desta fase.",
+    }
+
+
+def _operational_posture_payload(
+    *,
+    approval_rate: float | None,
+    signals_total: int,
+    effective_profile: dict[str, Any],
+) -> dict[str, str]:
+    score_floor = float(effective_profile.get("min_signal_score", 0.0) or 0.0)
+    max_open_positions = int(effective_profile.get("max_open_positions", VALIDATION_DEFAULT_MAX_OPEN_POSITIONS) or 0)
+
+    if approval_rate is not None and signals_total >= 10:
+        if approval_rate <= 0.08 and score_floor >= 0.74:
+            return {
+                "label": "Conservador",
+                "message": "O filtro esta bem seletivo para esta fase, com poucas aprovacoes por janela.",
+            }
+        if approval_rate >= 0.35 or score_floor <= 0.66 or max_open_positions >= 4:
+            return {
+                "label": "Permissivo",
+                "message": "O conjunto atual tende a aceitar sinais demais para uma validacao swing disciplinada.",
+            }
+
+    return {
+        "label": "Equilibrado",
+        "message": "O robo esta seletivo sem aparentar permissividade excessiva para esta fase.",
+    }
+
+
+def _watchlist_phase_alignment_payload(state: dict[str, Any]) -> dict[str, Any]:
+    current_watchlist = _normalized_watchlist((state.get("trader", {}) or {}).get("watchlist", []))
+    recommended_watchlist = _normalized_watchlist(SWING_VALIDATION_RECOMMENDED_WATCHLIST)
+    non_recommended_assets = [asset for asset in current_watchlist if asset not in recommended_watchlist]
+    missing_recommended_assets = [asset for asset in recommended_watchlist if asset not in current_watchlist]
+    open_positions = [
+        str(position.get("asset") or "").strip().upper()
+        for position in (state.get("positions", []) or [])
+        if str(position.get("module") or "").upper() == "TRADER" and str(position.get("status") or "").upper() == "OPEN"
+    ]
+    managed_assets_outside_watchlist = [asset for asset in open_positions if asset and asset not in current_watchlist]
+    phase_aligned = not non_recommended_assets and bool(current_watchlist)
+
+    if phase_aligned and not managed_assets_outside_watchlist:
+        message = "A watchlist ativa segue coerente com a fase cripto-only atual."
+    elif non_recommended_assets:
+        message = (
+            "Ha ativos fora da watchlist recomendada da fase: "
+            f"{', '.join(non_recommended_assets)}."
+        )
+    else:
+        message = (
+            "Existem posicoes abertas fora da watchlist ativa: "
+            f"{', '.join(managed_assets_outside_watchlist)}."
+        )
+
+    return {
+        "phase_aligned": phase_aligned,
+        "current_watchlist": current_watchlist,
+        "recommended_watchlist": recommended_watchlist,
+        "non_recommended_assets": non_recommended_assets,
+        "missing_recommended_assets": missing_recommended_assets,
+        "managed_assets_outside_watchlist": managed_assets_outside_watchlist,
+        "message": message,
+    }
+
+
+def _build_operational_consistency(
+    report: dict[str, Any],
+    state: dict[str, Any],
+    equity_metrics: dict[str, float | None],
+) -> dict[str, Any]:
+    metrics = dict(report.get("metrics", {}) or {})
+    trader_state = dict(state.get("trader", {}) or {})
+    current_profile = normalize_trader_profile(trader_state.get("profile"))
+    base_profile = get_trader_profile_config(
+        current_profile,
+        base_ticket_value=float(trader_state.get("ticket_value", 100.0) or 100.0),
+        base_holding_minutes=int(trader_state.get("holding_minutes", 60) or 60),
+        base_max_open_positions=int(trader_state.get("max_open_positions", VALIDATION_DEFAULT_MAX_OPEN_POSITIONS) or VALIDATION_DEFAULT_MAX_OPEN_POSITIONS),
+    )
+    effective_profile = apply_swing_validation_overrides(current_profile, base_profile)
+
+    signals_total = int(metrics.get("signals_total", 0) or 0)
+    signals_approved = int(metrics.get("signals_approved", 0) or 0)
+    approval_rate = (signals_approved / signals_total) if signals_total > 0 else None
+    sample_quality = _sample_quality_payload(int(metrics.get("trades_closed", 0) or 0))
+    posture = _operational_posture_payload(
+        approval_rate=approval_rate,
+        signals_total=signals_total,
+        effective_profile=effective_profile,
+    )
+    watchlist_alignment = _watchlist_phase_alignment_payload(state)
+    runtime_capital = float(state.get("wallet_value", 0.0) or 0.0)
+    capital_phase_aligned = abs(runtime_capital - float(VALIDATION_INITIAL_CAPITAL_BRL)) < 0.01
+
+    capital_message = (
+        "Capital do runtime alinhado ao capital-base recomendado da fase."
+        if capital_phase_aligned
+        else (
+            "O capital atual do runtime nao bate com o capital-base recomendado da fase "
+            f"({runtime_capital:,.2f} vs {float(VALIDATION_INITIAL_CAPITAL_BRL):,.2f})."
+        )
+    )
+
+    return {
+        "sample_quality_label": sample_quality["label"],
+        "sample_quality_message": sample_quality["message"],
+        "signal_approval_rate": None if approval_rate is None else round(float(approval_rate), 4),
+        "operational_posture_label": posture["label"],
+        "operational_posture_message": posture["message"],
+        "watchlist_phase_aligned": bool(watchlist_alignment["phase_aligned"]),
+        "watchlist_message": watchlist_alignment["message"],
+        "current_watchlist": watchlist_alignment["current_watchlist"],
+        "recommended_watchlist": watchlist_alignment["recommended_watchlist"],
+        "non_recommended_assets": watchlist_alignment["non_recommended_assets"],
+        "managed_assets_outside_watchlist": watchlist_alignment["managed_assets_outside_watchlist"],
+        "capital_phase_aligned": capital_phase_aligned,
+        "capital_message": capital_message,
+        "effective_profile_name": current_profile,
+        "effective_ticket_value": round(float(effective_profile.get("ticket_value", 0.0) or 0.0), 2),
+        "effective_holding_minutes": int(effective_profile.get("holding_minutes", 0) or 0),
+        "effective_max_open_positions": int(
+            effective_profile.get("max_open_positions", VALIDATION_DEFAULT_MAX_OPEN_POSITIONS) or VALIDATION_DEFAULT_MAX_OPEN_POSITIONS
+        ),
+        "effective_min_signal_score": round(float(effective_profile.get("min_signal_score", 0.0) or 0.0), 4),
+        "max_drawdown_brl": equity_metrics.get("max_drawdown_brl"),
+        "max_drawdown_pct": equity_metrics.get("max_drawdown_pct"),
+    }
+
+
 def _final_verdict(report: dict[str, Any], state: dict[str, Any]) -> tuple[str, str]:
     metrics = report.get("metrics", {}) or {}
     performance = report.get("performance", {}) or {}
@@ -671,6 +846,10 @@ def build_swing_validation_report(state: dict | None = None, now: datetime | Non
         "worst_trade": performance_metrics["worst_trade"],
     }
 
+    equity_metrics = _load_runtime_equity_curve_metrics()
+    metrics["max_drawdown_brl"] = equity_metrics.get("max_drawdown_brl")
+    metrics["max_drawdown_pct"] = equity_metrics.get("max_drawdown_pct")
+
     report = {
         "validation_mode": SWING_VALIDATION_MODE,
         "paper_only": True,
@@ -696,6 +875,7 @@ def build_swing_validation_report(state: dict | None = None, now: datetime | Non
     report["successes"] = _build_successes(report)
     report["context_impact_estimate"] = _build_context_impact_estimate(report)
     report["phase_conclusion"] = _phase_conclusion(day_number, report)
+    report["consistency"] = _build_operational_consistency(report, payload, equity_metrics)
 
     if day_number >= SWING_VALIDATION_DAYS:
         verdict, reason = _final_verdict(report, payload)

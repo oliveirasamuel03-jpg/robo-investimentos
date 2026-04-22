@@ -4,60 +4,80 @@ import time
 from datetime import datetime, timedelta, timezone
 
 from core.alerts import send_email_alert, send_final_validation_email, send_recovery_email
-from core.config import ALERT_EMAIL_ENABLED, PRODUCTION_MODE
+from core.config import (
+    ALERT_EMAIL_ENABLED,
+    BUILD_TIMESTAMP,
+    MARKET_DATA_BUILD_LABEL,
+    MARKET_DATA_FALLBACK_PROVIDER,
+    MARKET_DATA_PROVIDER,
+    PRODUCTION_MODE,
+    RAILWAY_GIT_COMMIT_SHA,
+    SERVICE_NAME,
+)
 from core.production_monitor import evaluate_production_health
 from core.retention import run_retention_job, should_run_retention_job
 from core.state_store import (
     load_bot_state,
     log_event,
+    persist_worker_cycle_state,
     save_bot_state,
     update_production_status,
     update_retention_status,
     update_validation_status,
-    update_worker_heartbeat,
 )
 from core.swing_validation import refresh_swing_validation_cycle
-from engines.trader_engine import run_trader_cycle
+from engines.trader_engine import refresh_daily_loss_guard, run_trader_cycle
 
 SLEEP_SECONDS = 60
 PAUSED_SLEEP_SECONDS = 5
+WORKER_RUNTIME_STARTED_AT = datetime.now(timezone.utc).isoformat()
+WORKER_PROCESS_ROLE = "worker"
 
 
 def utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def emit_startup_marker(message: str) -> None:
+    print(message, flush=True)
+    log_event("INFO", message)
+
+
 def update_runtime_state(last_action: str, next_run_delta_seconds: int) -> None:
-    state = load_bot_state()
-
-    now = datetime.now(timezone.utc)
-
-    state["last_action"] = last_action
-    state["last_run_at"] = now.isoformat()
-    state["next_run_at"] = (now + timedelta(seconds=next_run_delta_seconds)).isoformat()
-    state["worker_status"] = "online"
-    state["worker_heartbeat"] = now.isoformat()
-
-    save_bot_state(state)
+    persist_worker_cycle_state(
+        last_action=last_action,
+        next_run_delta_seconds=next_run_delta_seconds,
+        worker_status="online",
+        runtime_started_at=WORKER_RUNTIME_STARTED_AT,
+        process_role=WORKER_PROCESS_ROLE,
+    )
 
 
 def mark_error(message: str) -> None:
-    state = load_bot_state()
-
-    now = datetime.now(timezone.utc)
-
-    state["last_action"] = f"Erro: {message}"
-    state["last_run_at"] = now.isoformat()
-    state["next_run_at"] = (now + timedelta(seconds=SLEEP_SECONDS)).isoformat()
-    state["worker_status"] = "error"
-    state["worker_heartbeat"] = now.isoformat()
-
-    save_bot_state(state)
+    persist_worker_cycle_state(
+        last_action=f"Erro: {message}",
+        next_run_delta_seconds=SLEEP_SECONDS,
+        worker_status="error",
+        market_data_payload={
+            "requested_by": "worker_cycle",
+            "build_active": MARKET_DATA_BUILD_LABEL,
+            "git_sha": str(RAILWAY_GIT_COMMIT_SHA or ""),
+            "build_timestamp": str(BUILD_TIMESTAMP or ""),
+            "service_name": str(SERVICE_NAME or ""),
+            "process_role": WORKER_PROCESS_ROLE,
+            "last_stage": "worker_exception",
+            "last_error": str(message or ""),
+        },
+        runtime_started_at=WORKER_RUNTIME_STARTED_AT,
+        process_role=WORKER_PROCESS_ROLE,
+    )
 
 
 def build_action_text(result: dict) -> str:
     cycle_result = result.get("cycle_result", {}) if isinstance(result, dict) else {}
     trades_executed = int(cycle_result.get("trades_executed", 0))
+    if bool(cycle_result.get("entries_blocked_by_daily_loss", False)):
+        return "Entradas bloqueadas por limite de perda diaria"
 
     if trades_executed > 0:
         return f"{trades_executed} trade(s) executado(s) nesta rodada"
@@ -85,10 +105,11 @@ def _send_health_alert(state: dict, health_payload: dict, *, alert_type: str, cu
 
 
 def _log_cycle_health(health_payload: dict) -> None:
-    fallback_flag = 1 if str(health_payload.get("feed_status") or "").lower() == "error" else 0
+    fallback_flag = 1 if str(health_payload.get("feed_status") or "").strip().upper() == "FALLBACK" else 0
     message = (
         "[cycle_health] "
         f"health_level={str(health_payload.get('health_level') or 'healthy').lower()};"
+        f"provider={str(health_payload.get('provider') or 'unknown').lower()};"
         f"feed_status={str(health_payload.get('feed_status') or 'unknown').lower()};"
         f"broker_status={str(health_payload.get('broker_status') or 'paper').lower()};"
         f"worker_status={str(health_payload.get('worker_status') or 'online').lower()};"
@@ -247,12 +268,30 @@ def _refresh_production_monitor(*, cycle_success: bool, exception_message: str =
 
 
 def worker_loop() -> None:
-    log_event("INFO", "Worker 24h iniciado")
+    emit_startup_marker("[worker_startup_marker] WORKER_BUILD_MARKER_20260422_A")
+    emit_startup_marker("[worker_startup] worker starting")
+    emit_startup_marker(
+        (
+            "[worker_startup_marker] build info loaded "
+            f"build={MARKET_DATA_BUILD_LABEL};git_sha={str(RAILWAY_GIT_COMMIT_SHA or '') or 'na'};"
+            f"build_timestamp={str(BUILD_TIMESTAMP or '') or 'na'};service={str(SERVICE_NAME or '') or 'na'}"
+        )
+    )
+    emit_startup_marker(
+        (
+            "[worker_startup] provider configured "
+            f"primary={str(MARKET_DATA_PROVIDER or '').lower()};"
+            f"fallback={str(MARKET_DATA_FALLBACK_PROVIDER or '').lower()}"
+        )
+    )
+    load_bot_state()
+    emit_startup_marker("[worker_startup] state store ready")
+    emit_startup_marker("[worker_startup_marker] worker loop started")
 
     while True:
         try:
             current_time = datetime.now(timezone.utc)
-            update_worker_heartbeat("online")
+            refresh_daily_loss_guard()
             state = load_bot_state()
 
             if state.get("bot_status") != "RUNNING":
@@ -267,12 +306,16 @@ def worker_loop() -> None:
                 time.sleep(PAUSED_SLEEP_SECONDS)
                 continue
 
-            result = run_trader_cycle()
+            result = run_trader_cycle(persist_market_data=False)
             action_text = build_action_text(result)
 
-            update_runtime_state(
+            persist_worker_cycle_state(
                 last_action=action_text,
                 next_run_delta_seconds=SLEEP_SECONDS,
+                worker_status="online",
+                market_data_payload=result.get("cycle_result", {}).get("market_data_status"),
+                runtime_started_at=WORKER_RUNTIME_STARTED_AT,
+                process_role=WORKER_PROCESS_ROLE,
             )
 
             log_event("INFO", action_text)

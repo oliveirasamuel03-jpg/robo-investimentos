@@ -1,0 +1,19 @@
+{
+  "captured_at": "2026-04-22T00:38:03.628163+00:00",
+  "bot_status": "RUNNING",
+  "worker_status": "online",
+  "worker_heartbeat": "2026-04-21T22:04:22.160894+00:00",
+  "feed_status": "LIVE",
+  "watchlist": [
+    "AAPL"
+  ],
+  "wallet_value": 10000.0,
+  "cash": 47774.34,
+  "realized_pnl": 37724.34,
+  "paper_initial_capital": 10000.0,
+  "paper_cash": 47774.34,
+  "paper_equity": 47880.81,
+  "paper_positions": [
+    "AAPL"
+  ]
+}

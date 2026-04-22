@@ -22,8 +22,15 @@ def test_state_store_bootstraps_files_and_defaults(isolated_storage):
     assert state["trader"]["ticket_value"] == config.VALIDATION_DEFAULT_ENTRY_AMOUNT_BRL
     assert state["trader"]["max_open_positions"] == config.VALIDATION_DEFAULT_MAX_OPEN_POSITIONS
     assert state["market_data"]["provider"] == config.MARKET_DATA_PROVIDER
+    assert state["market_data"]["configured_provider"] == config.MARKET_DATA_PROVIDER
+    assert state["market_data"]["fallback_provider"] == config.MARKET_DATA_FALLBACK_PROVIDER
+    assert state["market_data"]["feed_status"] == "UNKNOWN"
+    assert state["market_data"]["status_legacy"] == "unknown"
+    assert state["market_data"]["provider_diagnostics"] == {}
     assert state["broker"]["provider"] == config.BROKER_PROVIDER
     assert state["production"]["health_level"] == "healthy"
+    assert state["risk"]["daily_loss_block_active"] is False
+    assert state["risk"]["daily_loss_limit_brl"] == config.DAILY_LOSS_LIMIT_BRL_DEFAULT
     assert state["retention"]["retention_days"] == config.RETENTION_DAYS
     assert state["retention"]["weekly_reports_index"] == []
     assert state["validation"]["validation_mode"] == "swing_10d"
@@ -69,6 +76,7 @@ def test_update_market_data_status_tracks_last_success_and_error(isolated_storag
             "last_sync_at": "2026-04-20T01:00:00+00:00",
             "last_source": "market",
             "source_breakdown": {"market": 2, "cached": 0, "fallback": 0, "unknown": 0},
+            "provider_diagnostics": {"twelvedata": {"api_key_present": True, "request_attempted": True}},
             "symbols": ["AAPL", "MSFT"],
             "requested_by": "worker_cycle",
         }
@@ -78,6 +86,9 @@ def test_update_market_data_status_tracks_last_success_and_error(isolated_storag
     assert success["last_error"] == ""
     assert root_after_success["requested_by"] == "worker_cycle"
     assert root_after_success["status"] == "healthy"
+    assert root_after_success["status_legacy"] == "healthy"
+    assert root_after_success["feed_status"] == "LIVE"
+    assert root_after_success["provider_diagnostics"]["twelvedata"]["api_key_present"] is True
 
     degraded = state_store.update_market_data_status(
         {
@@ -87,6 +98,7 @@ def test_update_market_data_status_tracks_last_success_and_error(isolated_storag
             "last_source": "fallback",
             "last_error": "rate limit",
             "source_breakdown": {"market": 0, "cached": 0, "fallback": 2, "unknown": 0},
+            "provider_diagnostics": {"twelvedata": {"api_key_present": True, "request_attempted": True}},
             "symbols": ["AAPL", "MSFT"],
             "requested_by": "trader_chart",
         }
@@ -97,6 +109,102 @@ def test_update_market_data_status_tracks_last_success_and_error(isolated_storag
     assert root_after_chart["requested_by"] == "worker_cycle"
     assert root_after_chart["status"] == "healthy"
     assert root_after_chart["contexts"]["trader_chart"]["status"] == "error"
+    assert root_after_chart["contexts"]["trader_chart"]["status_legacy"] == "error"
+    assert root_after_chart["contexts"]["trader_chart"]["feed_status"] == "FALLBACK"
+
+
+def test_update_market_data_status_logs_provider_switch(isolated_storage):
+    config = load_module("core.config")
+    state_store = load_module("core.state_store")
+
+    state_store.update_market_data_status(
+        {
+            "provider": "twelvedata",
+            "configured_provider": "twelvedata",
+            "fallback_provider": "yahoo",
+            "provider_chain": ["twelvedata", "yahoo"],
+            "status": "healthy",
+            "last_sync_at": "2026-04-20T01:00:00+00:00",
+            "last_source": "market",
+            "source_breakdown": {"market": 1, "cached": 0, "fallback": 0, "unknown": 0},
+            "provider_breakdown": {"twelvedata": 1, "yahoo": 0, "synthetic": 0, "mixed": 0, "unknown": 0},
+            "symbols": ["BTC-USD"],
+            "requested_by": "worker_cycle",
+        }
+    )
+
+    state_store.update_market_data_status(
+        {
+            "provider": "yahoo",
+            "configured_provider": "twelvedata",
+            "fallback_provider": "yahoo",
+            "provider_chain": ["twelvedata", "yahoo"],
+            "status": "healthy",
+            "last_sync_at": "2026-04-20T01:05:00+00:00",
+            "last_source": "market",
+            "source_breakdown": {"market": 1, "cached": 0, "fallback": 0, "unknown": 0},
+            "provider_breakdown": {"twelvedata": 0, "yahoo": 1, "synthetic": 0, "mixed": 0, "unknown": 0},
+            "symbols": ["BTC-USD"],
+            "requested_by": "worker_cycle",
+        }
+    )
+
+    logs = state_store.read_storage_table(config.BOT_LOG_FILE, columns=config.BOT_LOG_COLUMNS)
+
+    assert logs["message"].str.contains("Provider de dados alterado em worker_cycle").any()
+    assert logs["message"].str.contains("Twelve Data -> Yahoo").any()
+
+
+def test_persist_worker_cycle_state_writes_shared_runtime_snapshot(isolated_storage):
+    state_store = load_module("core.state_store")
+
+    state_store.persist_worker_cycle_state(
+        last_action="Rodada concluida sem novas operacoes",
+        next_run_delta_seconds=60,
+        worker_status="online",
+        runtime_started_at="2026-04-22T03:00:00+00:00",
+        process_role="worker",
+        market_data_payload={
+            "requested_by": "worker_cycle",
+            "provider": "twelvedata",
+            "provider_effective": "twelvedata",
+            "configured_provider": "twelvedata",
+            "fallback_provider": "yahoo",
+            "status": "healthy",
+            "feed_status": "LIVE",
+            "last_sync_at": "2026-04-22T03:01:00+00:00",
+            "last_source": "market",
+            "source_breakdown": {"market": 5, "cached": 0, "fallback": 0, "unknown": 0},
+            "requested_symbols": ["BTC-USD", "ETH-USD"],
+            "build_active": "abc123",
+            "git_sha": "abc123def456",
+            "build_timestamp": "2026-04-22T02:55:00+00:00",
+            "service_name": "work",
+            "api_key_present": True,
+            "request_prepared": True,
+            "request_attempted": True,
+            "response_received": True,
+            "response_status_code": 200,
+            "last_stage": "success",
+            "last_error": "",
+        },
+    )
+
+    state = state_store.load_bot_state()
+    market_state = state["market_data"]
+
+    assert state["worker_status"] == "online"
+    assert state["worker_heartbeat"]
+    assert state["last_run_at"]
+    assert market_state["requested_by"] == "worker_cycle"
+    assert market_state["state_writer"] == "worker"
+    assert market_state["process_role"] == "worker"
+    assert market_state["runtime_started_at"] == "2026-04-22T03:00:00+00:00"
+    assert market_state["response_status_code"] == 200
+    assert market_state["provider_effective"] == "twelvedata"
+    assert market_state["requested_symbols"] == ["BTC-USD", "ETH-USD"]
+    assert market_state["ui_audit_probe"] == "worker_state_v2"
+    assert market_state["state_build_sha"] == "abc123def456"
 
 
 def test_update_broker_status_tracks_readiness_fields(isolated_storage):

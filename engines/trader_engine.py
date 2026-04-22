@@ -11,6 +11,7 @@ from core.config import (
     TRADER_ORDERS_FILE,
 )
 from core.broker import probe_broker_status
+from core.daily_risk import evaluate_daily_loss_guard
 from core.state_store import (
     load_bot_state,
     log_event,
@@ -20,6 +21,7 @@ from core.state_store import (
     update_broker_status,
     update_market_context_status,
     update_market_data_status,
+    update_risk_status,
 )
 from core.swing_validation import SWING_VALIDATION_MODE, apply_swing_validation_overrides
 from core.trader_profiles import get_trader_profile_config
@@ -35,8 +37,9 @@ from engines.quant_bridge import (
 )
 
 
-def build_paper_cfg_from_platform_state(state: dict) -> PaperTradingConfig:
+def build_paper_cfg_from_platform_state(state: dict, risk_state: dict | None = None) -> PaperTradingConfig:
     trader = state["trader"]
+    risk = risk_state or (state.get("risk", {}) or {})
     ticket_value = float(trader["ticket_value"])
     holding_minutes = int(trader["holding_minutes"])
     max_open_positions = int(trader.get("max_open_positions", 3))
@@ -69,7 +72,12 @@ def build_paper_cfg_from_platform_state(state: dict) -> PaperTradingConfig:
         max_open_positions=max(1, int(profile_config["max_open_positions"])),
         holding_minutes=int(profile_config["holding_minutes"]),
         history_limit=int(profile_config.get("history_limit", 500)),
-        allow_new_entries=state.get("bot_status") == "RUNNING",
+        allow_new_entries=state.get("bot_status") == "RUNNING" and not bool(risk.get("daily_loss_block_active", False)),
+        daily_loss_limit_brl=float(risk.get("daily_loss_limit_brl", 0.0) or 0.0),
+        daily_loss_day_key=str(risk.get("daily_loss_day_key") or ""),
+        daily_realized_pnl_brl=float(risk.get("daily_realized_pnl_brl", 0.0) or 0.0),
+        daily_loss_block_active=bool(risk.get("daily_loss_block_active", False)),
+        daily_loss_block_reason=str(risk.get("daily_loss_block_reason") or ""),
         min_signal_score=float(profile_config["min_signal_score"]),
         min_atr_pct=float(profile_config["min_atr_pct"]),
         max_atr_pct=float(profile_config["max_atr_pct"]),
@@ -90,6 +98,31 @@ def build_paper_cfg_from_platform_state(state: dict) -> PaperTradingConfig:
         trend_break_buffer_pct=float(profile_config["trend_break_buffer_pct"]),
         hard_stop_loss_pct=float(profile_config["hard_stop_loss_pct"]),
     )
+
+
+def _refresh_daily_loss_guard(state: dict) -> tuple[dict, dict]:
+    previous_risk = dict(state.get("risk", {}) or {})
+    paper_trades = read_paper_trades(limit=5000)
+    risk_state = evaluate_daily_loss_guard(previous_risk, paper_trades)
+    persisted = update_risk_status(risk_state)
+
+    prev_block = bool(previous_risk.get("daily_loss_block_active", False))
+    now_block = bool(persisted.get("daily_loss_block_active", False))
+    transition = str(persisted.get("last_transition") or "none")
+    if not prev_block and now_block:
+        log_event("WARNING", str(persisted.get("daily_loss_block_reason") or "Limite de perda diaria atingido."))
+    elif transition == "reset_day":
+        log_event("INFO", f"Trava diaria resetada na virada do dia UTC {persisted.get('daily_loss_day_key')}.")
+    elif prev_block and not now_block:
+        log_event("INFO", "Trava diaria liberada. Novas entradas permitidas novamente.")
+
+    return previous_risk, persisted
+
+
+def refresh_daily_loss_guard(state: dict | None = None) -> dict:
+    base_state = state or load_bot_state()
+    _previous, persisted = _refresh_daily_loss_guard(base_state)
+    return persisted
 
 
 def sync_platform_positions_from_paper() -> dict:
@@ -167,7 +200,9 @@ def _sync_trader_orders_into_storage() -> None:
     replace_storage_table(TRADER_ORDERS_FILE, rows_to_store, columns=TRADER_ORDERS_COLUMNS)
 
 
-def run_trader_cycle() -> dict:
+def run_trader_cycle(*, persist_market_data: bool = True) -> dict:
+    state = load_bot_state()
+    risk_state = refresh_daily_loss_guard(state)
     state = load_bot_state()
     broker_status = probe_broker_status(state.get("security", {}), requested_by="worker_cycle")
     update_broker_status(broker_status)
@@ -180,14 +215,16 @@ def run_trader_cycle() -> dict:
         log_event("INFO", "Trader desabilitado")
         return {"status": "DISABLED"}
 
-    cfg = build_paper_cfg_from_platform_state(state)
+    cfg = build_paper_cfg_from_platform_state(state, risk_state=risk_state)
     ensure_paper_files(cfg)
 
     cycle_result = run_paper_cycle(cfg)
-    update_market_data_status(cycle_result.get("market_data_status"))
+    if persist_market_data:
+        update_market_data_status(cycle_result.get("market_data_status"))
     update_market_context_status(cycle_result.get("market_context"))
     _sync_trader_orders_into_storage()
     platform_state = sync_platform_positions_from_paper()
+    post_risk_state = refresh_daily_loss_guard(load_bot_state())
     report = build_paper_report()
     equity_df = read_paper_equity(limit=200)
 
@@ -197,6 +234,7 @@ def run_trader_cycle() -> dict:
         "paper_report": report,
         "paper_equity": equity_df.to_dict(orient="records") if not equity_df.empty else [],
         "broker_status": broker_status,
+        "risk": post_risk_state,
     }
 
 

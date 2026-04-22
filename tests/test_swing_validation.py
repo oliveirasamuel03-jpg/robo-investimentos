@@ -31,6 +31,7 @@ def test_refresh_swing_validation_cycle_generates_final_verdict(isolated_storage
 
     state = state_store.load_bot_state()
     state["validation"]["validation_started_at"] = "2026-04-10T00:00:00+00:00"
+    state["trader"]["watchlist"] = ["AAPL", "MSFT"]
     state["validation"]["signal_counters"] = {
         "signals_total": 8,
         "signals_approved": 3,
@@ -143,3 +144,6 @@ def test_refresh_swing_validation_cycle_generates_final_verdict(isolated_storage
     assert report["final_validation_grade"] in {"APROVADO", "APROVADO_COM_AJUSTES"}
     assert report["metrics"]["trades_closed"] == 2
     assert report["performance"]["pnl_total"] > 0
+    assert "consistency" in report
+    assert report["consistency"]["sample_quality_label"] == "Baixa"
+    assert report["consistency"]["watchlist_phase_aligned"] is False

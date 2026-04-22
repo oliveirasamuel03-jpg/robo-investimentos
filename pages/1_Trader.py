@@ -16,7 +16,12 @@ from core.auth.users_store import (
     set_user_disabled,
     update_user_role,
 )
-from core.market_data import fetch_market_data_frame
+from core.market_data import (
+    classify_feed_status,
+    fetch_market_data_frame,
+    format_market_timestamp,
+    legacy_market_status,
+)
 from core.config import (
     MAX_HOLDING_MINUTES,
     MAX_TICKET,
@@ -32,7 +37,13 @@ from core.config import (
     VALIDATION_INITIAL_CAPITAL_BRL,
     VALIDATION_MODE_DISPLAY,
 )
-from core.state_store import load_bot_state, read_storage_table, save_bot_state, update_market_data_status
+from core.state_store import (
+    load_bot_state,
+    read_storage_table,
+    resolve_market_data_views as resolve_persisted_market_data_views,
+    save_bot_state,
+    update_market_data_status,
+)
 from core.swing_validation import SWING_VALIDATION_MODE, apply_swing_validation_overrides
 from core.trader_profiles import (
     get_trader_profile_config,
@@ -95,19 +106,29 @@ def load_chart_data(ticker: str, period: str, interval: str, refresh_key: int | 
 
 
 def market_data_status_label(status: dict | None) -> str:
-    raw = str((status or {}).get("status", "unknown") or "unknown").lower()
+    payload = status or {}
+    return classify_feed_status(
+        status=payload.get("feed_status") or payload.get("status"),
+        last_source=payload.get("last_source"),
+        source_breakdown=payload.get("source_breakdown"),
+    )
+
+
+def market_data_provider_label(status: dict | None) -> str:
+    raw = str((status or {}).get("provider", "unknown") or "unknown").strip().lower()
     labels = {
-        "healthy": "Saudavel",
-        "degraded": "Degradado",
-        "cached": "Cache",
-        "error": "Fallback",
+        "twelvedata": "Twelve Data",
+        "yahoo": "Yahoo",
+        "synthetic": "Fallback sintetico",
+        "mixed": "Twelve Data + Yahoo",
         "unknown": "Desconhecido",
     }
-    return labels.get(raw, raw.title())
+    return labels.get(raw, raw.upper())
 
 
 def market_data_source_label(status: dict | None) -> str:
-    raw = str((status or {}).get("last_source", "unknown") or "unknown").lower()
+    payload = status or {}
+    raw = str(payload.get("last_source", "unknown") or "unknown").lower()
     labels = {
         "market": "Mercado ao vivo",
         "cached": "Cache reaproveitado",
@@ -115,7 +136,34 @@ def market_data_source_label(status: dict | None) -> str:
         "mixed": "Misto",
         "unknown": "Desconhecido",
     }
-    return labels.get(raw, raw.title())
+    base_label = labels.get(raw, raw.title())
+    provider_label = market_data_provider_label(payload)
+    if raw == "fallback":
+        return base_label
+    return f"{base_label} via {provider_label}"
+
+
+def twelvedata_diagnostic_payload(status: dict | None) -> dict:
+    payload = status or {}
+    diagnostics = payload.get("provider_diagnostics", {}) or {}
+    diagnostic = diagnostics.get("twelvedata", {}) if isinstance(diagnostics, dict) else {}
+    return dict(diagnostic or {})
+
+
+def market_data_legacy_label(status: dict | None) -> str:
+    payload = status or {}
+    return legacy_market_status(
+        status=payload.get("status_legacy") or payload.get("status"),
+        last_source=payload.get("last_source"),
+        source_breakdown=payload.get("source_breakdown"),
+    )
+
+
+def resolve_market_data_views(state: dict, chart_market_data_status: dict | None = None) -> tuple[dict, dict]:
+    operational_market_data_status, chart_state = resolve_persisted_market_data_views(state)
+    if chart_market_data_status:
+        chart_state.update(dict(chart_market_data_status or {}))
+    return operational_market_data_status, chart_state
 
 
 def market_context_label(raw_status: str | None) -> str:
@@ -126,6 +174,10 @@ def market_context_label(raw_status: str | None) -> str:
         "CRITICO": "Critico",
     }
     return labels.get(str(raw_status or "NEUTRO").strip().upper(), str(raw_status or "Neutro").title())
+
+
+def daily_loss_guard_label(is_blocked: bool) -> str:
+    return "Entradas bloqueadas" if is_blocked else "Entradas liberadas"
 
 
 def load_trader_orders() -> pd.DataFrame:
@@ -171,8 +223,8 @@ def align_orders_to_chart(df_orders: pd.DataFrame, df_chart: pd.DataFrame, ticke
     if getattr(chart_index["chart_time"].dt, "tz", None) is not None:
         chart_index["chart_time"] = chart_index["chart_time"].dt.tz_convert(None)
 
-    orders["ts_int"] = orders["timestamp"].view("int64")
-    chart_index["ts_int"] = chart_index["chart_time"].view("int64")
+    orders["ts_int"] = orders["timestamp"].astype("int64")
+    chart_index["ts_int"] = chart_index["chart_time"].astype("int64")
 
     orders = orders.sort_values("ts_int")
     chart_index = chart_index.sort_values("ts_int")
@@ -608,6 +660,7 @@ def build_trader_snapshot(
     sync_platform_positions_from_paper()
     state = load_bot_state()
     security_state = state.get("security", {}) or {}
+    risk_state = state.get("risk", {}) or {}
     trader_state = state.get("trader", {}) or {}
     active_profile = normalize_trader_profile(trader_state.get("profile"))
     active_profile_config = get_trader_profile_config(
@@ -632,13 +685,16 @@ def build_trader_snapshot(
 
     chart_df = pd.DataFrame()
     chart_error = ""
-    market_data_status = state.get("market_data", {}) or {}
+    operational_market_data_status, chart_market_data_status = resolve_market_data_views(state)
     orders_df = load_trader_orders()
 
     try:
         chart_payload = load_chart_data(selected_ticker, period, interval, refresh_key=refresh_key)
         chart_df = chart_payload.get("frame", pd.DataFrame())
-        market_data_status = update_market_data_status(chart_payload.get("market_data_status"))
+        chart_market_data_status = update_market_data_status(chart_payload.get("market_data_status"))
+        state = load_bot_state()
+        risk_state = state.get("risk", {}) or {}
+        operational_market_data_status, chart_market_data_status = resolve_market_data_views(state, chart_market_data_status)
     except Exception as exc:
         chart_error = str(exc)
 
@@ -662,6 +718,7 @@ def build_trader_snapshot(
     return {
         "state": state,
         "security_state": security_state,
+        "risk_state": risk_state,
         "paper_state": paper_state,
         "paper_report": paper_report,
         "paper_equity_df": paper_equity_df,
@@ -688,7 +745,8 @@ def build_trader_snapshot(
         "worker_heartbeat": worker_heartbeat,
         "current_max": current_max,
         "current_min": current_min,
-        "market_data_status": market_data_status,
+        "market_data_status": operational_market_data_status,
+        "chart_market_data_status": chart_market_data_status,
         "trade_reports_df": trade_reports_df,
         "trade_report_metrics": trade_report_metrics,
         "profile_summary_df": profile_summary_df,
@@ -838,9 +896,13 @@ def render_trader_snapshot(snapshot: dict, selected_ticker: str) -> None:
         st.write(f"**Ultima execucao:** {snapshot['last_execution'] or 'Ainda nao executado'}")
         st.write(f"**Proxima analise:** {snapshot['next_execution'] or 'Aguardando'}")
         st.write(f"**Heartbeat:** {snapshot['worker_heartbeat'] or 'Sem sinal'}")
-        st.write(f"**Provider de dados:** {str((snapshot.get('market_data_status') or {}).get('provider', 'yahoo')).upper()}")
-        st.write(f"**Status do feed:** {market_data_status_label(snapshot.get('market_data_status'))}")
-        st.write(f"**Fonte atual:** {market_data_source_label(snapshot.get('market_data_status'))}")
+        st.write(f"**Provider de dados:** {market_data_provider_label(snapshot.get('market_data_status'))}")
+        st.write(f"**Status do feed (worker):** {market_data_status_label(snapshot.get('market_data_status'))}")
+        st.write(
+            f"**Ultimo sync do feed:** "
+            f"{format_market_timestamp((snapshot.get('market_data_status') or {}).get('last_sync_at'))}"
+        )
+        st.write(f"**Fonte operacional:** {market_data_source_label(snapshot.get('market_data_status'))}")
 
         for item in build_robot_log(signal_text, robot_label, snapshot["last_action"], open_positions):
             st.markdown(f"<div class='log-item'>{item}</div>", unsafe_allow_html=True)
@@ -1009,6 +1071,8 @@ st.markdown(
 state = load_bot_state()
 trader = state["trader"]
 admin_mode = is_admin(current_user)
+if admin_mode:
+    st.code("TRADER_UI_MARKER_20260422_A")
 
 sync_platform_positions_from_paper()
 state = load_bot_state()
@@ -1023,11 +1087,19 @@ open_positions = [p for p in positions if p.get("status") == "OPEN"]
 watchlist = trader.get("watchlist", []) or list(SWING_VALIDATION_RECOMMENDED_WATCHLIST)
 recommended_watchlist = list(SWING_VALIDATION_RECOMMENDED_WATCHLIST)
 non_recommended_watchlist = [asset for asset in watchlist if asset not in recommended_watchlist]
+managed_assets_outside_watchlist = sorted(
+    {
+        str(position.get("asset") or "").upper()
+        for position in open_positions
+        if str(position.get("asset") or "").upper() and str(position.get("asset") or "").upper() not in watchlist
+    }
+)
+ticker_options = list(watchlist) + [asset for asset in managed_assets_outside_watchlist if asset not in watchlist]
 
 top_left, top_right = st.columns([1.4, 1.0])
 
 with top_left:
-    selected_ticker = st.selectbox("Ativo", options=watchlist, index=0)
+    selected_ticker = st.selectbox("Ativo", options=ticker_options, index=0)
 
 with top_right:
     tf1, tf2 = st.columns(2)
@@ -1067,6 +1139,7 @@ page_snapshot = build_trader_snapshot(
 state = page_snapshot["state"]
 trader = state["trader"]
 security_state = page_snapshot["security_state"]
+risk_state = page_snapshot["risk_state"]
 paper_state = page_snapshot["paper_state"]
 paper_report = page_snapshot["paper_report"]
 paper_equity_df = page_snapshot["paper_equity_df"]
@@ -1091,6 +1164,7 @@ robot_status = page_snapshot["robot_status"]
 robot_label = page_snapshot["robot_label"]
 robot_class = page_snapshot["robot_class"]
 market_data_status = page_snapshot.get("market_data_status", {})
+chart_market_data_status = page_snapshot.get("chart_market_data_status", {})
 
 selected_position = next((p for p in open_positions if p.get("asset") == selected_ticker), None)
 entry_price = float(selected_position.get("entry_price", 0.0)) if selected_position else None
@@ -1123,6 +1197,7 @@ robot_class = "metric-good" if robot_label == "Ligado" else "metric-bad" if robo
 # lendo a mesma base de estado durante esta renderizacao.
 state = page_snapshot["state"]
 security_state = page_snapshot["security_state"]
+risk_state = page_snapshot["risk_state"]
 paper_state = page_snapshot["paper_state"]
 paper_report = page_snapshot["paper_report"]
 paper_equity_df = page_snapshot["paper_equity_df"]
@@ -1142,9 +1217,20 @@ robot_status = page_snapshot["robot_status"]
 robot_label = page_snapshot["robot_label"]
 robot_class = page_snapshot["robot_class"]
 market_data_status = page_snapshot.get("market_data_status", market_data_status)
+chart_market_data_status = page_snapshot.get("chart_market_data_status", chart_market_data_status)
 market_context_state = state.get("market_context", {}) or {}
 validation_state = state.get("validation", {}) or {}
 validation_last_report = (validation_state.get("last_report", {}) or {})
+validation_consistency = dict(validation_last_report.get("consistency", {}) or {})
+validation_metrics = dict(validation_last_report.get("metrics", {}) or {})
+daily_loss_limit_brl = float(risk_state.get("daily_loss_limit_brl", 0.0) or 0.0)
+daily_loss_consumed_brl = float(risk_state.get("daily_loss_consumed_brl", 0.0) or 0.0)
+daily_loss_remaining_brl = float(risk_state.get("daily_loss_remaining_brl", 0.0) or 0.0)
+daily_realized_pnl_brl = float(risk_state.get("daily_realized_pnl_brl", 0.0) or 0.0)
+daily_loss_block_active = bool(risk_state.get("daily_loss_block_active", False))
+daily_loss_block_reason = str(risk_state.get("daily_loss_block_reason") or "")
+daily_loss_day_key = str(risk_state.get("daily_loss_day_key") or "-")
+daily_loss_blocked_at = str(risk_state.get("daily_loss_blocked_at") or "")
 
 m1, m2, m3, m4, m5 = st.columns(5)
 
@@ -1224,6 +1310,30 @@ st.caption(
     f"modo {VALIDATION_MODE_DISPLAY} | PAPER TRADING obrigatório."
 )
 
+if daily_loss_block_active:
+    st.error(
+        "Trava diária de risco ativa: novas entradas estão bloqueadas por perda diária. "
+        "As posições já abertas continuam sob gestão normal."
+    )
+else:
+    st.success("Trava diária de risco ativa no sistema: novas entradas estão liberadas no momento.")
+
+risk_c1, risk_c2, risk_c3, risk_c4 = st.columns(4)
+risk_c1.metric("Trava diária", daily_loss_guard_label(daily_loss_block_active))
+risk_c2.metric("Limite diário", br_money(daily_loss_limit_brl))
+risk_c3.metric("Perda consumida", br_money(daily_loss_consumed_brl))
+risk_c4.metric("Limite restante", br_money(daily_loss_remaining_brl))
+
+st.caption(
+    f"Dia operacional UTC: {daily_loss_day_key} | "
+    f"PnL realizado do dia (base da trava): {br_money(daily_realized_pnl_brl)}"
+)
+if daily_loss_block_active:
+    st.caption(
+        f"Bloqueio ativado em: {format_market_timestamp(daily_loss_blocked_at)} | "
+        f"Motivo: {daily_loss_block_reason or 'Limite diário atingido.'}"
+    )
+
 st.markdown(
     f"""
     <div class="hero-box">
@@ -1271,6 +1381,20 @@ if non_recommended_watchlist:
         "Ha ativos fora da watchlist recomendada desta fase: "
         f"{', '.join(non_recommended_watchlist)}. Eles continuam editaveis, mas nao sao os mais indicados agora."
     )
+if managed_assets_outside_watchlist:
+    st.warning(
+        "Ha posicoes abertas fora da watchlist atual que seguem sob gestao normal: "
+        f"{', '.join(managed_assets_outside_watchlist)}."
+    )
+if validation_consistency.get("capital_phase_aligned") is False:
+    st.warning(
+        "O capital atual do paper nao esta alinhado ao capital-base recomendado da fase. "
+        "Para iniciar um ciclo limpo, salve a configuracao desejada e use 'Resetar modulo trader'."
+    )
+if validation_consistency.get("sample_quality_message"):
+    st.caption(f"Amostra operacional: {validation_consistency.get('sample_quality_message')}")
+if validation_consistency.get("watchlist_message"):
+    st.caption(f"Leitura de consistencia: {validation_consistency.get('watchlist_message')}")
 
 if bool(security_state.get("real_mode_enabled", False)):
     st.warning("Real trading enabled")
@@ -1321,19 +1445,41 @@ if auto_refresh_fragment_supported:
             refresh_key=make_chart_refresh_key(True, int(live_refresh_seconds)),
         )
 
-        lm1, lm2, lm3, lm4, lm5 = st.columns(5)
+        live_risk_state = live_snapshot.get("risk_state", {}) or {}
+        live_daily_loss_block_active = bool(live_risk_state.get("daily_loss_block_active", False))
+        live_daily_loss_limit = float(live_risk_state.get("daily_loss_limit_brl", 0.0) or 0.0)
+        live_daily_loss_consumed = float(live_risk_state.get("daily_loss_consumed_brl", 0.0) or 0.0)
+
+        lm1, lm2, lm3, lm4, lm5, lm6 = st.columns(6)
         lm1.metric("Preco ao vivo", f"{float(live_snapshot['last_price']):,.2f}")
         lm2.metric("Worker", str(live_snapshot["worker_status"]))
         lm3.metric("Posicoes", f"{len(live_snapshot['open_positions'])}")
         lm4.metric("Bot", str(live_snapshot["robot_label"]))
         lm5.metric("Feed", market_data_status_label(live_snapshot.get("market_data_status")))
+        lm6.metric("Risco diario", daily_loss_guard_label(live_daily_loss_block_active))
 
         st.caption(
             f"Ultima acao: {live_snapshot['last_action']} | "
             f"Ultima execucao: {live_snapshot['last_execution'] or 'Aguardando'} | "
             f"Heartbeat: {live_snapshot['worker_heartbeat'] or 'Sem sinal'} | "
-            f"Fonte: {market_data_source_label(live_snapshot.get('market_data_status'))}"
+            f"Feed operacional: {market_data_status_label(live_snapshot.get('market_data_status'))} | "
+            f"Ultimo sync: {format_market_timestamp((live_snapshot.get('market_data_status') or {}).get('last_sync_at'))} | "
+            f"Fonte operacional: {market_data_source_label(live_snapshot.get('market_data_status'))} | "
+            f"Perda diaria: {br_money(live_daily_loss_consumed)} de {br_money(live_daily_loss_limit)}"
         )
+        if live_daily_loss_block_active:
+            st.caption(
+                "Entradas bloqueadas no ciclo atual por limite de perda diaria. "
+                f"Motivo: {live_risk_state.get('daily_loss_block_reason') or 'Limite atingido.'}"
+            )
+        live_chart_market_data_status = live_snapshot.get("chart_market_data_status") or {}
+        if live_chart_market_data_status:
+            st.caption(
+                "Leitura do grafico nesta tela: "
+                f"{market_data_status_label(live_chart_market_data_status)} | "
+                f"Ultimo sync do grafico: {format_market_timestamp(live_chart_market_data_status.get('last_sync_at'))} | "
+                f"Fonte do grafico: {market_data_source_label(live_chart_market_data_status)}"
+            )
 
         live_chart_df = live_snapshot["chart_df"]
         if not live_chart_df.empty:
@@ -1423,9 +1569,49 @@ with side_col:
     st.write(f"**Última execução:** {last_execution or 'Ainda não executado'}")
     st.write(f"**Próxima análise:** {next_execution or 'Aguardando'}")
     st.write(f"**Heartbeat:** {worker_heartbeat or 'Sem sinal'}")
-    st.write(f"**Provider de dados:** {str((market_data_status or {}).get('provider', 'yahoo')).upper()}")
-    st.write(f"**Status do feed:** {market_data_status_label(market_data_status)}")
-    st.write(f"**Fonte atual:** {market_data_source_label(market_data_status)}")
+    st.write(f"**Provider de dados:** {market_data_provider_label(market_data_status)}")
+    st.write(f"**Status do feed (worker):** {market_data_status_label(market_data_status)}")
+    st.write(f"**Ultimo sync do feed:** {format_market_timestamp((market_data_status or {}).get('last_sync_at'))}")
+    st.write(f"**Fonte operacional:** {market_data_source_label(market_data_status)}")
+    st.write(f"**Trava diaria de risco:** {daily_loss_guard_label(daily_loss_block_active)}")
+    st.write(f"**Perda consumida hoje:** {br_money(daily_loss_consumed_brl)} / {br_money(daily_loss_limit_brl)}")
+    td_diag = twelvedata_diagnostic_payload(market_data_status)
+    if td_diag:
+        st.caption(
+            "Diagnostico Twelve Data: "
+            f"build {td_diag.get('build_label') or 'sem-registro'} | "
+            f"chave lida: {'Sim' if td_diag.get('api_key_present') else 'Nao'} | "
+            f"request saiu: {'Sim' if td_diag.get('request_attempted') else 'Nao'} | "
+            f"estagio: {td_diag.get('last_stage') or 'sem-registro'}"
+        )
+        if td_diag.get("last_error"):
+            st.caption(f"Ultimo erro Twelve Data: {td_diag.get('last_error')}")
+    if market_data_status.get("state_writer") or market_data_status.get("state_written_at"):
+        st.caption(
+            "Estado operacional compartilhado: "
+            f"writer {market_data_status.get('state_writer') or 'nao-registrado'} | "
+            f"gravado em {market_data_status.get('state_written_at') or 'nao-registrado'} | "
+            f"build {market_data_status.get('build_active') or 'nao-registrado'}"
+        )
+    if admin_mode:
+        st.caption(
+            "Admin audit snapshot: "
+            f"ui_audit_probe={market_data_status.get('ui_audit_probe') or 'NAO REGISTRADO NO ESTADO ATUAL'} | "
+            f"state_writer={market_data_status.get('state_writer') or 'NAO REGISTRADO NO ESTADO ATUAL'} | "
+            f"state_written_at={market_data_status.get('state_written_at') or 'NAO REGISTRADO NO ESTADO ATUAL'} | "
+            f"git_sha={market_data_status.get('git_sha') or 'NAO REGISTRADO NO ESTADO ATUAL'}"
+        )
+    if daily_loss_block_active:
+        st.write(f"**Bloqueio ativado em:** {format_market_timestamp(daily_loss_blocked_at)}")
+        st.caption(f"Motivo da trava: {daily_loss_block_reason or 'Limite diário atingido.'}")
+    st.caption(f"Taxonomia legada preservada: {market_data_legacy_label(market_data_status)}")
+    if chart_market_data_status:
+        st.caption(
+            "Grafico desta tela: "
+            f"{market_data_status_label(chart_market_data_status)} | "
+            f"Ultimo sync do grafico: {format_market_timestamp(chart_market_data_status.get('last_sync_at'))} | "
+            f"Fonte do grafico: {market_data_source_label(chart_market_data_status)}"
+        )
 
     for item in build_robot_log(signal_text, robot_label, last_action, open_positions):
         st.markdown(f"<div class='log-item'>{item}</div>", unsafe_allow_html=True)
@@ -1440,6 +1626,24 @@ perf_m1.metric("Trades fechados", f"{int(trade_report_metrics['total_trades'])}"
 perf_m2.metric("Win rate", f"{float(trade_report_metrics['win_rate'] or 0.0) * 100:.2f}%")
 perf_m3.metric("Payoff", "-" if trade_report_metrics["payoff"] is None else f"{float(trade_report_metrics['payoff']):.2f}")
 perf_m4.metric("PnL fechado", br_money(float(trade_report_metrics["total_pnl"] or 0.0)))
+
+cons_m1, cons_m2, cons_m3, cons_m4 = st.columns(4)
+cons_m1.metric("Amostra do ciclo", str(validation_consistency.get("sample_quality_label") or "Sem leitura"))
+cons_m2.metric("Postura operacional", str(validation_consistency.get("operational_posture_label") or "Indefinida"))
+cons_m3.metric(
+    "Aprovacao de sinais",
+    "-"
+    if validation_consistency.get("signal_approval_rate") is None
+    else f"{float(validation_consistency.get('signal_approval_rate') or 0.0) * 100:.1f}%",
+)
+cons_m4.metric(
+    "Drawdown max",
+    "-"
+    if validation_metrics.get("max_drawdown_pct") is None
+    else f"{float(validation_metrics.get('max_drawdown_pct') or 0.0) * 100:.2f}%",
+)
+if validation_consistency.get("operational_posture_message"):
+    st.caption(f"Postura atual: {validation_consistency.get('operational_posture_message')}")
 
 perf_chart_left, perf_chart_right = st.columns(2)
 with perf_chart_left:

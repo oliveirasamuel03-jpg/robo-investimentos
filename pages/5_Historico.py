@@ -31,6 +31,8 @@ trade_reports = read_trade_reports()
 logs = read_storage_table(BOT_LOG_FILE, columns=BOT_LOG_COLUMNS)
 state = load_bot_state()
 retention_summary = get_retention_summary(state)
+validation_report = dict((state.get("validation", {}) or {}).get("last_report", {}) or {})
+validation_consistency = dict(validation_report.get("consistency", {}) or {})
 
 t1, t2, t3, t4 = st.tabs(["Ordens", "Relatorios Trader", "Validacao Semanal", "Logs"])
 
@@ -140,6 +142,23 @@ with t3:
     status_c6.metric("Logs arquivados", str(retention_summary["bot_logs_archived_rows"]))
     status_c7.metric("Ordens arquivadas", str(retention_summary["trader_orders_archived_rows"]))
     status_c8.metric("Intervalo da rotina", f"{retention_summary['run_interval_hours']} h")
+
+    if validation_consistency:
+        cons_c1, cons_c2, cons_c3, cons_c4 = st.columns(4)
+        cons_c1.metric("Amostra atual", str(validation_consistency.get("sample_quality_label") or "Sem leitura"))
+        cons_c2.metric("Postura", str(validation_consistency.get("operational_posture_label") or "Indefinida"))
+        cons_c3.metric(
+            "Drawdown max",
+            "-"
+            if validation_report.get("metrics", {}).get("max_drawdown_pct") is None
+            else f"{float(validation_report.get('metrics', {}).get('max_drawdown_pct') or 0.0) * 100:.2f}%",
+        )
+        cons_c4.metric(
+            "Watchlist da fase",
+            "Coerente" if bool(validation_consistency.get("watchlist_phase_aligned")) else "Fora da fase",
+        )
+        st.caption(validation_consistency.get("sample_quality_message") or "")
+        st.caption(validation_consistency.get("watchlist_message") or "")
 
     if retention_summary["archive_trader_orders"]:
         st.caption("Ordens antigas tambem entram na politica de retencao nesta configuracao.")

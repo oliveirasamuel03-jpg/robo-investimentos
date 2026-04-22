@@ -1,0 +1,172 @@
+{
+  "started_at": "2026-04-21T21:07:58.089059+00:00",
+  "artifacts_dir": "C:\\Users\\User\\Documents\\Codex\\2026-04-18-tenho-um-rob-trader-em-streamlit\\robo-investimentos-hardening\\storage\\tmp_real_env_validation_hardening",
+  "pids": {
+    "web": 19652,
+    "worker": 1192
+  },
+  "web_ready": true,
+  "state_before": {
+    "worker_status": "online",
+    "worker_heartbeat": "2026-04-21T21:08:00.881159+00:00",
+    "cash": 10000.0,
+    "equity": 10000.0,
+    "pnl": 0.0,
+    "risk": {
+      "daily_loss_limit_brl": 100.0,
+      "daily_loss_day_key": "2026-04-21",
+      "daily_realized_pnl_brl": -520.0,
+      "daily_loss_consumed_brl": 520.0,
+      "daily_loss_remaining_brl": 0.0,
+      "daily_loss_block_active": true,
+      "daily_loss_block_reason": "Limite de perda diaria atingido: R$ 520.00 consumidos de R$ 100.00 no dia UTC 2026-04-21. Novas entradas bloqueadas.",
+      "daily_loss_blocked_at": "2026-04-21T20:48:44.456502+00:00",
+      "daily_loss_blocked_value_brl": 520.0,
+      "daily_loss_reset_at": "",
+      "last_transition": "none",
+      "last_updated_at": "2026-04-21T21:08:00.848962+00:00"
+    }
+  },
+  "cycle_1": {
+    "entries_blocked_by_daily_loss": true,
+    "entries_block_reason": "Limite de perda diaria atingido: R$ 650.00 consumidos de R$ 100.00 no dia UTC 2026-04-21. Novas entradas bloqueadas.",
+    "trades_executed": 0
+  },
+  "cycle_2": {
+    "entries_blocked_by_daily_loss": true,
+    "trades_executed": 0
+  },
+  "management_validation": {
+    "position_updated_at_before": "2026-04-21T21:08:01.659245+00:00",
+    "position_updated_at_after": "2026-04-21T21:08:02.660332+00:00",
+    "position_was_managed": true
+  },
+  "buy_count": {
+    "before": 0,
+    "after": 0,
+    "new_entries_after_block": 0
+  },
+  "state_block": {
+    "worker_status": "online",
+    "worker_heartbeat": "2026-04-21T21:08:00.881159+00:00",
+    "cash": 10000.0,
+    "equity": 10000.0,
+    "pnl": 0.0,
+    "risk": {
+      "daily_loss_limit_brl": 100.0,
+      "daily_loss_day_key": "2026-04-21",
+      "daily_realized_pnl_brl": -650.0,
+      "daily_loss_consumed_brl": 650.0,
+      "daily_loss_remaining_brl": 0.0,
+      "daily_loss_block_active": true,
+      "daily_loss_block_reason": "Limite de perda diaria atingido: R$ 650.00 consumidos de R$ 100.00 no dia UTC 2026-04-21. Novas entradas bloqueadas.",
+      "daily_loss_blocked_at": "2026-04-21T20:48:44.456502+00:00",
+      "daily_loss_blocked_value_brl": 650.0,
+      "daily_loss_reset_at": "",
+      "last_transition": "none",
+      "last_updated_at": "2026-04-21T21:08:02.776184+00:00"
+    }
+  },
+  "state_after_refresh": {
+    "risk": {
+      "daily_loss_limit_brl": 100.0,
+      "daily_loss_day_key": "2026-04-21",
+      "daily_realized_pnl_brl": -650.0,
+      "daily_loss_consumed_brl": 650.0,
+      "daily_loss_remaining_brl": 0.0,
+      "daily_loss_block_active": true,
+      "daily_loss_block_reason": "Limite de perda diaria atingido: R$ 650.00 consumidos de R$ 100.00 no dia UTC 2026-04-21. Novas entradas bloqueadas.",
+      "daily_loss_blocked_at": "2026-04-21T20:48:44.456502+00:00",
+      "daily_loss_blocked_value_brl": 650.0,
+      "daily_loss_reset_at": "",
+      "last_transition": "none",
+      "last_updated_at": "2026-04-21T21:08:02.776184+00:00"
+    }
+  },
+  "state_after_worker_restart": {
+    "worker_status": "online",
+    "worker_heartbeat": "2026-04-21T21:08:05.450325+00:00",
+    "risk": {
+      "daily_loss_limit_brl": 100.0,
+      "daily_loss_day_key": "2026-04-21",
+      "daily_realized_pnl_brl": -650.0,
+      "daily_loss_consumed_brl": 650.0,
+      "daily_loss_remaining_brl": 0.0,
+      "daily_loss_block_active": true,
+      "daily_loss_block_reason": "Limite de perda diaria atingido: R$ 650.00 consumidos de R$ 100.00 no dia UTC 2026-04-21. Novas entradas bloqueadas.",
+      "daily_loss_blocked_at": "2026-04-21T20:48:44.456502+00:00",
+      "daily_loss_blocked_value_brl": 650.0,
+      "daily_loss_reset_at": "",
+      "last_transition": "none",
+      "last_updated_at": "2026-04-21T21:08:05.433898+00:00"
+    }
+  },
+  "audit_events": [
+    {
+      "timestamp": "2026-04-21T20:48:44.456502",
+      "level": "WARNING",
+      "message": "Limite de perda diaria atingido: R$ 130.00 consumidos de R$ 100.00 no dia UTC 2026-04-21. Novas entradas bloqueadas."
+    },
+    {
+      "timestamp": "2026-04-21T20:48:55.501134",
+      "level": "INFO",
+      "message": "Entradas bloqueadas por limite de perda diaria"
+    },
+    {
+      "timestamp": "2026-04-21T20:55:04.566454",
+      "level": "INFO",
+      "message": "Entradas bloqueadas por limite de perda diaria"
+    },
+    {
+      "timestamp": "2026-04-21T20:55:14.093838",
+      "level": "INFO",
+      "message": "Entradas bloqueadas por limite de perda diaria"
+    },
+    {
+      "timestamp": "2026-04-21T20:56:05.945212",
+      "level": "INFO",
+      "message": "Entradas bloqueadas por limite de perda diaria"
+    },
+    {
+      "timestamp": "2026-04-21T20:56:43.971117",
+      "level": "INFO",
+      "message": "Entradas bloqueadas por limite de perda diaria"
+    },
+    {
+      "timestamp": "2026-04-21T20:59:28.708902",
+      "level": "INFO",
+      "message": "Entradas bloqueadas por limite de perda diaria"
+    },
+    {
+      "timestamp": "2026-04-21T20:59:33.347979",
+      "level": "INFO",
+      "message": "Entradas bloqueadas por limite de perda diaria"
+    },
+    {
+      "timestamp": "2026-04-21T21:08:00.884172",
+      "level": "INFO",
+      "message": "Entradas bloqueadas por limite de perda diaria"
+    },
+    {
+      "timestamp": "2026-04-21T21:08:05.463221",
+      "level": "INFO",
+      "message": "Entradas bloqueadas por limite de perda diaria"
+    }
+  ],
+  "ui_runtime": {
+    "series_view_error_present": false
+  },
+  "screenshots": {
+    "trader": {
+      "screenshot": "C:\\Users\\User\\Documents\\Codex\\2026-04-18-tenho-um-rob-trader-em-streamlit\\robo-investimentos-hardening\\storage\\tmp_real_env_validation_hardening\\trader.png",
+      "has_trava": true,
+      "has_bloqueio": true
+    },
+    "controle": {
+      "screenshot": "C:\\Users\\User\\Documents\\Codex\\2026-04-18-tenho-um-rob-trader-em-streamlit\\robo-investimentos-hardening\\storage\\tmp_real_env_validation_hardening\\controle.png",
+      "has_trava": true,
+      "has_bloqueio": true
+    }
+  },
+  "finished_at": "2026-04-21T21:08:27.104282+00:00"
+}
