@@ -518,6 +518,18 @@ def _normalize_twelvedata_interval(interval: str | None) -> str:
         return "1h"
 
     aliases = {
+        "1m": "1min",
+        "1min": "1min",
+        "5m": "5min",
+        "5min": "5min",
+        "15m": "15min",
+        "15min": "15min",
+        "30m": "30min",
+        "30min": "30min",
+        "45m": "45min",
+        "45min": "45min",
+        "60m": "1h",
+        "60min": "1h",
         "1d": "1day",
         "1day": "1day",
         "1w": "1week",
@@ -582,6 +594,8 @@ def _summarize_twelvedata_diagnostics(entries: list[dict[str, Any]], *, symbols:
         "used_live_data": any(bool(item.get("used_live_data")) for item in entries),
         "sample_symbol": str(first.get("symbol") or ""),
         "sample_normalized_symbol": str(first.get("normalized_symbol") or ""),
+        "interval_raw": str(first.get("interval_raw") or ""),
+        "normalized_interval": str(first.get("interval") or ""),
         "last_stage": str(
             next((item.get("last_stage") for item in entries if item.get("last_stage")), first.get("last_stage") or "unknown")
         ),
@@ -592,12 +606,19 @@ def _summarize_twelvedata_diagnostics(entries: list[dict[str, Any]], *, symbols:
     }
 
 
-def _summarize_provider_diagnostics(provider: str, symbols: list[str], errors: list[str]) -> dict[str, Any]:
+def _summarize_provider_diagnostics(
+    provider: str,
+    symbols: list[str],
+    errors: list[str],
+    *,
+    interval: str = "",
+) -> dict[str, Any]:
     normalized_provider = _normalize_provider_name(provider)
     return {
         normalized_provider: {
             "symbols_total": len(symbols),
             "symbols_requested": [str(symbol).upper() for symbol in symbols[:5]],
+            "interval": str(interval or ""),
             "last_error": _safe_diagnostic_text(errors[0]) if errors else "",
         }
     }
@@ -744,10 +765,10 @@ def _fetch_provider_frames(
 
     if normalized_provider == "yahoo":
         frames, errors = _fetch_yahoo_frames(symbols, period=period, interval=interval, history_limit=history_limit)
-        return frames, errors, _summarize_provider_diagnostics("yahoo", symbols, errors)
+        return frames, errors, _summarize_provider_diagnostics("yahoo", symbols, errors, interval=interval)
 
     errors = [f"provider nao suportado: {provider}"]
-    return {}, errors, _summarize_provider_diagnostics(provider, symbols, errors)
+    return {}, errors, _summarize_provider_diagnostics(provider, symbols, errors, interval=interval)
 
 
 def _resolve_effective_provider(provider_breakdown: dict[str, int]) -> str:
@@ -766,6 +787,7 @@ def _status_from_frames(
     fallback_provider: str,
     provider_chain: list[str],
     symbols: list[str],
+    requested_interval: str,
     requested_by: str,
     last_error: str = "",
     provider_diagnostics: dict[str, Any] | None = None,
@@ -824,10 +846,17 @@ def _status_from_frames(
         except Exception:
             response_status_code = None
     configured_service_name = str(SERVICE_NAME or RAILWAY_SERVICE_NAME or "").strip()
+    provider_effective = _resolve_effective_provider(provider_breakdown)
+    yahoo_diag = dict((provider_diagnostics or {}).get("yahoo") or {})
+    effective_interval = str(requested_interval or "")
+    if provider_effective in {"twelvedata", "mixed"}:
+        effective_interval = str(twelvedata_diag.get("normalized_interval") or effective_interval)
+    elif provider_effective == "yahoo":
+        effective_interval = str(yahoo_diag.get("interval") or effective_interval)
 
     return {
-        "provider": _resolve_effective_provider(provider_breakdown),
-        "provider_effective": _resolve_effective_provider(provider_breakdown),
+        "provider": provider_effective,
+        "provider_effective": provider_effective,
         "configured_provider": configured_provider,
         "fallback_provider": fallback_provider,
         "provider_chain": list(provider_chain),
@@ -842,6 +871,8 @@ def _status_from_frames(
         "source_breakdown": source_breakdown,
         "symbols": symbols,
         "requested_symbols": list(symbols),
+        "requested_interval": str(requested_interval or ""),
+        "effective_interval": effective_interval,
         "live_symbols": live_symbols,
         "cached_symbols": cached_symbols,
         "fallback_symbols": fallback_symbols,
@@ -951,6 +982,7 @@ def fetch_market_data_map(
             fallback_provider=fallback_provider,
             provider_chain=active_provider_chain,
             symbols=normalized_symbols,
+            requested_interval=interval,
             requested_by=requested_by,
             last_error=last_error,
             provider_diagnostics=provider_diagnostics,
