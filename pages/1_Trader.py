@@ -17,11 +17,13 @@ from core.auth.users_store import (
     update_user_role,
 )
 from core.market_data import (
+    build_feed_quality_snapshot,
     classify_feed_status,
     fetch_market_data_frame,
     format_market_timestamp,
     legacy_market_status,
 )
+from core.signal_rejection_analysis import rejection_layer_label, rejection_reason_label
 from core.config import (
     MAX_HOLDING_MINUTES,
     MAX_TICKET,
@@ -178,6 +180,17 @@ def market_context_label(raw_status: str | None) -> str:
 
 def daily_loss_guard_label(is_blocked: bool) -> str:
     return "Entradas bloqueadas" if is_blocked else "Entradas liberadas"
+
+
+def symbol_list_label(symbols: list[str] | None) -> str:
+    values = [str(item).upper() for item in (symbols or []) if str(item)]
+    return ", ".join(values) if values else "Nenhum"
+
+
+def pct_label(value: float | None) -> str:
+    if value is None:
+        return "-"
+    return f"{float(value or 0.0) * 100:.1f}%"
 
 
 def load_trader_orders() -> pd.DataFrame:
@@ -1223,6 +1236,7 @@ validation_state = state.get("validation", {}) or {}
 validation_last_report = (validation_state.get("last_report", {}) or {})
 validation_consistency = dict(validation_last_report.get("consistency", {}) or {})
 validation_metrics = dict(validation_last_report.get("metrics", {}) or {})
+validation_rejection_quality = dict(validation_last_report.get("rejection_quality", {}) or {})
 daily_loss_limit_brl = float(risk_state.get("daily_loss_limit_brl", 0.0) or 0.0)
 daily_loss_consumed_brl = float(risk_state.get("daily_loss_consumed_brl", 0.0) or 0.0)
 daily_loss_remaining_brl = float(risk_state.get("daily_loss_remaining_brl", 0.0) or 0.0)
@@ -1481,6 +1495,47 @@ if auto_refresh_fragment_supported:
                 f"Fonte do grafico: {market_data_source_label(live_chart_market_data_status)}"
             )
 
+        worker_feed_quality = build_feed_quality_snapshot(live_snapshot.get("market_data_status"))
+        chart_feed_quality = build_feed_quality_snapshot(live_chart_market_data_status)
+        st.markdown("#### Qualidade do feed")
+        feed_q1, feed_q2 = st.columns(2)
+        with feed_q1:
+            st.write("**Feed operacional do worker**")
+            st.write(
+                f"Status: {market_data_status_label(live_snapshot.get('market_data_status'))} | "
+                f"Fonte: {market_data_source_label(live_snapshot.get('market_data_status'))}"
+            )
+            st.write(f"Sucesso Twelve Data no ciclo: {pct_label(worker_feed_quality.get('twelvedata_success_rate'))}")
+            st.write(
+                f"Ativos live no ciclo: "
+                f"{symbol_list_label(worker_feed_quality.get('live_symbols'))}"
+            )
+            st.write(
+                f"Ativos em fallback no ciclo: "
+                f"{symbol_list_label(worker_feed_quality.get('fallback_symbols'))}"
+            )
+            if worker_feed_quality.get("fallback_reason"):
+                st.caption(f"Motivo do fallback operacional: {worker_feed_quality.get('fallback_reason')}")
+            if worker_feed_quality.get("quality_message"):
+                st.caption(worker_feed_quality.get("quality_message"))
+        with feed_q2:
+            st.write("**Feed do grafico desta tela**")
+            st.write(
+                f"Status: {market_data_status_label(live_chart_market_data_status)} | "
+                f"Fonte: {market_data_source_label(live_chart_market_data_status)}"
+            )
+            st.write(
+                f"Ativos live no grafico: "
+                f"{symbol_list_label(chart_feed_quality.get('live_symbols'))}"
+            )
+            st.write(
+                f"Ativos em fallback no grafico: "
+                f"{symbol_list_label(chart_feed_quality.get('fallback_symbols'))}"
+            )
+            if chart_feed_quality.get("fallback_reason"):
+                st.caption(f"Motivo do fallback visual: {chart_feed_quality.get('fallback_reason')}")
+            st.caption("O worker usa o feed operacional acima. O grafico pode cair em fallback sem mudar a fonte operacional.")
+
         live_chart_df = live_snapshot["chart_df"]
         if not live_chart_df.empty:
             aligned_orders = align_orders_to_chart(live_snapshot["orders_df"], live_chart_df, selected_ticker)
@@ -1642,8 +1697,56 @@ cons_m4.metric(
     if validation_metrics.get("max_drawdown_pct") is None
     else f"{float(validation_metrics.get('max_drawdown_pct') or 0.0) * 100:.2f}%",
 )
+signal_m1, signal_m2, signal_m3, signal_m4, signal_m5 = st.columns(5)
+signal_m1.metric("Sinais aprovados", str(int(validation_metrics.get("signals_approved", 0) or 0)))
+signal_m2.metric("Sinais rejeitados", str(int(validation_metrics.get("signals_rejected", 0) or 0)))
+signal_m3.metric("Qualidade do sinal", str(validation_consistency.get("signal_quality_label") or "Baixa"))
+signal_m4.metric(
+    "Watchlist da fase",
+    "Coerente" if bool(validation_consistency.get("watchlist_phase_aligned")) else "Fora da fase",
+)
+signal_m5.metric(
+    "Ajuste fino",
+    "Base minima" if bool(validation_consistency.get("fine_tuning_ready")) else "Aguardar",
+)
 if validation_consistency.get("operational_posture_message"):
     st.caption(f"Postura atual: {validation_consistency.get('operational_posture_message')}")
+if validation_consistency.get("signal_quality_message"):
+    st.caption(f"Leitura de sinal: {validation_consistency.get('signal_quality_message')}")
+if validation_consistency.get("validation_reading_message"):
+    st.caption(f"Leitura da validacao: {validation_consistency.get('validation_reading_message')}")
+
+rej_m1, rej_m2, rej_m3, rej_m4 = st.columns(4)
+rej_m1.metric(
+    "Motivo principal de rejeicao",
+    rejection_reason_label(validation_rejection_quality.get("top_reason"))
+    if validation_rejection_quality.get("top_reason")
+    else "Sem leitura",
+)
+rej_m2.metric(
+    "Camada dominante",
+    rejection_layer_label(validation_rejection_quality.get("top_layer"))
+    if validation_rejection_quality.get("top_layer")
+    else "Sem leitura",
+)
+rej_m3.metric(
+    "Setup mais bloqueado",
+    str(validation_rejection_quality.get("top_strategy") or "Sem leitura"),
+)
+rej_m4.metric(
+    "Base minima para ajuste fino",
+    "Sim" if bool(validation_rejection_quality.get("has_minimum_sample")) else "Nao",
+)
+top_reasons = validation_rejection_quality.get("top_reasons", []) or []
+if top_reasons:
+    lead_reason = dict(top_reasons[0] or {})
+    st.caption(
+        "Rejeicao dominante agora: "
+        f"{lead_reason.get('human_reason') or 'Sem leitura'} "
+        f"({pct_label(lead_reason.get('pct'))})."
+    )
+elif validation_metrics.get("signals_rejected", 0):
+    st.caption("Ja existem rejeicoes no ciclo, mas ainda sem detalhe consolidado suficiente.")
 
 perf_chart_left, perf_chart_right = st.columns(2)
 with perf_chart_left:

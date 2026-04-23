@@ -14,6 +14,7 @@ from core.config import (
     RAILWAY_GIT_COMMIT_SHA,
     SERVICE_NAME,
 )
+from core.market_data import build_feed_quality_snapshot
 from core.production_monitor import evaluate_production_health
 from core.retention import run_retention_job, should_run_retention_job
 from core.state_store import (
@@ -123,6 +124,12 @@ def _log_validation_cycle(validation_report: dict) -> None:
     metrics = dict(validation_report.get("metrics", {}) or {})
     rejections = dict(metrics.get("signal_rejections", {}) or {})
     current_context = dict(validation_report.get("current_market_context", {}) or {})
+    weak_score_count = int(
+        rejections.get("score_below_minimum", rejections.get("weak_score", 0)) or 0
+    )
+    feed_blocked_count = int(
+        rejections.get("feed_quality_blocked", 0) or 0
+    ) + int(rejections.get("fallback_blocked", 0) or 0) + int(rejections.get("provider_unknown", 0) or 0)
     message = (
         "[validation_signal] "
         f"day={int(validation_report.get('validation_day_number', 1) or 1)};"
@@ -130,10 +137,95 @@ def _log_validation_cycle(validation_report: dict) -> None:
         f"approved={int(metrics.get('signals_approved', 0) or 0)};"
         f"rejected={int(metrics.get('signals_rejected', 0) or 0)};"
         f"against_trend={int(metrics.get('against_trend_entries', 0) or 0)};"
-        f"weak_score={int(rejections.get('weak_score', 0) or 0)};"
-        f"feed_unreliable={int(rejections.get('feed_unreliable', 0) or 0)};"
+        f"weak_score={weak_score_count};"
+        f"feed_unreliable={feed_blocked_count};"
         f"context={str(current_context.get('market_context_status') or 'NEUTRO').upper()};"
         f"context_blocked={int(metrics.get('context_blocked_signals', 0) or 0)}"
+    )
+    log_event("INFO", message)
+
+
+def _log_feed_quality_summary(market_data_status: dict | None) -> None:
+    quality = build_feed_quality_snapshot(market_data_status)
+    message = (
+        "[feed_quality_summary] "
+        f"status={str(quality.get('feed_status') or 'UNKNOWN').lower()};"
+        f"provider={str(quality.get('provider_effective') or 'unknown').lower()};"
+        f"success_rate={'-' if quality.get('twelvedata_success_rate') is None else f'{float(quality.get('twelvedata_success_rate') or 0.0) * 100:.1f}%'};"
+        f"live={int(quality.get('live_count') or 0)}/{int(quality.get('total_symbols') or 0)};"
+        f"fallback={int(quality.get('fallback_count') or 0)};"
+        f"last_success={str(quality.get('last_success_at') or 'na')};"
+        f"reason={str(quality.get('fallback_reason') or 'none')}"
+    )
+    log_event("INFO", message)
+
+
+def _log_signal_quality_summary(validation_report: dict) -> None:
+    metrics = dict(validation_report.get("metrics", {}) or {})
+    consistency = dict(validation_report.get("consistency", {}) or {})
+    approval_rate = consistency.get("signal_approval_rate")
+    message = (
+        "[signal_quality_summary] "
+        f"approved={int(metrics.get('signals_approved', 0) or 0)};"
+        f"rejected={int(metrics.get('signals_rejected', 0) or 0)};"
+        f"approval_rate={'-' if approval_rate is None else f'{float(approval_rate or 0.0) * 100:.1f}%'};"
+        f"sample={str(consistency.get('sample_quality_label') or 'Sem leitura').lower()};"
+        f"posture={str(consistency.get('operational_posture_label') or 'Indefinida').lower()};"
+        f"watchlist={'coerente' if bool(consistency.get('watchlist_phase_aligned')) else 'fora_da_fase'};"
+        f"reading={str(consistency.get('signal_quality_label') or 'Baixa').lower()}"
+    )
+    log_event("INFO", message)
+
+
+def _log_signal_rejection_summary(validation_report: dict, cycle_result: dict | None) -> None:
+    cycle_validation = dict((cycle_result or {}).get("validation_cycle", {}) or {})
+    rejection_summary = dict(cycle_validation.get("rejection_summary", {}) or validation_report.get("rejection_quality", {}) or {})
+    top_reason = str(rejection_summary.get("top_rejection_reason") or "")
+    top_layer = str(rejection_summary.get("top_rejection_layer") or "")
+    top_strategy = str(rejection_summary.get("top_rejection_strategy") or "")
+    reason_breakdown = dict(rejection_summary.get("rejected_by_reason", {}) or {})
+    layer_breakdown = dict(rejection_summary.get("rejected_by_layer", {}) or {})
+    log_event(
+        "INFO",
+        (
+            "[signal_rejection_summary] "
+            f"rejected={int(rejection_summary.get('total_rejected_signals', 0) or 0)};"
+            f"events={int(rejection_summary.get('total_rejection_events', 0) or 0)};"
+            f"top_reason={top_reason or 'none'};"
+            f"top_layer={top_layer or 'none'};"
+            f"top_strategy={top_strategy or 'none'}"
+        ),
+    )
+    if top_reason:
+        log_event(
+            "INFO",
+            (
+                "[signal_rejection_top_reason] "
+                f"reason={top_reason};"
+                f"count={int(reason_breakdown.get(top_reason, 0) or 0)}"
+            ),
+        )
+    if layer_breakdown:
+        summary = ",".join(
+            f"{str(layer)}:{int(count or 0)}"
+            for layer, count in sorted(layer_breakdown.items(), key=lambda item: int(item[1] or 0), reverse=True)
+        )
+        log_event("INFO", f"[signal_rejection_layer_summary] {summary}")
+
+
+def _log_cycle_summary(*, action_text: str, market_data_status: dict | None, validation_report: dict) -> None:
+    metrics = dict(validation_report.get("metrics", {}) or {})
+    consistency = dict(validation_report.get("consistency", {}) or {})
+    status = dict(market_data_status or {})
+    message = (
+        "[cycle_summary] "
+        f"action={str(action_text or '').lower().replace(' ', '_')};"
+        f"provider={str(status.get('provider_effective') or status.get('provider') or 'unknown').lower()};"
+        f"feed={str(status.get('feed_status') or 'UNKNOWN').lower()};"
+        f"positions={int(metrics.get('open_positions', 0) or 0)};"
+        f"approved={int(metrics.get('signals_approved', 0) or 0)};"
+        f"rejected={int(metrics.get('signals_rejected', 0) or 0)};"
+        f"posture={str(consistency.get('operational_posture_label') or 'Indefinida').lower()}"
     )
     log_event("INFO", message)
 
@@ -326,7 +418,15 @@ def worker_loop() -> None:
                 cycle_result=result.get("cycle_result", {}),
                 now=current_time,
             )
+            _log_cycle_summary(
+                action_text=action_text,
+                market_data_status=result.get("cycle_result", {}).get("market_data_status"),
+                validation_report=validation_report,
+            )
+            _log_feed_quality_summary(result.get("cycle_result", {}).get("market_data_status"))
             _log_validation_cycle(validation_report)
+            _log_signal_quality_summary(validation_report)
+            _log_signal_rejection_summary(validation_report, result.get("cycle_result", {}))
             _maybe_send_final_validation_email(validation_report, current_time=current_time)
 
         except Exception as exc:

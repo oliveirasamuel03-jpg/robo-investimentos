@@ -35,6 +35,12 @@ from core.persistence import (
     replace_json_rows,
     save_json_state,
 )
+from core.signal_rejection_analysis import (
+    DEFAULT_STRATEGY_NAME,
+    build_rejection_event,
+    build_signal_rejection_events,
+    summarize_rejection_events,
+)
 from core.trader_reports import append_trade_report, build_closed_trade_report
 
 
@@ -428,29 +434,31 @@ def _evaluate_buy_signal(latest: pd.Series, config: PaperTradingConfig) -> dict[
     )
     rsi_ok = float(config.rsi_entry_min) <= rsi <= float(config.rsi_entry_max)
     atr_ok = float(config.min_atr_pct) <= atr_pct <= float(config.max_atr_pct)
-    structure_ok = float(config.pullback_min) <= pullback_to_ma20 <= float(config.pullback_max)
-    momentum_ok = (
-        momentum >= float(config.momentum_min)
-        and momentum_8 >= float(config.momentum_8_min)
-        and breakout_20 >= float(config.breakout_min)
-    )
+    pullback_ok = float(config.pullback_min) <= pullback_to_ma20 <= float(config.pullback_max)
+    breakout_ok = breakout_20 >= float(config.breakout_min)
+    momentum_short_ok = momentum >= float(config.momentum_min)
+    momentum_medium_ok = momentum_8 >= float(config.momentum_8_min)
+    structure_ok = pullback_ok
+    momentum_ok = momentum_short_ok and momentum_medium_ok and breakout_ok
 
     setup_ok = trend_ok and rsi_ok and atr_ok and structure_ok and momentum_ok
     score_ok = score >= float(config.min_signal_score)
 
     rejection_reasons: list[str] = []
     if not trend_ok:
-        rejection_reasons.append("against_trend")
+        rejection_reasons.append("trend_not_confirmed")
     if not score_ok:
-        rejection_reasons.append("weak_score")
+        rejection_reasons.append("score_below_minimum")
     if not rsi_ok:
-        rejection_reasons.append("rsi_filter")
+        rejection_reasons.append("reversal_not_eligible")
     if not atr_ok:
-        rejection_reasons.append("atr_filter")
-    if not structure_ok:
-        rejection_reasons.append("structure_filter")
-    if not momentum_ok:
-        rejection_reasons.append("momentum_filter")
+        rejection_reasons.append("volatility_out_of_range")
+    if not pullback_ok:
+        rejection_reasons.append("no_setup_eligible")
+    if not breakout_ok:
+        rejection_reasons.append("breakout_not_confirmed")
+    if not momentum_short_ok or not momentum_medium_ok:
+        rejection_reasons.append("confidence_too_low")
 
     return {
         "buy": bool(setup_ok and score_ok),
@@ -459,6 +467,10 @@ def _evaluate_buy_signal(latest: pd.Series, config: PaperTradingConfig) -> dict[
         "score_ok": score_ok,
         "rsi_ok": rsi_ok,
         "atr_ok": atr_ok,
+        "pullback_ok": pullback_ok,
+        "breakout_ok": breakout_ok,
+        "momentum_short_ok": momentum_short_ok,
+        "momentum_medium_ok": momentum_medium_ok,
         "structure_ok": structure_ok,
         "momentum_ok": momentum_ok,
         "trend_alignment": dominant_trend,
@@ -635,17 +647,26 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[s
         "context_blocked": 0,
         "market_context_status": str(market_context.get("market_context_status") or "NEUTRO"),
         "rejections": {
-            "against_trend": 0,
-            "weak_score": 0,
-            "rsi_filter": 0,
-            "atr_filter": 0,
-            "structure_filter": 0,
-            "momentum_filter": 0,
-            "feed_unreliable": 0,
+            "trend_not_confirmed": 0,
+            "score_below_minimum": 0,
+            "reversal_not_eligible": 0,
+            "volatility_out_of_range": 0,
+            "no_setup_eligible": 0,
+            "breakout_not_confirmed": 0,
+            "confidence_too_low": 0,
+            "feed_quality_blocked": 0,
+            "fallback_blocked": 0,
+            "provider_unknown": 0,
             "context_blocked": 0,
             "daily_loss_guard": 0,
+            "cooldown_active": 0,
+            "duplicate_signal_blocked": 0,
+            "position_limit_reached": 0,
+            "schedule_blocked": 0,
         },
+        "rejection_events": [],
     }
+    rejection_events: list[dict[str, Any]] = []
 
     open_positions = dict(state.get("positions", {}) or {})
     for asset, position in list(open_positions.items()):
@@ -747,8 +768,26 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[s
 
     for asset, data in market_data.items():
         if asset in state.get("positions", {}):
+            open_position = dict((state.get("positions", {}) or {}).get(asset) or {})
+            rejection_events.append(
+                build_rejection_event(
+                    "duplicate_signal_blocked",
+                    symbol=asset,
+                    timestamp=str(open_position.get("opened_at") or _utc_now_iso()),
+                    event_key=f"{str(open_position.get('entry_signal_key') or asset)}|duplicate_signal_blocked",
+                )
+            )
             continue
         if _asset_in_cooldown(state, asset, int(config.reentry_cooldown_minutes)):
+            cooldown_ref = str((state.get("asset_cooldowns", {}) or {}).get(str(asset).upper()) or _utc_now_iso())
+            rejection_events.append(
+                build_rejection_event(
+                    "cooldown_active",
+                    symbol=asset,
+                    timestamp=cooldown_ref,
+                    event_key=f"{str(asset).upper()}|{cooldown_ref}|cooldown_active",
+                )
+            )
             continue
 
         latest = data.iloc[-1]
@@ -776,12 +815,23 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[s
                 evaluation["rejection_reasons"] = [*evaluation["rejection_reasons"], "daily_loss_guard"]
         if not _is_live_market_source(data_source):
             should_buy = False
-            if "feed_unreliable" not in evaluation["rejection_reasons"]:
-                evaluation["rejection_reasons"] = [*evaluation["rejection_reasons"], "feed_unreliable"]
+            feed_reason = "fallback_blocked" if str(data_source).lower() == "fallback" else "provider_unknown"
+            if str(data_source).lower() not in {"fallback", "unknown"}:
+                feed_reason = "feed_quality_blocked"
+            if feed_reason not in evaluation["rejection_reasons"]:
+                evaluation["rejection_reasons"] = [*evaluation["rejection_reasons"], feed_reason]
 
         signal_key = _signal_snapshot_key(asset, latest, data_source)
+        signal_timestamp = ""
+        raw_datetime = latest.get("datetime")
+        if isinstance(raw_datetime, pd.Timestamp):
+            signal_timestamp = raw_datetime.isoformat()
+        else:
+            signal_timestamp = str(raw_datetime or "")
         signal = {
             "asset": asset,
+            "timestamp": _utc_now_iso(),
+            "signal_timestamp": signal_timestamp,
             "price": round(float(latest["close"]), 6),
             "rsi": round(float(latest.get("rsi", 50.0)), 2),
             "atr_pct": round(float(latest.get("atr_pct", 0.0) or 0.0), 4),
@@ -796,12 +846,17 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[s
             "buy": should_buy,
             "data_source": data_source,
             "signal_key": signal_key,
+            "strategy_name": DEFAULT_STRATEGY_NAME,
             "trend_ok": bool(evaluation["trend_ok"]),
             "score_ok": bool(evaluation["score_ok"]),
             "rsi_ok": bool(evaluation["rsi_ok"]),
             "atr_ok": bool(evaluation["atr_ok"]),
-            "structure_ok": bool(evaluation["structure_ok"]),
-            "momentum_ok": bool(evaluation["momentum_ok"]),
+            "pullback_ok": bool(evaluation.get("pullback_ok", evaluation.get("structure_ok", False))),
+            "breakout_ok": bool(evaluation.get("breakout_ok", evaluation.get("momentum_ok", False))),
+            "momentum_short_ok": bool(evaluation.get("momentum_short_ok", evaluation.get("momentum_ok", False))),
+            "momentum_medium_ok": bool(evaluation.get("momentum_medium_ok", evaluation.get("momentum_ok", False))),
+            "structure_ok": bool(evaluation.get("structure_ok", False)),
+            "momentum_ok": bool(evaluation.get("momentum_ok", False)),
             "trend_alignment": str(evaluation["trend_alignment"]),
             "rejection_reasons": list(evaluation["rejection_reasons"]),
             "base_min_signal_score": float(config.min_signal_score),
@@ -821,6 +876,7 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[s
                 if reason not in cycle_validation["rejections"]:
                     cycle_validation["rejections"][reason] = 0
                 cycle_validation["rejections"][reason] = int(cycle_validation["rejections"][reason]) + 1
+            rejection_events.extend(build_signal_rejection_events(signal))
             if "context_blocked" in signal["rejection_reasons"]:
                 cycle_validation["context_blocked"] = int(cycle_validation["context_blocked"]) + 1
 
@@ -828,6 +884,28 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[s
             candidates.append(signal)
 
     candidates.sort(key=lambda item: item["score"], reverse=True)
+    if not config.allow_new_entries:
+        for candidate in candidates:
+            rejection_events.append(
+                build_rejection_event(
+                    "schedule_blocked",
+                    symbol=str(candidate.get("asset") or ""),
+                    timestamp=str(candidate.get("signal_timestamp") or candidate.get("timestamp") or _utc_now_iso()),
+                    strategy_name=str(candidate.get("strategy_name") or DEFAULT_STRATEGY_NAME),
+                    event_key=f"{str(candidate.get('signal_key') or candidate.get('asset') or '')}|schedule_blocked",
+                )
+            )
+    elif len(candidates) > slots_left:
+        for candidate in candidates[slots_left:]:
+            rejection_events.append(
+                build_rejection_event(
+                    "position_limit_reached",
+                    symbol=str(candidate.get("asset") or ""),
+                    timestamp=str(candidate.get("signal_timestamp") or candidate.get("timestamp") or _utc_now_iso()),
+                    strategy_name=str(candidate.get("strategy_name") or DEFAULT_STRATEGY_NAME),
+                    event_key=f"{str(candidate.get('signal_key') or candidate.get('asset') or '')}|position_limit_reached",
+                )
+            )
 
     for candidate in candidates[:slots_left]:
         if not config.allow_new_entries:
@@ -914,6 +992,11 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[s
     save_paper_state(state)
 
     report = build_paper_report({"signals": signals}, initial_capital=float(config.initial_capital))
+    cycle_validation["rejection_events"] = rejection_events
+    cycle_validation["rejection_summary"] = summarize_rejection_events(
+        rejection_events,
+        rejected_signal_count=int(cycle_validation.get("signals_rejected", 0) or 0),
+    )
 
     return {
         "state": state,

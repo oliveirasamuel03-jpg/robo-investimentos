@@ -9,8 +9,9 @@ from core.alerts import send_email_alert
 from core.auth.guards import render_auth_toolbar, require_admin
 from core.broker import broker_status_label, probe_broker_status
 from core.config import ALERT_EMAIL_ENABLED, ALERT_EMAIL_FROM, ALERT_EMAIL_PROVIDER, PRODUCTION_MODE, SMTP_USERNAME
-from core.market_data import classify_feed_status, format_market_timestamp, legacy_market_status
+from core.market_data import build_feed_quality_snapshot, classify_feed_status, format_market_timestamp, legacy_market_status
 from core.production_monitor import evaluate_production_health
+from core.signal_rejection_analysis import rejection_dominant_message, rejection_layer_label, rejection_reason_label
 from core.state_store import (
     load_bot_state,
     log_event,
@@ -78,6 +79,17 @@ def audit_display_value(value: object) -> str:
     if isinstance(value, bool):
         return "Sim" if value else "Nao"
     return str(value)
+
+
+def symbol_list_label(symbols: list[str] | None) -> str:
+    values = [str(item).upper() for item in (symbols or []) if str(item)]
+    return ", ".join(values) if values else "Nenhum"
+
+
+def pct_label(value: float | None) -> str:
+    if value is None:
+        return "-"
+    return f"{float(value or 0.0) * 100:.1f}%"
 
 
 def worker_instrumentation_confirmed(payload: dict | None) -> bool:
@@ -331,6 +343,89 @@ if val_consistency.get("capital_phase_aligned") is False:
         "Para um novo ciclo limpo, use o reset operacional do trader."
     )
 
+st.subheader("Qualidade de sinal da FASE 2")
+signal_c1, signal_c2, signal_c3, signal_c4, signal_c5, signal_c6 = st.columns(6)
+signal_c1.metric("Sinais aprovados", str(int(val_metrics.get("signals_approved", 0) or 0)))
+signal_c2.metric("Sinais rejeitados", str(int(val_metrics.get("signals_rejected", 0) or 0)))
+signal_c3.metric(
+    "Taxa de aprovacao",
+    "-"
+    if val_consistency.get("signal_approval_rate") is None
+    else f"{float(val_consistency.get('signal_approval_rate') or 0.0) * 100:.1f}%",
+)
+signal_c4.metric("Amostra do ciclo", str(val_consistency.get("sample_quality_label") or "Sem leitura"))
+signal_c5.metric("Postura atual", str(val_consistency.get("operational_posture_label") or "Indefinida"))
+signal_c6.metric("Leitura simples", str(val_consistency.get("signal_quality_label") or "Baixa"))
+
+signal_d1, signal_d2 = st.columns(2)
+with signal_d1:
+    st.write(
+        f"Consistencia da watchlist: "
+        f"{'Coerente com a fase' if bool(val_consistency.get('watchlist_phase_aligned')) else 'Fora da fase'}"
+    )
+    if val_consistency.get("signal_quality_message"):
+        st.caption(f"Sinal: {val_consistency.get('signal_quality_message')}")
+with signal_d2:
+    st.write(
+        f"Ajuste fino: "
+        f"{'Ja existe base minima' if bool(val_consistency.get('fine_tuning_ready')) else 'Ainda nao'}"
+    )
+    if val_consistency.get("validation_reading_message"):
+        st.caption(f"Validacao: {val_consistency.get('validation_reading_message')}")
+
+rejection_quality = dict(validation_report.get("rejection_quality", {}) or {})
+rejection_top_reasons = rejection_quality.get("top_reasons", []) or []
+st.subheader("Qualidade de rejeicao de sinal")
+rej_c1, rej_c2, rej_c3, rej_c4 = st.columns(4)
+rej_c1.metric(
+    "Motivo dominante",
+    rejection_reason_label(rejection_quality.get("top_reason")) if rejection_quality.get("top_reason") else "Sem leitura",
+)
+rej_c2.metric(
+    "Camada dominante",
+    rejection_layer_label(rejection_quality.get("top_layer")) if rejection_quality.get("top_layer") else "Sem leitura",
+)
+rej_c3.metric(
+    "Setup mais bloqueado",
+    str(rejection_quality.get("top_strategy") or "Sem leitura"),
+)
+rej_c4.metric(
+    "Base minima para ajuste",
+    "Sim" if bool(rejection_quality.get("has_minimum_sample")) else "Nao",
+)
+
+rej_d1, rej_d2 = st.columns(2)
+with rej_d1:
+    st.write("**Top 5 motivos de rejeicao**")
+    if rejection_top_reasons:
+        for item in rejection_top_reasons:
+            st.caption(
+                f"- {item.get('human_reason')}: {int(item.get('count', 0) or 0)} "
+                f"({pct_label(item.get('pct'))})"
+            )
+    else:
+        st.caption("Sem rejeicoes suficientes registradas ate o momento.")
+with rej_d2:
+    layer_breakdown = dict(rejection_quality.get("layer_breakdown", {}) or {})
+    strategy_breakdown = dict(rejection_quality.get("strategy_breakdown", {}) or {})
+    st.write(
+        f"**Leitura curta:** "
+        f"{rejection_dominant_message(rejection_quality.get('top_layer')) if rejection_quality.get('top_layer') else 'Sem leitura consolidada.'}"
+    )
+    if layer_breakdown:
+        layer_lines = [
+            f"{rejection_layer_label(layer)}={pct_label((int(count or 0) / max(int(rejection_quality.get('total_rejection_events', 0) or 0), 1)))}"
+            for layer, count in sorted(layer_breakdown.items(), key=lambda item: int(item[1] or 0), reverse=True)
+        ]
+        st.caption("Camadas: " + " | ".join(layer_lines))
+    if strategy_breakdown:
+        top_strategy, top_strategy_count = sorted(
+            strategy_breakdown.items(),
+            key=lambda item: int(item[1] or 0),
+            reverse=True,
+        )[0]
+        st.caption(f"Estrategia mais bloqueada: {top_strategy} ({int(top_strategy_count or 0)})")
+
 val_actions1, val_actions2 = st.columns(2)
 with val_actions1:
     if st.button("Recalcular validacao swing", use_container_width=True):
@@ -497,6 +592,41 @@ if broker_state.get("warning"):
     st.caption(f"Observacao do broker: {broker_state.get('warning')}")
 if production_state.get("last_alert_error"):
     st.caption(f"Ultima falha no envio de alerta: {production_state.get('last_alert_error')}")
+
+worker_feed_quality = build_feed_quality_snapshot(operational_market_state)
+chart_feed_quality = build_feed_quality_snapshot(chart_market_state)
+st.subheader("Qualidade do feed")
+st.caption("Separacao explicita entre o feed operacional do worker e o ultimo feed visual usado pelo grafico do Trader.")
+feed_c1, feed_c2, feed_c3, feed_c4 = st.columns(4)
+feed_c1.metric("Sucesso Twelve Data", pct_label(worker_feed_quality.get("twelvedata_success_rate")))
+feed_c2.metric("Ultimo sucesso real", format_market_timestamp(worker_feed_quality.get("last_success_at")))
+feed_c3.metric("Ativos live no ciclo", f"{int(worker_feed_quality.get('live_count') or 0)}/{int(worker_feed_quality.get('total_symbols') or 0)}")
+feed_c4.metric("Ativos em fallback", str(int(worker_feed_quality.get("fallback_count") or 0)))
+
+feed_detail_c1, feed_detail_c2 = st.columns(2)
+with feed_detail_c1:
+    st.write("**Feed operacional do worker**")
+    st.write(
+        f"Status: {market_data_status_label(operational_market_state)} | "
+        f"Fonte: {market_data_source_label(operational_market_state)}"
+    )
+    st.write(f"Ativos live: {symbol_list_label(worker_feed_quality.get('live_symbols'))}")
+    st.write(f"Ativos em fallback: {symbol_list_label(worker_feed_quality.get('fallback_symbols'))}")
+    if worker_feed_quality.get("fallback_reason"):
+        st.caption(f"Motivo do fallback operacional: {worker_feed_quality.get('fallback_reason')}")
+    if worker_feed_quality.get("quality_message"):
+        st.caption(worker_feed_quality.get("quality_message"))
+with feed_detail_c2:
+    st.write("**Feed do grafico do Trader**")
+    st.write(
+        f"Status: {market_data_status_label(chart_market_state)} | "
+        f"Fonte: {market_data_source_label(chart_market_state)}"
+    )
+    st.write(f"Ativos live: {symbol_list_label(chart_feed_quality.get('live_symbols'))}")
+    st.write(f"Ativos em fallback: {symbol_list_label(chart_feed_quality.get('fallback_symbols'))}")
+    if chart_feed_quality.get("fallback_reason"):
+        st.caption(f"Motivo do fallback visual: {chart_feed_quality.get('fallback_reason')}")
+    st.caption("Fallback apenas visual do grafico nao altera o feed operacional do worker.")
 
 with st.expander("Diagnostico do feed"):
     st.write("**Contexto operacional (worker):**")

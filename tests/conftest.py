@@ -17,6 +17,7 @@ MODULES_TO_CLEAR = [
     "core.alerts",
     "core.daily_risk",
     "core.retention",
+    "core.signal_rejection_analysis",
     "core.swing_validation",
     "core.trader_profiles",
     "core.trader_reports",
