@@ -15,6 +15,7 @@ import pandas as pd
 import yfinance as yf
 
 from core.config import (
+    APP_SOURCE_COMMIT_SHA,
     BUILD_TIMESTAMP,
     CACHE_DIR,
     MARKET_DATA_CACHE_TTL_SECONDS,
@@ -848,6 +849,7 @@ def _status_from_frames(
         "requested_by": requested_by,
         "build_active": MARKET_DATA_BUILD_LABEL,
         "git_sha": str(RAILWAY_GIT_COMMIT_SHA or "").strip(),
+        "source_commit_sha": str(APP_SOURCE_COMMIT_SHA or "").strip(),
         "build_timestamp": str(BUILD_TIMESTAMP or "").strip(),
         "service_name": configured_service_name or "unknown",
         "api_key_present": bool(twelvedata_diag.get("api_key_present")),

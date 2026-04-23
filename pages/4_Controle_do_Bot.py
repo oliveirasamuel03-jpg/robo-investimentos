@@ -82,6 +82,14 @@ def audit_display_value(value: object) -> str:
     return str(value)
 
 
+def source_commit_display_value(value: object) -> str:
+    if value is None:
+        return "NAO INFORMADO PELO DEPLOY"
+    if isinstance(value, str) and not value.strip():
+        return "NAO INFORMADO PELO DEPLOY"
+    return str(value)
+
+
 def symbol_list_label(symbols: list[str] | None) -> str:
     values = [str(item).upper() for item in (symbols or []) if str(item)]
     return ", ".join(values) if values else "Nenhum"
@@ -728,6 +736,9 @@ with st.expander("Diagnostico do feed"):
 
 st.markdown("### AUDITORIA DO WORKER")
 st.write("controle_bot_ui_version: audit_v2")
+st.caption(
+    "Os campos abaixo mostram o commit real do deploy em producao, nao necessariamente o SHA da branch original."
+)
 worker_confirmed = worker_instrumentation_confirmed(operational_market_state)
 if worker_confirmed:
     st.success("WORKER INSTRUMENTADO CONFIRMADO")
@@ -737,15 +748,19 @@ else:
 audit_c1, audit_c2 = st.columns(2)
 with audit_c1:
     st.write(f"ui_audit_probe: {audit_display_value(operational_market_state.get('ui_audit_probe'))}")
-    st.write(f"Build ativo: {audit_display_value(operational_market_state.get('build_active'))}")
-    st.write(f"Git SHA: {audit_display_value(operational_market_state.get('git_sha'))}")
+    st.write(f"Build do deploy: {audit_display_value(operational_market_state.get('build_active'))}")
+    st.write(f"SHA do deploy: {audit_display_value(operational_market_state.get('git_sha'))}")
+    st.write(f"SHA de origem: {source_commit_display_value(operational_market_state.get('source_commit_sha'))}")
     st.write(f"Build timestamp: {audit_display_value(operational_market_state.get('build_timestamp'))}")
     st.write(f"Runtime iniciado em: {audit_display_value(operational_market_state.get('runtime_started_at'))}")
     st.write(f"Servico: {audit_display_value(operational_market_state.get('service_name'))}")
     st.write(f"Papel do processo: {audit_display_value(operational_market_state.get('process_role'))}")
     st.write(f"Ultima gravacao do estado: {audit_display_value(operational_market_state.get('state_written_at'))}")
     st.write(f"Writer do estado: {audit_display_value(operational_market_state.get('state_writer'))}")
-    st.write(f"Build SHA do estado: {audit_display_value(operational_market_state.get('state_build_sha'))}")
+    st.write(
+        "SHA do deploy gravado no estado: "
+        f"{audit_display_value(operational_market_state.get('state_build_sha'))}"
+    )
     st.write(f"Schema do estado: {audit_display_value(operational_market_state.get('state_schema_version'))}")
 with audit_c2:
     st.write(f"API key presente: {audit_display_value(operational_market_state.get('api_key_present'))}")
