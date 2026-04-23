@@ -18,6 +18,11 @@ from core.config import (
     VALIDATION_TRADING_MODE,
 )
 from core.state_store import load_bot_state, read_storage_table, save_bot_state
+from core.signal_rejection_analysis import (
+    rejection_dominant_message,
+    rejection_reason_label,
+    update_validation_rejection_state,
+)
 from core.trader_profiles import get_trader_profile_config, normalize_trader_profile
 from core.trader_reports import (
     calculate_equity_curve_metrics,
@@ -162,14 +167,22 @@ def _default_signal_counters() -> dict[str, Any]:
         "signals_rejected": 0,
         "entries_against_trend": 0,
         "rejections": {
-            "against_trend": 0,
-            "weak_score": 0,
-            "rsi_filter": 0,
-            "atr_filter": 0,
-            "structure_filter": 0,
-            "momentum_filter": 0,
-            "feed_unreliable": 0,
+            "trend_not_confirmed": 0,
+            "score_below_minimum": 0,
+            "reversal_not_eligible": 0,
+            "volatility_out_of_range": 0,
+            "no_setup_eligible": 0,
+            "breakout_not_confirmed": 0,
+            "confidence_too_low": 0,
+            "feed_quality_blocked": 0,
+            "fallback_blocked": 0,
+            "provider_unknown": 0,
             "context_blocked": 0,
+            "cooldown_active": 0,
+            "duplicate_signal_blocked": 0,
+            "position_limit_reached": 0,
+            "schedule_blocked": 0,
+            "daily_loss_guard": 0,
         },
         "assets_observed": {},
         "assets_approved": {},
@@ -205,8 +218,16 @@ def default_validation_state() -> dict[str, Any]:
         "last_evaluated_at": "",
         "last_reset_at": "",
         "last_report": {},
+        "rejection_top_reason": "",
+        "rejection_top_layer": "",
+        "rejection_top_strategy": "",
+        "rejection_reason_breakdown": {},
+        "rejection_layer_breakdown": {},
+        "rejection_strategy_breakdown": {},
+        "rejection_has_minimum_sample": False,
         "signal_counters": _default_signal_counters(),
         "last_signal_keys": {},
+        "last_rejection_event_keys": {},
     }
 
 
@@ -309,6 +330,7 @@ def _update_signal_counters(validation_state: dict[str, Any], cycle_result: dict
 
     validation_state["signal_counters"] = counters
     validation_state["last_signal_keys"] = last_signal_keys
+    validation_state = update_validation_rejection_state(validation_state, cycle_result)
     return validation_state
 
 
@@ -657,6 +679,121 @@ def _operational_posture_payload(
     }
 
 
+def _signal_quality_payload(
+    *,
+    approval_rate: float | None,
+    signals_total: int,
+    sample_quality: dict[str, str],
+    posture: dict[str, str],
+    watchlist_phase_aligned: bool,
+    fallback_cycle_pct: float,
+) -> dict[str, str]:
+    if signals_total <= 0 or sample_quality.get("label") == "Inicial":
+        return {
+            "label": "Baixa",
+            "message": "Ainda ha pouca amostra para concluir a qualidade dos sinais desta fase.",
+        }
+    if not watchlist_phase_aligned or fallback_cycle_pct >= 20.0:
+        return {
+            "label": "Baixa",
+            "message": "A leitura de sinal ainda esta contaminada por desalinhamento da watchlist ou qualidade insuficiente do feed.",
+        }
+    if posture.get("label") == "Conservador" and approval_rate is not None and approval_rate <= 0.12:
+        return {
+            "label": "Moderada",
+            "message": "O filtro parece seletivo demais para a amostra atual; vale observar mais ciclos antes de ajustar.",
+        }
+    if sample_quality.get("label") == "Aceitavel" and posture.get("label") == "Equilibrado":
+        return {
+            "label": "Boa",
+            "message": "Os sinais ja sustentam uma leitura operacional mais confiavel desta fase.",
+        }
+    return {
+        "label": "Moderada",
+        "message": "Os sinais ja permitem leitura inicial, mas ainda pedem mais amostra antes de ajuste fino.",
+    }
+
+
+def _validation_reading_payload(
+    *,
+    sample_quality: dict[str, str],
+    posture: dict[str, str],
+    watchlist_alignment: dict[str, Any],
+) -> dict[str, Any]:
+    messages: list[str] = []
+
+    if sample_quality.get("label") == "Inicial":
+        messages.append("Ainda ha pouca amostra para leitura estrategica desta fase.")
+    elif sample_quality.get("label") == "Parcial":
+        messages.append("A amostra ja permite leitura inicial, mas ainda nao sustenta ajuste fino.")
+    else:
+        messages.append("Ja existe base minima para avaliar pequenos ajustes sem precipitar a estrategia.")
+
+    if posture.get("label") == "Conservador":
+        messages.append("O filtro parece seletivo demais para esta janela.")
+    elif posture.get("label") == "Permissivo":
+        messages.append("O filtro esta permissivo demais para uma validacao swing disciplinada.")
+    else:
+        messages.append("O filtro atual segue equilibrado para a fase.")
+
+    if watchlist_alignment.get("phase_aligned"):
+        messages.append("A watchlist segue coerente com a fase cripto-only.")
+    else:
+        messages.append("A watchlist ainda nao esta totalmente coerente com a fase atual.")
+
+    fine_tuning_ready = bool(
+        sample_quality.get("label") == "Aceitavel"
+        and posture.get("label") == "Equilibrado"
+        and bool(watchlist_alignment.get("phase_aligned"))
+    )
+    if fine_tuning_ready:
+        messages.append("Ja existe base minima para observar ajustes finos, sem mudar a estrategia base agora.")
+    else:
+        messages.append("Ainda nao ha base minima suficiente para ajuste fino com seguranca.")
+
+    return {
+        "message": " ".join(messages),
+        "fine_tuning_ready": fine_tuning_ready,
+    }
+
+
+def _rejection_quality_payload(validation_state: dict[str, Any]) -> dict[str, Any]:
+    reason_breakdown = dict(validation_state.get("rejection_reason_breakdown", {}) or {})
+    layer_breakdown = dict(validation_state.get("rejection_layer_breakdown", {}) or {})
+    strategy_breakdown = dict(validation_state.get("rejection_strategy_breakdown", {}) or {})
+    total_events = int(sum(int(value or 0) for value in reason_breakdown.values()))
+    top_reason = str(validation_state.get("rejection_top_reason") or "")
+    top_layer = str(validation_state.get("rejection_top_layer") or "")
+    top_strategy = str(validation_state.get("rejection_top_strategy") or "")
+
+    top_reasons: list[dict[str, Any]] = []
+    if total_events > 0:
+        for reason_code, count in sorted(reason_breakdown.items(), key=lambda item: int(item[1] or 0), reverse=True)[:5]:
+            pct = (int(count or 0) / total_events) if total_events > 0 else 0.0
+            top_reasons.append(
+                {
+                    "reason_code": str(reason_code),
+                    "human_reason": rejection_reason_label(str(reason_code)),
+                    "count": int(count or 0),
+                    "pct": round(pct, 4),
+                }
+            )
+
+    return {
+        "total_rejection_events": total_events,
+        "top_reason": top_reason,
+        "top_reason_label": rejection_reason_label(top_reason),
+        "top_layer": top_layer,
+        "top_layer_message": rejection_dominant_message(top_layer) if top_layer else "",
+        "top_strategy": top_strategy,
+        "reason_breakdown": reason_breakdown,
+        "layer_breakdown": layer_breakdown,
+        "strategy_breakdown": strategy_breakdown,
+        "top_reasons": top_reasons,
+        "has_minimum_sample": bool(validation_state.get("rejection_has_minimum_sample", False)),
+    }
+
+
 def _watchlist_phase_alignment_payload(state: dict[str, Any]) -> dict[str, Any]:
     current_watchlist = _normalized_watchlist((state.get("trader", {}) or {}).get("watchlist", []))
     recommended_watchlist = _normalized_watchlist(SWING_VALIDATION_RECOMMENDED_WATCHLIST)
@@ -714,12 +851,26 @@ def _build_operational_consistency(
     signals_approved = int(metrics.get("signals_approved", 0) or 0)
     approval_rate = (signals_approved / signals_total) if signals_total > 0 else None
     sample_quality = _sample_quality_payload(int(metrics.get("trades_closed", 0) or 0))
+    rejection_quality = _rejection_quality_payload(dict(state.get("validation", {}) or {}))
     posture = _operational_posture_payload(
         approval_rate=approval_rate,
         signals_total=signals_total,
         effective_profile=effective_profile,
     )
     watchlist_alignment = _watchlist_phase_alignment_payload(state)
+    signal_quality = _signal_quality_payload(
+        approval_rate=approval_rate,
+        signals_total=signals_total,
+        sample_quality=sample_quality,
+        posture=posture,
+        watchlist_phase_aligned=bool(watchlist_alignment["phase_aligned"]),
+        fallback_cycle_pct=float(metrics.get("fallback_cycle_pct", 0.0) or 0.0),
+    )
+    validation_reading = _validation_reading_payload(
+        sample_quality=sample_quality,
+        posture=posture,
+        watchlist_alignment=watchlist_alignment,
+    )
     runtime_capital = float(state.get("wallet_value", 0.0) or 0.0)
     capital_phase_aligned = abs(runtime_capital - float(VALIDATION_INITIAL_CAPITAL_BRL)) < 0.01
 
@@ -738,6 +889,14 @@ def _build_operational_consistency(
         "signal_approval_rate": None if approval_rate is None else round(float(approval_rate), 4),
         "operational_posture_label": posture["label"],
         "operational_posture_message": posture["message"],
+        "signal_quality_label": signal_quality["label"],
+        "signal_quality_message": signal_quality["message"],
+        "rejection_top_reason": rejection_quality["top_reason"],
+        "rejection_top_reason_label": rejection_quality["top_reason_label"],
+        "rejection_top_layer": rejection_quality["top_layer"],
+        "rejection_top_layer_message": rejection_quality["top_layer_message"],
+        "rejection_top_strategy": rejection_quality["top_strategy"],
+        "rejection_has_minimum_sample": rejection_quality["has_minimum_sample"],
         "watchlist_phase_aligned": bool(watchlist_alignment["phase_aligned"]),
         "watchlist_message": watchlist_alignment["message"],
         "current_watchlist": watchlist_alignment["current_watchlist"],
@@ -753,6 +912,8 @@ def _build_operational_consistency(
             effective_profile.get("max_open_positions", VALIDATION_DEFAULT_MAX_OPEN_POSITIONS) or VALIDATION_DEFAULT_MAX_OPEN_POSITIONS
         ),
         "effective_min_signal_score": round(float(effective_profile.get("min_signal_score", 0.0) or 0.0), 4),
+        "validation_reading_message": validation_reading["message"],
+        "fine_tuning_ready": bool(validation_reading["fine_tuning_ready"]),
         "max_drawdown_brl": equity_metrics.get("max_drawdown_brl"),
         "max_drawdown_pct": equity_metrics.get("max_drawdown_pct"),
     }
@@ -805,6 +966,7 @@ def build_swing_validation_report(state: dict | None = None, now: datetime | Non
 
     signal_counters = dict(validation_state.get("signal_counters", {}) or _default_signal_counters())
     signal_rejections = dict(signal_counters.get("rejections", {}) or {})
+    rejection_summary = _rejection_quality_payload(validation_state)
 
     performance_metrics = calculate_trade_report_metrics(reports_df)
     early_closed, late_held = _early_and_late_trades(reports_df)
@@ -823,6 +985,13 @@ def build_swing_validation_report(state: dict | None = None, now: datetime | Non
         "signals_rejected": int(signal_counters.get("signals_rejected", 0) or 0),
         "against_trend_entries": int(signal_counters.get("entries_against_trend", 0) or 0),
         "signal_rejections": signal_rejections,
+        "rejection_top_reason": rejection_summary["top_reason"],
+        "rejection_top_layer": rejection_summary["top_layer"],
+        "rejection_top_strategy": rejection_summary["top_strategy"],
+        "rejection_reason_breakdown": dict(rejection_summary["reason_breakdown"]),
+        "rejection_layer_breakdown": dict(rejection_summary["layer_breakdown"]),
+        "rejection_strategy_breakdown": dict(rejection_summary["strategy_breakdown"]),
+        "rejection_has_minimum_sample": bool(rejection_summary["has_minimum_sample"]),
         "context_status_counts": dict(signal_counters.get("context_status_counts", {}) or {}),
         "context_blocked_signals": int(signal_counters.get("context_blocked_signals", 0) or 0),
         "open_positions": len(payload.get("positions", []) or []),
@@ -864,6 +1033,7 @@ def build_swing_validation_report(state: dict | None = None, now: datetime | Non
         "validation_status": "completed" if day_number >= SWING_VALIDATION_DAYS else "running",
         "metrics": metrics,
         "performance": performance,
+        "rejection_quality": rejection_summary,
         "most_used_assets": most_used_assets,
         "best_assets": best_assets,
         "worst_assets": worst_assets,
@@ -940,6 +1110,25 @@ def refresh_swing_validation_cycle(
             "timeframe": SWING_VALIDATION_INTERVAL,
             "timeframe_label": "Diario (1D)",
             "period_label": SWING_VALIDATION_PERIOD,
+            "rejection_top_reason": sanitized_report.get("metrics", {}).get("rejection_top_reason", validation_state.get("rejection_top_reason", "")),
+            "rejection_top_layer": sanitized_report.get("metrics", {}).get("rejection_top_layer", validation_state.get("rejection_top_layer", "")),
+            "rejection_top_strategy": sanitized_report.get("metrics", {}).get("rejection_top_strategy", validation_state.get("rejection_top_strategy", "")),
+            "rejection_reason_breakdown": sanitized_report.get("metrics", {}).get(
+                "rejection_reason_breakdown",
+                validation_state.get("rejection_reason_breakdown", {}),
+            ),
+            "rejection_layer_breakdown": sanitized_report.get("metrics", {}).get(
+                "rejection_layer_breakdown",
+                validation_state.get("rejection_layer_breakdown", {}),
+            ),
+            "rejection_strategy_breakdown": sanitized_report.get("metrics", {}).get(
+                "rejection_strategy_breakdown",
+                validation_state.get("rejection_strategy_breakdown", {}),
+            ),
+            "rejection_has_minimum_sample": sanitized_report.get("metrics", {}).get(
+                "rejection_has_minimum_sample",
+                validation_state.get("rejection_has_minimum_sample", False),
+            ),
         }
     )
     save_bot_state(updated_state)

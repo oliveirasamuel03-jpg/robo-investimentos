@@ -156,6 +156,10 @@ def _normalize_market_data_state(state: dict) -> dict:
         normalized["response_status_code"] = normalized.get("response_status_code")
         normalized["last_stage"] = str(normalized.get("last_stage") or "")
         normalized["requested_symbols"] = [str(item).upper() for item in (normalized.get("requested_symbols") or []) if str(item)]
+        normalized["live_symbols"] = [str(item).upper() for item in (normalized.get("live_symbols") or []) if str(item)]
+        normalized["cached_symbols"] = [str(item).upper() for item in (normalized.get("cached_symbols") or []) if str(item)]
+        normalized["fallback_symbols"] = [str(item).upper() for item in (normalized.get("fallback_symbols") or []) if str(item)]
+        normalized["unknown_symbols"] = [str(item).upper() for item in (normalized.get("unknown_symbols") or []) if str(item)]
         normalized["state_writer"] = str(normalized.get("state_writer") or "")
         normalized["state_written_at"] = str(normalized.get("state_written_at") or "")
         normalized["state_build_sha"] = str(normalized.get("state_build_sha") or "")
@@ -219,6 +223,10 @@ DEFAULT_STATE = {
         "source_breakdown": {},
         "symbols": [],
         "requested_symbols": [],
+        "live_symbols": [],
+        "cached_symbols": [],
+        "fallback_symbols": [],
+        "unknown_symbols": [],
         "requested_by": "",
         "build_active": "",
         "git_sha": "",
@@ -353,21 +361,35 @@ DEFAULT_STATE = {
         "last_evaluated_at": "",
         "last_reset_at": "",
         "last_report": {},
+        "rejection_top_reason": "",
+        "rejection_top_layer": "",
+        "rejection_top_strategy": "",
+        "rejection_reason_breakdown": {},
+        "rejection_layer_breakdown": {},
+        "rejection_strategy_breakdown": {},
+        "rejection_has_minimum_sample": False,
         "signal_counters": {
             "signals_total": 0,
             "signals_approved": 0,
             "signals_rejected": 0,
             "entries_against_trend": 0,
             "rejections": {
-                "against_trend": 0,
-                "weak_score": 0,
-                "rsi_filter": 0,
-                "atr_filter": 0,
-                "structure_filter": 0,
-                "momentum_filter": 0,
-                "feed_unreliable": 0,
+                "trend_not_confirmed": 0,
+                "score_below_minimum": 0,
+                "reversal_not_eligible": 0,
+                "volatility_out_of_range": 0,
+                "no_setup_eligible": 0,
+                "breakout_not_confirmed": 0,
+                "confidence_too_low": 0,
+                "feed_quality_blocked": 0,
+                "fallback_blocked": 0,
+                "provider_unknown": 0,
                 "context_blocked": 0,
                 "daily_loss_guard": 0,
+                "cooldown_active": 0,
+                "duplicate_signal_blocked": 0,
+                "position_limit_reached": 0,
+                "schedule_blocked": 0,
             },
             "assets_observed": {},
             "assets_approved": {},
@@ -380,6 +402,7 @@ DEFAULT_STATE = {
             "context_blocked_signals": 0,
         },
         "last_signal_keys": {},
+        "last_rejection_event_keys": {},
     },
     "trader": {
         "enabled": True,
@@ -598,6 +621,9 @@ def update_market_data_status(
         context_state["symbols"] = [str(symbol).upper() for symbol in (payload.get("symbols") or [])]
     if payload.get("requested_symbols") is not None:
         context_state["requested_symbols"] = [str(symbol).upper() for symbol in (payload.get("requested_symbols") or [])]
+    for key in ("live_symbols", "cached_symbols", "fallback_symbols", "unknown_symbols"):
+        if payload.get(key) is not None:
+            context_state[key] = [str(symbol).upper() for symbol in (payload.get(key) or [])]
     for key in (
         "build_active",
         "git_sha",
@@ -668,6 +694,10 @@ def update_market_data_status(
             "source_breakdown",
             "symbols",
             "requested_symbols",
+            "live_symbols",
+            "cached_symbols",
+            "fallback_symbols",
+            "unknown_symbols",
             "requested_by",
             "build_active",
             "git_sha",
