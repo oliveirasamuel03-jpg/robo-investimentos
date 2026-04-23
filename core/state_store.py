@@ -20,6 +20,13 @@ from core.config import (
     MARKET_DATA_PROVIDER,
     PRODUCTION_MODE,
     RAILWAY_GIT_COMMIT_SHA,
+    REPORT_EMAIL_10DAY_ENABLED,
+    REPORT_EMAIL_DAILY_ENABLED,
+    REPORT_EMAIL_ENABLED,
+    REPORT_EMAIL_FINAL_ENABLED,
+    REPORT_EMAIL_PROVIDER,
+    REPORT_EMAIL_TO,
+    REPORT_EMAIL_WEEKLY_ENABLED,
     SERVICE_NAME,
     STATE_SCHEMA_VERSION,
     RETENTION_ARCHIVE_TRADER_ORDERS,
@@ -308,6 +315,26 @@ DEFAULT_STATE = {
         "next_alert_eligible_at": "",
         "last_recovery_email_at": "",
     },
+    "email_reporting": {
+        "enabled": REPORT_EMAIL_ENABLED,
+        "provider": REPORT_EMAIL_PROVIDER,
+        "destination": REPORT_EMAIL_TO,
+        "daily_enabled": REPORT_EMAIL_DAILY_ENABLED,
+        "weekly_enabled": REPORT_EMAIL_WEEKLY_ENABLED,
+        "ten_day_enabled": REPORT_EMAIL_10DAY_ENABLED,
+        "final_enabled": REPORT_EMAIL_FINAL_ENABLED,
+        "last_daily_report_email_date": "",
+        "last_weekly_report_email_week": "",
+        "last_10day_report_email_block": "",
+        "last_final_report_email_ts": "",
+        "last_email_delivery_status": "",
+        "last_email_delivery_reason": "",
+        "last_email_delivery_attempt_ts": "",
+        "last_email_delivery_success_ts": "",
+        "last_email_delivery_report_type": "",
+        "last_email_delivery_provider": "",
+        "last_email_delivery_subject": "",
+    },
     "risk": {
         "daily_loss_limit_brl": DAILY_LOSS_LIMIT_BRL_DEFAULT,
         "daily_loss_day_key": "",
@@ -453,6 +480,15 @@ def load_bot_state() -> dict:
     production_state["alert_email_enabled"] = ALERT_EMAIL_ENABLED
     production_state["alert_provider"] = ALERT_EMAIL_PROVIDER
     state["production"] = production_state
+    email_reporting_state = state.get("email_reporting", {}) or {}
+    email_reporting_state["enabled"] = REPORT_EMAIL_ENABLED
+    email_reporting_state["provider"] = REPORT_EMAIL_PROVIDER
+    email_reporting_state["destination"] = REPORT_EMAIL_TO
+    email_reporting_state["daily_enabled"] = REPORT_EMAIL_DAILY_ENABLED
+    email_reporting_state["weekly_enabled"] = REPORT_EMAIL_WEEKLY_ENABLED
+    email_reporting_state["ten_day_enabled"] = REPORT_EMAIL_10DAY_ENABLED
+    email_reporting_state["final_enabled"] = REPORT_EMAIL_FINAL_ENABLED
+    state["email_reporting"] = email_reporting_state
     risk_state = state.get("risk", {}) or {}
     risk_state["daily_loss_limit_brl"] = max(
         1.0,
@@ -828,6 +864,20 @@ def update_production_status(status_payload: dict | None) -> dict:
     state["production"] = production_state
     save_bot_state(state)
     return production_state
+
+
+def update_email_reporting_status(status_payload: dict | None) -> dict:
+    state = load_bot_state()
+    email_reporting_state = state.get("email_reporting", {}) or {}
+    payload = status_payload or {}
+
+    for key, value in payload.items():
+        if value is not None:
+            email_reporting_state[key] = value
+
+    state["email_reporting"] = email_reporting_state
+    save_bot_state(state)
+    return email_reporting_state
 
 
 def update_risk_status(status_payload: dict | None) -> dict:

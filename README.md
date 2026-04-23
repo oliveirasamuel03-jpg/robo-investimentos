@@ -133,6 +133,20 @@ Variaveis suportadas:
 - `ALERT_FEED_FALLBACK_MAX_MINUTES`
 - `ALERT_COOLDOWN_MINUTES`
 - `ALERT_SEND_RECOVERY_EMAIL`
+- `REPORT_EMAIL_ENABLED`
+- `REPORT_EMAIL_PROVIDER`
+- `REPORT_EMAIL_TO`
+- `REPORT_EMAIL_FROM`
+- `REPORT_EMAIL_SMTP_HOST`
+- `REPORT_EMAIL_SMTP_PORT`
+- `REPORT_EMAIL_SMTP_USERNAME`
+- `REPORT_EMAIL_SMTP_PASSWORD`
+- `REPORT_EMAIL_USE_TLS`
+- `REPORT_EMAIL_TIMEOUT_SECONDS`
+- `REPORT_EMAIL_DAILY_ENABLED`
+- `REPORT_EMAIL_WEEKLY_ENABLED`
+- `REPORT_EMAIL_10DAY_ENABLED`
+- `REPORT_EMAIL_FINAL_ENABLED`
 - `RETENTION_ENABLED`
 - `RETENTION_DAYS`
 - `RETENTION_RUN_INTERVAL_HOURS`
@@ -285,6 +299,49 @@ RESEND_API_BASE=https://api.resend.com/emails
 BROKER_PROVIDER=paper
 BROKER_MODE=paper
 ```
+
+## Email reporting dos relatorios
+
+O worker pode enviar relatorios operacionais por email sem sair do PAPER mode:
+
+- diario: uma vez por dia
+- semanal: uma vez por semana
+- bloco de avaliacao: dias 10, 20 e 30
+- final de 30 dias: uma unica vez
+
+Configuracao minima:
+
+```env
+REPORT_EMAIL_ENABLED=true
+REPORT_EMAIL_PROVIDER=smtp
+REPORT_EMAIL_TO=seu@email.com
+REPORT_EMAIL_FROM=desk@email.com
+REPORT_EMAIL_SMTP_HOST=seu_smtp
+REPORT_EMAIL_SMTP_PORT=587
+REPORT_EMAIL_SMTP_USERNAME=seu_usuario
+REPORT_EMAIL_SMTP_PASSWORD=sua_senha
+REPORT_EMAIL_USE_TLS=true
+REPORT_EMAIL_DAILY_ENABLED=true
+REPORT_EMAIL_WEEKLY_ENABLED=true
+REPORT_EMAIL_10DAY_ENABLED=true
+REPORT_EMAIL_FINAL_ENABLED=true
+```
+
+Como testar localmente:
+
+1. configure as variaveis acima no `.env`
+2. rode `streamlit run app.py`
+3. rode `python -m workers.trader_worker`
+4. confira em `Controle do Bot` a secao `Email reporting`
+5. verifique `storage/runtime/bot_log.csv` para eventos `[report_email_delivery]`
+
+Comportamento em falha e garantias de seguranca:
+
+- o envio e sempre `best-effort`
+- se SMTP ou Resend falhar, o worker continua o ciclo normalmente
+- os relatorios locais continuam sendo gerados mesmo sem email
+- a entrega por email nao dispara trades, nao muda score, nao muda broker e nao toca em ordem real
+- PAPER mode continua obrigatorio em todos os emails e no fluxo operacional
 
 Observacao importante:
 
