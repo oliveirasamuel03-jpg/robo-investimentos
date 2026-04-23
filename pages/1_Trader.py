@@ -1646,7 +1646,7 @@ with side_col:
             "Estado operacional compartilhado: "
             f"writer {market_data_status.get('state_writer') or 'nao-registrado'} | "
             f"gravado em {market_data_status.get('state_written_at') or 'nao-registrado'} | "
-            f"build {market_data_status.get('build_active') or 'nao-registrado'}"
+            f"build do deploy {market_data_status.get('build_active') or 'nao-registrado'}"
         )
     if admin_mode:
         st.caption(
@@ -1654,7 +1654,8 @@ with side_col:
             f"ui_audit_probe={market_data_status.get('ui_audit_probe') or 'NAO REGISTRADO NO ESTADO ATUAL'} | "
             f"state_writer={market_data_status.get('state_writer') or 'NAO REGISTRADO NO ESTADO ATUAL'} | "
             f"state_written_at={market_data_status.get('state_written_at') or 'NAO REGISTRADO NO ESTADO ATUAL'} | "
-            f"git_sha={market_data_status.get('git_sha') or 'NAO REGISTRADO NO ESTADO ATUAL'}"
+            f"sha_deploy={market_data_status.get('git_sha') or 'NAO REGISTRADO NO ESTADO ATUAL'} | "
+            f"sha_origem={market_data_status.get('source_commit_sha') or 'NAO INFORMADO PELO DEPLOY'}"
         )
     if daily_loss_block_active:
         st.write(f"**Bloqueio ativado em:** {format_market_timestamp(daily_loss_blocked_at)}")

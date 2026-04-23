@@ -8,6 +8,7 @@ import pandas as pd
 from core.config import (
     ALERT_EMAIL_ENABLED,
     ALERT_EMAIL_PROVIDER,
+    APP_SOURCE_COMMIT_SHA,
     BUILD_TIMESTAMP,
     BOT_LOG_COLUMNS,
     BOT_LOG_FILE,
@@ -152,6 +153,7 @@ def _normalize_market_data_state(state: dict) -> dict:
         normalized["provider_diagnostics"] = dict(normalized.get("provider_diagnostics") or {})
         normalized["build_active"] = str(normalized.get("build_active") or "")
         normalized["git_sha"] = str(normalized.get("git_sha") or "")
+        normalized["source_commit_sha"] = str(normalized.get("source_commit_sha") or "")
         normalized["build_timestamp"] = str(normalized.get("build_timestamp") or "")
         normalized["runtime_started_at"] = str(normalized.get("runtime_started_at") or "")
         normalized["service_name"] = str(normalized.get("service_name") or "")
@@ -237,6 +239,7 @@ DEFAULT_STATE = {
         "requested_by": "",
         "build_active": "",
         "git_sha": "",
+        "source_commit_sha": "",
         "build_timestamp": "",
         "runtime_started_at": "",
         "service_name": "",
@@ -585,6 +588,7 @@ def persist_worker_cycle_state(
     payload.setdefault("requested_by", "worker_cycle")
     payload["build_active"] = str(payload.get("build_active") or MARKET_DATA_BUILD_LABEL)
     payload["git_sha"] = str(payload.get("git_sha") or RAILWAY_GIT_COMMIT_SHA or "")
+    payload["source_commit_sha"] = str(payload.get("source_commit_sha") or APP_SOURCE_COMMIT_SHA or "")
     payload["build_timestamp"] = str(payload.get("build_timestamp") or BUILD_TIMESTAMP or "")
     payload["runtime_started_at"] = str(payload.get("runtime_started_at") or runtime_started_at or "")
     payload["service_name"] = str(payload.get("service_name") or SERVICE_NAME or "")
@@ -663,6 +667,7 @@ def update_market_data_status(
     for key in (
         "build_active",
         "git_sha",
+        "source_commit_sha",
         "build_timestamp",
         "runtime_started_at",
         "service_name",
@@ -737,6 +742,7 @@ def update_market_data_status(
             "requested_by",
             "build_active",
             "git_sha",
+            "source_commit_sha",
             "build_timestamp",
             "runtime_started_at",
             "service_name",

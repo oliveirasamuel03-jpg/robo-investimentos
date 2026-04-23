@@ -181,6 +181,7 @@ def test_persist_worker_cycle_state_writes_shared_runtime_snapshot(isolated_stor
             "requested_symbols": ["BTC-USD", "ETH-USD"],
             "build_active": "abc123",
             "git_sha": "abc123def456",
+            "source_commit_sha": "33cb320",
             "build_timestamp": "2026-04-22T02:55:00+00:00",
             "service_name": "work",
             "api_key_present": True,
@@ -208,6 +209,25 @@ def test_persist_worker_cycle_state_writes_shared_runtime_snapshot(isolated_stor
     assert market_state["requested_symbols"] == ["BTC-USD", "ETH-USD"]
     assert market_state["ui_audit_probe"] == "worker_state_v2"
     assert market_state["state_build_sha"] == "abc123def456"
+    assert market_state["source_commit_sha"] == "33cb320"
+
+
+def test_persist_worker_cycle_state_uses_optional_source_commit_sha_env(isolated_storage, monkeypatch):
+    monkeypatch.setenv("APP_SOURCE_COMMIT_SHA", "branch-tip-123")
+    state_store = load_module("core.state_store")
+
+    state_store.persist_worker_cycle_state(
+        last_action="Robo pausado. Aguardando ativacao.",
+        next_run_delta_seconds=5,
+        worker_status="online",
+        runtime_started_at="2026-04-23T00:00:00+00:00",
+        process_role="worker",
+        market_data_payload={"requested_by": "worker_cycle"},
+    )
+
+    state = state_store.load_bot_state()
+
+    assert state["market_data"]["source_commit_sha"] == "branch-tip-123"
 
 
 def test_update_broker_status_tracks_readiness_fields(isolated_storage):
