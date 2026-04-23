@@ -186,6 +186,61 @@ def legacy_market_status(
     return "unknown"
 
 
+def build_feed_quality_snapshot(status: dict[str, Any] | None) -> dict[str, Any]:
+    payload = dict(status or {})
+    diagnostics = dict(payload.get("provider_diagnostics", {}) or {})
+    twelvedata_diag = dict(diagnostics.get("twelvedata", {}) or {})
+    requested_symbols = [str(item).upper() for item in (payload.get("requested_symbols") or payload.get("symbols") or []) if str(item)]
+    live_symbols = [str(item).upper() for item in (payload.get("live_symbols") or []) if str(item)]
+    cached_symbols = [str(item).upper() for item in (payload.get("cached_symbols") or []) if str(item)]
+    fallback_symbols = [str(item).upper() for item in (payload.get("fallback_symbols") or []) if str(item)]
+    unknown_symbols = [str(item).upper() for item in (payload.get("unknown_symbols") or []) if str(item)]
+    total_symbols = len(requested_symbols)
+    success_total = int(twelvedata_diag.get("symbols_total") or total_symbols or 0)
+    success_count = int(twelvedata_diag.get("success_count") or len(live_symbols) or 0)
+    success_rate = None if success_total <= 0 else round(float(success_count / success_total), 4)
+    feed_status = classify_feed_status(
+        status=payload.get("feed_status") or payload.get("status"),
+        last_source=payload.get("last_source"),
+        source_breakdown=payload.get("source_breakdown"),
+    )
+    fallback_reason = str(payload.get("last_error") or twelvedata_diag.get("last_error") or "").strip()
+
+    if feed_status == FEED_STATUS_LIVE and len(fallback_symbols) == 0:
+        quality_label = "Boa"
+        quality_message = "O worker conseguiu dado live para os ativos monitorados neste ciclo."
+    elif feed_status == FEED_STATUS_DELAYED or len(cached_symbols) > 0:
+        quality_label = "Moderada"
+        quality_message = "Parte do ciclo usou cache ou mistura de fontes; a leitura operacional segue util, mas pede atencao."
+    elif len(fallback_symbols) > 0 or feed_status == FEED_STATUS_FALLBACK:
+        quality_label = "Baixa"
+        quality_message = "O ciclo ainda dependeu de fallback e nao sustenta uma leitura estrategica confiavel."
+    else:
+        quality_label = "Baixa"
+        quality_message = "Ainda nao ha leitura suficiente do feed para classificar a qualidade desta janela."
+
+    return {
+        "feed_status": feed_status,
+        "provider_effective": str(payload.get("provider_effective") or payload.get("provider") or "unknown"),
+        "requested_symbols": requested_symbols,
+        "live_symbols": live_symbols,
+        "cached_symbols": cached_symbols,
+        "fallback_symbols": fallback_symbols,
+        "unknown_symbols": unknown_symbols,
+        "live_count": len(live_symbols),
+        "cached_count": len(cached_symbols),
+        "fallback_count": len(fallback_symbols),
+        "unknown_count": len(unknown_symbols),
+        "total_symbols": total_symbols,
+        "twelvedata_success_rate": success_rate,
+        "last_success_at": str(payload.get("last_success_at") or ""),
+        "last_sync_at": str(payload.get("last_sync_at") or ""),
+        "fallback_reason": fallback_reason,
+        "quality_label": quality_label,
+        "quality_message": quality_message,
+    }
+
+
 def fallback_data(symbol: str, rows: int = 240) -> pd.DataFrame:
     seed = sum(ord(ch) for ch in str(symbol).upper()) % 17
     idx = np.arange(rows, dtype=float)
@@ -716,6 +771,10 @@ def _status_from_frames(
 ) -> dict[str, Any]:
     source_breakdown = {"market": 0, "cached": 0, "fallback": 0, "unknown": 0}
     provider_breakdown = {"twelvedata": 0, "yahoo": 0, "synthetic": 0, "mixed": 0, "unknown": 0}
+    live_symbols: list[str] = []
+    cached_symbols: list[str] = []
+    fallback_symbols: list[str] = []
+    unknown_symbols: list[str] = []
     last_source = "unknown"
 
     for symbol in symbols:
@@ -725,6 +784,14 @@ def _status_from_frames(
         last_source = source
         source_breakdown[source if source in source_breakdown else "unknown"] += 1
         provider_breakdown[provider_name if provider_name in provider_breakdown else "unknown"] += 1
+        if source == "market":
+            live_symbols.append(symbol)
+        elif source == "cached":
+            cached_symbols.append(symbol)
+        elif source == "fallback":
+            fallback_symbols.append(symbol)
+        else:
+            unknown_symbols.append(symbol)
 
     if source_breakdown["market"] == len(symbols):
         status = "healthy"
@@ -774,6 +841,10 @@ def _status_from_frames(
         "source_breakdown": source_breakdown,
         "symbols": symbols,
         "requested_symbols": list(symbols),
+        "live_symbols": live_symbols,
+        "cached_symbols": cached_symbols,
+        "fallback_symbols": fallback_symbols,
+        "unknown_symbols": unknown_symbols,
         "requested_by": requested_by,
         "build_active": MARKET_DATA_BUILD_LABEL,
         "git_sha": str(RAILWAY_GIT_COMMIT_SHA or "").strip(),
