@@ -152,6 +152,27 @@ def twelvedata_diagnostic_payload(status: dict | None) -> dict:
     return dict(diagnostic or {})
 
 
+def chart_interval_summary(status: dict | None, requested_interval: str | None) -> str:
+    payload = status or {}
+    td_diag = twelvedata_diagnostic_payload(payload)
+    requested = str(
+        payload.get("requested_interval")
+        or requested_interval
+        or td_diag.get("interval_raw")
+        or ""
+    ).strip()
+    effective = str(
+        payload.get("effective_interval")
+        or td_diag.get("normalized_interval")
+        or requested
+    ).strip()
+    if not requested and not effective:
+        return "Intervalo visual: Sem registro"
+    if requested and effective and requested != effective:
+        return f"Intervalo visual: solicitado {requested} | usado {effective}"
+    return f"Intervalo visual: {effective or requested}"
+
+
 def market_data_legacy_label(status: dict | None) -> str:
     payload = status or {}
     return legacy_market_status(
@@ -1494,6 +1515,7 @@ if auto_refresh_fragment_supported:
                 f"Ultimo sync do grafico: {format_market_timestamp(live_chart_market_data_status.get('last_sync_at'))} | "
                 f"Fonte do grafico: {market_data_source_label(live_chart_market_data_status)}"
             )
+            st.caption(chart_interval_summary(live_chart_market_data_status, interval))
 
         worker_feed_quality = build_feed_quality_snapshot(live_snapshot.get("market_data_status"))
         chart_feed_quality = build_feed_quality_snapshot(live_chart_market_data_status)
@@ -1532,8 +1554,17 @@ if auto_refresh_fragment_supported:
                 f"Ativos em fallback no grafico: "
                 f"{symbol_list_label(chart_feed_quality.get('fallback_symbols'))}"
             )
+            st.caption(chart_interval_summary(live_chart_market_data_status, interval))
             if chart_feed_quality.get("fallback_reason"):
                 st.caption(f"Motivo do fallback visual: {chart_feed_quality.get('fallback_reason')}")
+            td_chart_diag = twelvedata_diagnostic_payload(live_chart_market_data_status)
+            if td_chart_diag.get("request_attempted"):
+                st.caption(
+                    "Diagnostico visual do Twelve Data: "
+                    f"intervalo solicitado {td_chart_diag.get('interval_raw') or interval} | "
+                    f"intervalo usado {td_chart_diag.get('normalized_interval') or td_chart_diag.get('interval_raw') or interval} | "
+                    f"estagio {td_chart_diag.get('last_stage') or 'sem-registro'}"
+                )
             st.caption("O worker usa o feed operacional acima. O grafico pode cair em fallback sem mudar a fonte operacional.")
 
         live_chart_df = live_snapshot["chart_df"]
@@ -1668,6 +1699,7 @@ with side_col:
             f"Ultimo sync do grafico: {format_market_timestamp(chart_market_data_status.get('last_sync_at'))} | "
             f"Fonte do grafico: {market_data_source_label(chart_market_data_status)}"
         )
+        st.caption(chart_interval_summary(chart_market_data_status, interval))
 
     for item in build_robot_log(signal_text, robot_label, last_action, open_positions):
         st.markdown(f"<div class='log-item'>{item}</div>", unsafe_allow_html=True)

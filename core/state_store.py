@@ -165,6 +165,8 @@ def _normalize_market_data_state(state: dict) -> dict:
         normalized["response_status_code"] = normalized.get("response_status_code")
         normalized["last_stage"] = str(normalized.get("last_stage") or "")
         normalized["requested_symbols"] = [str(item).upper() for item in (normalized.get("requested_symbols") or []) if str(item)]
+        normalized["requested_interval"] = str(normalized.get("requested_interval") or "")
+        normalized["effective_interval"] = str(normalized.get("effective_interval") or "")
         normalized["live_symbols"] = [str(item).upper() for item in (normalized.get("live_symbols") or []) if str(item)]
         normalized["cached_symbols"] = [str(item).upper() for item in (normalized.get("cached_symbols") or []) if str(item)]
         normalized["fallback_symbols"] = [str(item).upper() for item in (normalized.get("fallback_symbols") or []) if str(item)]
@@ -232,6 +234,8 @@ DEFAULT_STATE = {
         "source_breakdown": {},
         "symbols": [],
         "requested_symbols": [],
+        "requested_interval": "",
+        "effective_interval": "",
         "live_symbols": [],
         "cached_symbols": [],
         "fallback_symbols": [],
@@ -661,6 +665,10 @@ def update_market_data_status(
         context_state["symbols"] = [str(symbol).upper() for symbol in (payload.get("symbols") or [])]
     if payload.get("requested_symbols") is not None:
         context_state["requested_symbols"] = [str(symbol).upper() for symbol in (payload.get("requested_symbols") or [])]
+    if payload.get("requested_interval") is not None:
+        context_state["requested_interval"] = str(payload.get("requested_interval") or "")
+    if payload.get("effective_interval") is not None:
+        context_state["effective_interval"] = str(payload.get("effective_interval") or "")
     for key in ("live_symbols", "cached_symbols", "fallback_symbols", "unknown_symbols"):
         if payload.get(key) is not None:
             context_state[key] = [str(symbol).upper() for symbol in (payload.get(key) or [])]
@@ -735,6 +743,8 @@ def update_market_data_status(
             "source_breakdown",
             "symbols",
             "requested_symbols",
+            "requested_interval",
+            "effective_interval",
             "live_symbols",
             "cached_symbols",
             "fallback_symbols",
