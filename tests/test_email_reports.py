@@ -181,8 +181,8 @@ def test_final_report_email_sends_once_only(isolated_storage, monkeypatch):
         lambda subject, body: captured.append((subject, body)) or {"sent": True, "reason": "sent", "provider": "smtp"},
     )
 
-    now = datetime(2026, 4, 30, 12, 0, tzinfo=timezone.utc)
-    report = _sample_validation_report(30)
+    now = datetime(2026, 4, 10, 12, 0, tzinfo=timezone.utc)
+    report = _sample_validation_report(10)
     report["final_validation_grade"] = "APROVADO"
 
     first = email_reports.process_report_email_delivery(validation_report=report, now=now)
@@ -191,9 +191,19 @@ def test_final_report_email_sends_once_only(isolated_storage, monkeypatch):
 
     assert len(first["sent"]) == 1
     assert not second["sent"]
-    assert captured[0][0] == "[PAPER] Final 30-Day Phase Report"
+    assert captured[0][0] == "[PAPER] Final 10-Day Phase Report"
     assert captured[0][1].startswith("[PAPER MODE]")
     assert state["email_reporting"]["last_final_report_email_ts"]
+
+
+def test_final_report_path_is_reachable_in_active_10_day_cycle(isolated_storage, monkeypatch):
+    _configure_report_email_env(monkeypatch, daily=False, weekly=False, ten_day=False, final=True)
+    email_reports = load_module("core.email_reports")
+
+    report = _sample_validation_report(10)
+
+    assert email_reports.active_final_model_label() == "10-day final"
+    assert email_reports.final_report_path_reachable(report) is True
 
 
 def test_missing_smtp_config_fails_safely(isolated_storage, monkeypatch):

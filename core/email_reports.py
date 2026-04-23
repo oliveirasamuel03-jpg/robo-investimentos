@@ -12,9 +12,6 @@ import pandas as pd
 
 from core.config import (
     APP_TITLE,
-    BOT_LOG_COLUMNS,
-    BOT_LOG_FILE,
-    PRODUCTION_MODE,
     REPORT_EMAIL_10DAY_ENABLED,
     REPORT_EMAIL_DAILY_ENABLED,
     REPORT_EMAIL_ENABLED,
@@ -34,13 +31,9 @@ from core.config import (
 )
 from core.market_data import build_feed_quality_snapshot
 from core.retention import load_weekly_summary, read_weekly_report_rows
-from core.signal_rejection_analysis import rejection_layer_label, rejection_reason_label
-from core.state_store import (
-    load_bot_state,
-    log_event,
-    read_storage_table,
-    update_email_reporting_status,
-)
+from core.signal_rejection_analysis import rejection_reason_label
+from core.state_store import load_bot_state, log_event, update_email_reporting_status
+from core.swing_validation import SWING_VALIDATION_DAYS
 from core.trader_reports import calculate_trade_report_metrics, normalize_trade_reports_frame, read_trade_reports
 
 
@@ -72,6 +65,22 @@ def _utc_now(now: datetime | None = None) -> datetime:
 def _safe_text(value: object, *, fallback: str = "Sem leitura consolidada") -> str:
     text = str(value or "").strip()
     return text or fallback
+
+
+def _format_money(value: Any) -> str:
+    return f"R$ {float(value or 0.0):,.2f}"
+
+
+def _format_pct(value: Any, *, multiplier: float = 100.0, digits: int = 2) -> str:
+    if value is None:
+        return "-"
+    return f"{float(value or 0.0) * multiplier:.{digits}f}%"
+
+
+def _format_ratio(value: Any, *, digits: int = 2) -> str:
+    if value is None:
+        return "-"
+    return f"{float(value or 0.0):.{digits}f}"
 
 
 def _date_key(now: datetime) -> str:
@@ -321,10 +330,13 @@ def _short_audit_summary(state: dict[str, Any], validation_report: dict[str, Any
 
 def _worker_reliability_summary(state: dict[str, Any]) -> str:
     production = dict(state.get("production", {}) or {})
+    heartbeat_age = production.get("heartbeat_age_seconds")
+    heartbeat_age_text = str(heartbeat_age) if heartbeat_age is not None else "-"
+    consecutive_errors = int(production.get("consecutive_errors", 0) or 0)
     return (
         f"Worker={_safe_text(state.get('worker_status'), fallback='offline')}; "
-        f"heartbeat_age={production.get('heartbeat_age_seconds') if production.get('heartbeat_age_seconds') is not None else '-'}s; "
-        f"falhas consecutivas={int(production.get('consecutive_errors', 0) or 0)}."
+        f"heartbeat_age={heartbeat_age_text}s; "
+        f"falhas consecutivas={consecutive_errors}."
     )
 
 
@@ -350,6 +362,21 @@ def _build_daily_email_body(state: dict[str, Any], validation_report: dict[str, 
     daily_profit_factor = _profit_factor_from_reports(daily_reports)
     feed_quality = build_feed_quality_snapshot(market_state)
     dominant_strategy = _safe_text(rejection_quality.get("top_strategy"))
+    daily_pnl_text = _format_money(daily_metrics.get("total_pnl", 0.0))
+    daily_win_rate_text = _format_pct(daily_metrics.get("win_rate", 0.0))
+    daily_payoff_text = _format_ratio(daily_metrics.get("payoff"))
+    daily_profit_factor_text = _format_ratio(daily_profit_factor)
+    blocked_trades = int(metrics.get("signals_rejected", 0) or 0)
+    live_count = int(feed_quality.get("live_count") or 0)
+    total_symbols = int(feed_quality.get("total_symbols") or 0)
+    fallback_count = int(feed_quality.get("fallback_count") or 0)
+    last_success_text = _safe_text(feed_quality.get("last_success_at"))
+    health_level_text = _safe_text(production.get("health_level"), fallback="healthy")
+    health_message_text = _safe_text(production.get("health_message"), fallback="Sem mensagem")
+    validation_reading_text = _safe_text(consistency.get("validation_reading_message"))
+    composite_summary = _composite_summary(validation_report, daily_reports)
+    multi_timeframe_summary = _multi_timeframe_summary(validation_report)
+    short_audit_summary = _short_audit_summary(state, validation_report)
 
     lines = [
         "[PAPER MODE] Nenhuma ordem real foi enviada.",
@@ -361,27 +388,24 @@ def _build_daily_email_body(state: dict[str, Any], validation_report: dict[str, 
         f"Effective provider: {_safe_text(market_state.get('provider_effective') or market_state.get('provider'), fallback='unknown')}",
         f"Context status: {_safe_text((state.get('market_context', {}) or {}).get('market_context_status'), fallback='NEUTRO')}",
         f"Dominant strategy: {dominant_strategy}",
-        f"Composite score summary: {_composite_summary(validation_report, daily_reports)}",
-        f"Multi-timeframe summary: {_multi_timeframe_summary(validation_report)}",
+        f"Composite score summary: {composite_summary}",
+        f"Multi-timeframe summary: {multi_timeframe_summary}",
         "",
         "Signal pipeline:",
         *_signal_pipeline_lines(validation_report),
         "",
         "Daily result:",
-        f"- Daily PnL: R$ {float(daily_metrics.get('total_pnl', 0.0) or 0.0):,.2f}",
-        f"- Win rate: {float(daily_metrics.get('win_rate', 0.0) or 0.0) * 100:.2f}%",
-        f"- Payoff: {'-' if daily_metrics.get('payoff') is None else f'{float(daily_metrics.get('payoff') or 0.0):.2f}'}",
-        f"- Profit factor: {'-' if daily_profit_factor is None else f'{float(daily_profit_factor):.2f}'}",
-        f"- Blocked trades: {int(metrics.get('signals_rejected', 0) or 0)}",
+        f"- Daily PnL: {daily_pnl_text}",
+        f"- Win rate: {daily_win_rate_text}",
+        f"- Payoff: {daily_payoff_text}",
+        f"- Profit factor: {daily_profit_factor_text}",
+        f"- Blocked trades: {blocked_trades}",
         "",
         "Short audit notes:",
-        f"- {_short_audit_summary(state, validation_report)}",
-        f"- Feed quality: live={int(feed_quality.get('live_count') or 0)}/{int(feed_quality.get('total_symbols') or 0)} | "
-        f"fallback={int(feed_quality.get('fallback_count') or 0)} | "
-        f"last_success={_safe_text(feed_quality.get('last_success_at'))}",
-        f"- Operational health: {_safe_text(production.get('health_level'), fallback='healthy')} | "
-        f"{_safe_text(production.get('health_message'), fallback='Sem mensagem')}",
-        f"- Validation reading: {_safe_text(consistency.get('validation_reading_message'))}",
+        f"- {short_audit_summary}",
+        f"- Feed quality: live={live_count}/{total_symbols} | fallback={fallback_count} | last_success={last_success_text}",
+        f"- Operational health: {health_level_text} | {health_message_text}",
+        f"- Validation reading: {validation_reading_text}",
     ]
     return "\n".join(lines)
 
@@ -408,21 +432,28 @@ def _build_weekly_email_body(state: dict[str, Any], validation_report: dict[str,
     recommendation = _safe_text(weekly_summary.get("observation_final"))
     suggestions = list(weekly_summary.get("suggestions", []) or [])
     suggestion_text = _safe_text((suggestions[0] or {}).get("message")) if suggestions else "Sem recomendacao adicional no resumo semanal."
+    weekly_trades = int(weekly_summary.get("trades_count", 0) or 0)
+    weekly_pnl_text = _format_money(weekly_summary.get("pnl", 0.0))
+    weekly_win_rate_text = _format_pct(weekly_summary.get("win_rate", 0.0))
+    weekly_payoff_text = _format_ratio(weekly_summary.get("payoff"))
+    weekly_profit_factor_text = _format_ratio(weekly_profit_factor)
+    weekly_drawdown_text = _format_pct((validation_report.get("metrics", {}) or {}).get("max_drawdown_pct"))
+    multi_timeframe_summary = _multi_timeframe_summary(validation_report)
 
     lines = [
         "[PAPER MODE] Nenhuma ordem real foi enviada.",
         "",
         f"Week range: {_week_range_label(now)}",
         f"Week key: {_week_key(now)}",
-        f"Total trades: {int(weekly_summary.get('trades_count', 0) or 0)}",
-        f"PnL: R$ {float(weekly_summary.get('pnl', 0.0) or 0.0):,.2f}",
-        f"Win rate: {float(weekly_summary.get('win_rate', 0.0) or 0.0) * 100:.2f}%",
-        f"Payoff: {'-' if weekly_summary.get('payoff') is None else f'{float(weekly_summary.get('payoff') or 0.0):.2f}'}",
-        f"Profit factor: {'-' if weekly_profit_factor is None else f'{float(weekly_profit_factor):.2f}'}",
-        f"Drawdown: {'-' if validation_report.get('metrics', {}).get('max_drawdown_pct') is None else f'{float(validation_report.get('metrics', {}).get('max_drawdown_pct') or 0.0) * 100:.2f}%'}",
+        f"Total trades: {weekly_trades}",
+        f"PnL: {weekly_pnl_text}",
+        f"Win rate: {weekly_win_rate_text}",
+        f"Payoff: {weekly_payoff_text}",
+        f"Profit factor: {weekly_profit_factor_text}",
+        f"Drawdown: {weekly_drawdown_text}",
         f"Dominant strategy: {dominant_strategy}",
         "Webhook value summary: Sem leitura consolidada no runtime atual.",
-        f"Multi-timeframe effect summary: {_multi_timeframe_summary(validation_report)}",
+        f"Multi-timeframe effect summary: {multi_timeframe_summary}",
         f"Weekly recommendation: {recommendation}",
         f"Suggestion highlight: {suggestion_text}",
     ]
@@ -461,6 +492,11 @@ def _build_10day_email_body(state: dict[str, Any], validation_report: dict[str, 
     metrics = dict(validation_report.get("metrics", {}) or {})
     approval_status = _block_status_message(validation_report, block_number)
     recommendation = _safe_text(validation_report.get("final_validation_reason") or validation_report.get("phase_conclusion"))
+    pnl_text = _format_money(performance.get("pnl_total", 0.0))
+    win_rate_text = _format_pct(performance.get("win_rate", 0.0))
+    payoff_text = _format_ratio(performance.get("payoff"))
+    feed_quality_text = _safe_text((state.get("market_data", {}) or {}).get("feed_status"), fallback="UNKNOWN")
+    audit_summary = _short_audit_summary(state, validation_report)
 
     lines = [
         "[PAPER MODE] Nenhuma ordem real foi enviada.",
@@ -471,10 +507,10 @@ def _build_10day_email_body(state: dict[str, Any], validation_report: dict[str, 
         "Key metrics:",
         f"- Signals approved: {int(metrics.get('signals_approved', 0) or 0)}",
         f"- Signals rejected: {int(metrics.get('signals_rejected', 0) or 0)}",
-        f"- PnL: R$ {float(performance.get('pnl_total', 0.0) or 0.0):,.2f}",
-        f"- Win rate: {float(performance.get('win_rate', 0.0) or 0.0) * 100:.2f}%",
-        f"- Payoff: {'-' if performance.get('payoff') is None else f'{float(performance.get('payoff') or 0.0):.2f}'}",
-        f"- Feed quality: {_safe_text((state.get('market_data', {}) or {}).get('feed_status'), fallback='UNKNOWN')}",
+        f"- PnL: {pnl_text}",
+        f"- Win rate: {win_rate_text}",
+        f"- Payoff: {payoff_text}",
+        f"- Feed quality: {feed_quality_text}",
         f"Current status: {current_status}",
         f"Approval for this block: {approval_status}",
         "Strengths:",
@@ -491,7 +527,7 @@ def _build_10day_email_body(state: dict[str, Any], validation_report: dict[str, 
     lines.extend(
         [
             f"Recommendation for next block: {recommendation}",
-            f"Audit summary: {_short_audit_summary(state, validation_report)}",
+            f"Audit summary: {audit_summary}",
         ]
     )
     return "\n".join(lines)
@@ -530,31 +566,66 @@ def _final_next_steps(validation_report: dict[str, Any], classification: str) ->
     return "Documentar criterios de transicao e planejar a proxima fase ainda sem liberar ordem real."
 
 
+def active_final_report_day() -> int:
+    return int(SWING_VALIDATION_DAYS)
+
+
+def active_final_model_label() -> str:
+    return "10-day final" if active_final_report_day() <= 10 else "10+10+10"
+
+
+def final_report_path_reachable(validation_report: dict[str, Any] | None) -> bool:
+    report = dict(validation_report or {})
+    day_number = int(report.get("validation_day_number", 0) or 0)
+    final_grade = str(report.get("final_validation_grade") or "").strip()
+    return day_number >= active_final_report_day() and bool(final_grade)
+
+
+def _final_report_subject() -> str:
+    if active_final_report_day() <= 10:
+        return "[PAPER] Final 10-Day Phase Report"
+    return "[PAPER] Final 30-Day Phase Report"
+
+
 def _build_final_email_body(state: dict[str, Any], validation_report: dict[str, Any], now: datetime) -> str:
     metrics = dict(validation_report.get("metrics", {}) or {})
-    performance = dict(validation_report.get("performance", {}) or {})
     consistency = dict(validation_report.get("consistency", {}) or {})
     market_state = dict(state.get("market_data", {}) or {})
     feed_quality = build_feed_quality_snapshot(market_state)
     classification = _final_classification(validation_report, state)
     main_risks = list(validation_report.get("errors", []) or [])
+    generated_at_text = _utc_now(now).isoformat()
+    final_reasoning = _safe_text(validation_report.get("final_validation_reason") or validation_report.get("verdict_message"))
+    stability_summary = _worker_reliability_summary(state)
+    decision_quality_summary = _safe_text(consistency.get("signal_quality_message"))
+    consistency_summary = _safe_text(consistency.get("validation_reading_message"))
+    drawdown_text = _format_pct(metrics.get("max_drawdown_pct"))
+    full_reports = read_trade_reports()
+    profit_factor_value = _profit_factor_from_reports(full_reports)
+    profit_factor_text = _format_ratio(profit_factor_value)
+    feed_status_text = _safe_text(market_state.get("feed_status"), fallback="UNKNOWN")
+    provider_text = _safe_text(market_state.get("provider_effective") or market_state.get("provider"), fallback="unknown")
+    live_count = int(feed_quality.get("live_count") or 0)
+    total_symbols = int(feed_quality.get("total_symbols") or 0)
+    worker_reliability_text = _worker_reliability_summary(state)
+    coherence_summary = _ui_coherence_summary(state)
+    next_steps = _final_next_steps(validation_report, classification)
 
     lines = [
         "[PAPER MODE] Nenhuma ordem real foi enviada.",
         "",
+        f"Active evaluation model: {active_final_model_label()}",
         f"Final classification: {classification}",
-        f"Generated at: {_utc_now(now).isoformat()}",
-        f"Final reasoning: {_safe_text(validation_report.get('final_validation_reason') or validation_report.get('verdict_message'))}",
-        f"Stability summary: {_worker_reliability_summary(state)}",
-        f"Decision quality summary: {_safe_text(consistency.get('signal_quality_message'))}",
-        f"Consistency summary: {_safe_text(consistency.get('validation_reading_message'))}",
-        f"Drawdown: {'-' if metrics.get('max_drawdown_pct') is None else f'{float(metrics.get('max_drawdown_pct') or 0.0) * 100:.2f}%'}",
-        f"Profit factor: {'-' if _profit_factor_from_reports(read_trade_reports()) is None else f'{float(_profit_factor_from_reports(read_trade_reports()) or 0.0):.2f}'}",
-        f"Feed quality summary: status={_safe_text(market_state.get('feed_status'), fallback='UNKNOWN')} | "
-        f"provider={_safe_text(market_state.get('provider_effective') or market_state.get('provider'), fallback='unknown')} | "
-        f"live={int(feed_quality.get('live_count') or 0)}/{int(feed_quality.get('total_symbols') or 0)}",
-        f"Worker reliability summary: {_worker_reliability_summary(state)}",
-        f"UI/log/state coherence summary: {_ui_coherence_summary(state)}",
+        f"Generated at: {generated_at_text}",
+        f"Final reasoning: {final_reasoning}",
+        f"Stability summary: {stability_summary}",
+        f"Decision quality summary: {decision_quality_summary}",
+        f"Consistency summary: {consistency_summary}",
+        f"Drawdown: {drawdown_text}",
+        f"Profit factor: {profit_factor_text}",
+        f"Feed quality summary: status={feed_status_text} | provider={provider_text} | live={live_count}/{total_symbols}",
+        f"Worker reliability summary: {worker_reliability_text}",
+        f"UI/log/state coherence summary: {coherence_summary}",
         "Main risks:",
     ]
     if main_risks:
@@ -563,7 +634,7 @@ def _build_final_email_body(state: dict[str, Any], validation_report: dict[str, 
         lines.append("- Sem riscos dominantes adicionais no fechamento.")
     lines.extend(
         [
-            f"Recommended next steps: {_final_next_steps(validation_report, classification)}",
+            f"Recommended next steps: {next_steps}",
         ]
     )
     return "\n".join(lines)
@@ -593,7 +664,9 @@ def _final_report_due(email_state: dict[str, Any], validation_report: dict[str, 
     if not (REPORT_EMAIL_ENABLED and REPORT_EMAIL_FINAL_ENABLED):
         return False
     day_number = int(validation_report.get("validation_day_number", 0) or 0)
-    if day_number < 30:
+    if day_number < active_final_report_day():
+        return False
+    if not str(validation_report.get("final_validation_grade") or "").strip():
         return False
     return not str(email_state.get("last_final_report_email_ts") or "").strip()
 
@@ -716,7 +789,7 @@ def process_report_email_delivery(
         (sent if result["sent"] else failed).append(result)
 
     if _final_report_due(email_state, report):
-        subject = "[PAPER] Final 30-Day Phase Report"
+        subject = _final_report_subject()
         result = _send_due_report(
             report_type=REPORT_TYPE_FINAL,
             subject=subject,
