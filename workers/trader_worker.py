@@ -12,10 +12,9 @@ from core.config import (
     MARKET_DATA_PROVIDER,
     PRODUCTION_MODE,
     RAILWAY_GIT_COMMIT_SHA,
-    REPORT_EMAIL_ENABLED,
     SERVICE_NAME,
 )
-from core.email_reports import process_report_email_delivery
+from core.email_reports import final_report_path_reachable, process_report_email_delivery
 from core.market_data import build_feed_quality_snapshot
 from core.production_monitor import evaluate_production_health
 from core.retention import run_retention_job, should_run_retention_job
@@ -233,7 +232,7 @@ def _log_cycle_summary(*, action_text: str, market_data_status: dict | None, val
 
 
 def _maybe_send_final_validation_email(validation_report: dict, *, current_time: datetime) -> None:
-    if REPORT_EMAIL_ENABLED:
+    if final_report_path_reachable(validation_report):
         return
     if int(validation_report.get("validation_day_number", 0) or 0) < 10:
         return
