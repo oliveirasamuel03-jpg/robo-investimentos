@@ -12,8 +12,10 @@ from core.config import (
     MARKET_DATA_PROVIDER,
     PRODUCTION_MODE,
     RAILWAY_GIT_COMMIT_SHA,
+    REPORT_EMAIL_ENABLED,
     SERVICE_NAME,
 )
+from core.email_reports import process_report_email_delivery
 from core.market_data import build_feed_quality_snapshot
 from core.production_monitor import evaluate_production_health
 from core.retention import run_retention_job, should_run_retention_job
@@ -231,6 +233,8 @@ def _log_cycle_summary(*, action_text: str, market_data_status: dict | None, val
 
 
 def _maybe_send_final_validation_email(validation_report: dict, *, current_time: datetime) -> None:
+    if REPORT_EMAIL_ENABLED:
+        return
     if int(validation_report.get("validation_day_number", 0) or 0) < 10:
         return
     if not validation_report.get("final_validation_grade"):
@@ -260,6 +264,13 @@ def _maybe_send_final_validation_email(validation_report: dict, *, current_time:
             "WARNING",
             f"Email final da validacao swing nao enviado: {result.get('reason') or 'motivo nao informado'}",
         )
+
+
+def _maybe_send_reporting_emails(validation_report: dict, *, current_time: datetime) -> None:
+    try:
+        process_report_email_delivery(validation_report=validation_report, now=current_time)
+    except Exception as exc:
+        log_event("ERROR", f"Falha no envio best-effort dos relatorios por email: {exc}")
 
 
 def _run_daily_retention_maintenance() -> None:
@@ -394,6 +405,7 @@ def worker_loop() -> None:
                 _refresh_production_monitor(cycle_success=True)
                 _run_daily_retention_maintenance()
                 validation_report = refresh_swing_validation_cycle(now=current_time)
+                _maybe_send_reporting_emails(validation_report, current_time=current_time)
                 _maybe_send_final_validation_email(validation_report, current_time=current_time)
                 time.sleep(PAUSED_SLEEP_SECONDS)
                 continue
@@ -427,6 +439,7 @@ def worker_loop() -> None:
             _log_validation_cycle(validation_report)
             _log_signal_quality_summary(validation_report)
             _log_signal_rejection_summary(validation_report, result.get("cycle_result", {}))
+            _maybe_send_reporting_emails(validation_report, current_time=current_time)
             _maybe_send_final_validation_email(validation_report, current_time=current_time)
 
         except Exception as exc:
@@ -437,6 +450,7 @@ def worker_loop() -> None:
             _log_cycle_health(health_payload)
             _run_daily_retention_maintenance()
             validation_report = refresh_swing_validation_cycle(now=datetime.now(timezone.utc))
+            _maybe_send_reporting_emails(validation_report, current_time=datetime.now(timezone.utc))
             _maybe_send_final_validation_email(validation_report, current_time=datetime.now(timezone.utc))
 
         time.sleep(SLEEP_SECONDS)

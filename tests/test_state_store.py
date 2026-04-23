@@ -29,6 +29,9 @@ def test_state_store_bootstraps_files_and_defaults(isolated_storage):
     assert state["market_data"]["provider_diagnostics"] == {}
     assert state["broker"]["provider"] == config.BROKER_PROVIDER
     assert state["production"]["health_level"] == "healthy"
+    assert state["email_reporting"]["enabled"] == config.REPORT_EMAIL_ENABLED
+    assert state["email_reporting"]["destination"] == config.REPORT_EMAIL_TO
+    assert state["email_reporting"]["last_email_delivery_status"] == ""
     assert state["risk"]["daily_loss_block_active"] is False
     assert state["risk"]["daily_loss_limit_brl"] == config.DAILY_LOSS_LIMIT_BRL_DEFAULT
     assert state["retention"]["retention_days"] == config.RETENTION_DAYS
@@ -267,6 +270,25 @@ def test_update_validation_status_tracks_cycle_fields(isolated_storage):
     assert validation_state["validation_day_number"] == 7
     assert validation_state["validation_phase"] == "Ajuste controlado"
     assert validation_state["final_validation_grade"] == "APROVADO_COM_AJUSTES"
+
+
+def test_update_email_reporting_status_tracks_delivery_fields(isolated_storage):
+    state_store = load_module("core.state_store")
+
+    email_state = state_store.update_email_reporting_status(
+        {
+            "last_daily_report_email_date": "2026-04-23",
+            "last_email_delivery_status": "sent",
+            "last_email_delivery_reason": "sent",
+            "last_email_delivery_attempt_ts": "2026-04-23T12:00:00+00:00",
+            "last_email_delivery_success_ts": "2026-04-23T12:00:02+00:00",
+            "last_email_delivery_report_type": "daily",
+        }
+    )
+
+    assert email_state["last_daily_report_email_date"] == "2026-04-23"
+    assert email_state["last_email_delivery_status"] == "sent"
+    assert email_state["last_email_delivery_report_type"] == "daily"
 
 
 def test_state_store_migrates_legacy_default_watchlist_to_crypto_only_default(isolated_storage):

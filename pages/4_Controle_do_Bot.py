@@ -9,6 +9,7 @@ from core.alerts import send_email_alert
 from core.auth.guards import render_auth_toolbar, require_admin
 from core.broker import broker_status_label, probe_broker_status
 from core.config import ALERT_EMAIL_ENABLED, ALERT_EMAIL_FROM, ALERT_EMAIL_PROVIDER, PRODUCTION_MODE, SMTP_USERNAME
+from core.email_reports import build_email_reporting_status
 from core.market_data import build_feed_quality_snapshot, classify_feed_status, format_market_timestamp, legacy_market_status
 from core.production_monitor import evaluate_production_health
 from core.signal_rejection_analysis import rejection_dominant_message, rejection_layer_label, rejection_reason_label
@@ -268,6 +269,56 @@ with act_c2:
     if st.button("Recalcular saude", use_container_width=True):
         production_state = update_production_status(evaluate_production_health(load_bot_state()))
         st.info(f"Saude recalculada: {health_level_label(production_state.get('health_level'))}")
+
+email_reporting_status = build_email_reporting_status(load_bot_state())
+st.subheader("Email reporting")
+st.caption("Entrega automatica de relatorios em PAPER mode. O envio e best-effort e nunca interfere no ciclo do worker.")
+email_c1, email_c2, email_c3, email_c4 = st.columns(4)
+email_c1.metric("Email reporting", "Ativo" if email_reporting_status.get("enabled") else "Inativo")
+email_c2.metric("Destino", email_reporting_status.get("destination") or "Sem registro")
+email_c3.metric(
+    "Ultimo status",
+    email_reporting_status.get("last_delivery_status") or "Sem registro",
+)
+email_c4.metric(
+    "Ultimo tipo enviado",
+    email_reporting_status.get("last_sent_report_type") or "Sem registro",
+)
+
+email_c5, email_c6, email_c7 = st.columns(3)
+email_c5.metric(
+    "Ultima tentativa",
+    email_reporting_status.get("last_delivery_attempt_ts") or "Sem registro",
+)
+email_c6.metric(
+    "Ultimo sucesso",
+    email_reporting_status.get("last_delivery_success_ts") or "Sem registro",
+)
+email_c7.metric(
+    "Provider",
+    str(email_reporting_status.get("provider") or "sem registro").upper(),
+)
+
+if not email_reporting_status.get("enabled"):
+    st.warning("Email reporting esta desabilitado. Os relatorios continuam sendo gerados localmente em PAPER mode.")
+elif not email_reporting_status.get("configured"):
+    st.warning(
+        "Email reporting esta habilitado, mas a configuracao atual esta incompleta ou invalida. "
+        "O worker continua operando normalmente e os relatorios seguem locais."
+    )
+else:
+    st.success("Email reporting habilitado em PAPER mode, com envio best-effort.")
+
+st.caption(
+    f"Razao mais recente: {email_reporting_status.get('last_delivery_reason') or email_reporting_status.get('warning') or 'Sem registro'}"
+)
+st.caption(
+    "Controles: "
+    f"diario={'on' if email_reporting_status.get('daily_enabled') else 'off'} | "
+    f"semanal={'on' if email_reporting_status.get('weekly_enabled') else 'off'} | "
+    f"10dias={'on' if email_reporting_status.get('ten_day_enabled') else 'off'} | "
+    f"final={'on' if email_reporting_status.get('final_enabled') else 'off'}"
+)
 
 st.subheader("Validacao swing 10 dias")
 st.caption("Camada de validacao paper para swing profissional. Nenhuma ordem real e liberada nesta etapa.")
