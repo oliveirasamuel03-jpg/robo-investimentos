@@ -23,6 +23,7 @@ from core.market_data import (
     format_market_timestamp,
     legacy_market_status,
 )
+from core.macro_alerts import macro_alert_operational_effect
 from core.signal_rejection_analysis import rejection_layer_label, rejection_reason_label
 from core.config import (
     MAX_HOLDING_MINUTES,
@@ -1253,6 +1254,7 @@ robot_class = page_snapshot["robot_class"]
 market_data_status = page_snapshot.get("market_data_status", market_data_status)
 chart_market_data_status = page_snapshot.get("chart_market_data_status", chart_market_data_status)
 market_context_state = state.get("market_context", {}) or {}
+macro_alert_state = state.get("macro_alert", {}) or {}
 validation_state = state.get("validation", {}) or {}
 validation_last_report = (validation_state.get("last_report", {}) or {})
 validation_consistency = dict(validation_last_report.get("consistency", {}) or {})
@@ -1368,6 +1370,30 @@ if daily_loss_block_active:
         f"Bloqueio ativado em: {format_market_timestamp(daily_loss_blocked_at)} | "
         f"Motivo: {daily_loss_block_reason or 'Limite diário atingido.'}"
     )
+
+st.markdown("### Alerta macro de risco")
+st.caption(
+    "Filtro operacional de risco: nao e gatilho direto de compra/venda, nao autoriza trades sozinho "
+    "e preserva PAPER TRADING."
+)
+macro_active = bool(macro_alert_state.get("macro_alert_active", False))
+macro_c1, macro_c2, macro_c3, macro_c4 = st.columns(4)
+macro_c1.metric("Alerta macro", "Ativo" if macro_active else "Inativo")
+macro_c2.metric("Impacto", str(macro_alert_state.get("macro_alert_level") or "LOW"))
+macro_c3.metric("Janela", str(macro_alert_state.get("macro_alert_window_status") or "INACTIVE"))
+macro_c4.metric(
+    "Penalidade",
+    f"{float(macro_alert_state.get('macro_alert_penalty', 0.0) or 0.0):.2f}",
+)
+macro_event_time = macro_alert_state.get("macro_alert_time")
+macro_minutes = macro_alert_state.get("macro_alert_minutes_to_event")
+st.caption(
+    f"Evento: {macro_alert_state.get('macro_alert_title') or 'Sem evento ativo'} | "
+    f"Moeda: {macro_alert_state.get('macro_alert_currency') or '-'} | "
+    f"Horario: {format_market_timestamp(macro_event_time) if macro_event_time else 'Sem registro'} | "
+    f"Minutos ate o evento: {macro_minutes if macro_minutes is not None else '-'}"
+)
+st.caption(f"Efeito operacional: {macro_alert_operational_effect(macro_alert_state)}")
 
 st.markdown(
     f"""

@@ -11,6 +11,7 @@ from core.broker import broker_status_label, probe_broker_status
 from core.config import ALERT_EMAIL_ENABLED, ALERT_EMAIL_FROM, ALERT_EMAIL_PROVIDER, PRODUCTION_MODE, SMTP_USERNAME
 from core.email_reports import build_email_reporting_status
 from core.market_data import build_feed_quality_snapshot, classify_feed_status, format_market_timestamp, legacy_market_status
+from core.macro_alerts import macro_alert_operational_effect
 from core.production_monitor import evaluate_production_health
 from core.signal_rejection_analysis import rejection_dominant_message, rejection_layer_label, rejection_reason_label
 from core.state_store import (
@@ -177,6 +178,7 @@ validation_report = refresh_swing_validation_cycle()
 state = load_bot_state()
 validation_state = state.get("validation", {}) or {}
 market_context_state = state.get("market_context", {}) or {}
+macro_alert_state = state.get("macro_alert", {}) or {}
 risk_state = state.get("risk", {}) or {}
 daily_loss_limit_brl = float(risk_state.get("daily_loss_limit_brl", 0.0) or 0.0)
 daily_loss_consumed_brl = float(risk_state.get("daily_loss_consumed_brl", 0.0) or 0.0)
@@ -258,6 +260,36 @@ if risk_state.get("daily_loss_reset_at"):
         f"Último reset automático na virada do dia UTC: "
         f"{format_market_timestamp(risk_state.get('daily_loss_reset_at'))}"
     )
+
+st.subheader("Alerta macro de risco")
+st.caption(
+    "Camada operacional de risco em PAPER mode. Eventos macro nao disparam ordens; "
+    "eles apenas reduzem confianca, restringem setups frageis ou bloqueiam entradas sob risco alto."
+)
+macro_active = bool(macro_alert_state.get("macro_alert_active", False))
+macro_m1, macro_m2, macro_m3, macro_m4 = st.columns(4)
+macro_m1.metric("Estado", "Ativo" if macro_active else "Inativo")
+macro_m2.metric("Impacto", str(macro_alert_state.get("macro_alert_level") or "LOW"))
+macro_m3.metric("Janela", str(macro_alert_state.get("macro_alert_window_status") or "INACTIVE"))
+macro_m4.metric(
+    "Bloqueia novas entradas",
+    "Sim" if bool(macro_alert_state.get("macro_alert_blocks_new_entries", False)) else "Nao",
+)
+macro_m5, macro_m6, macro_m7, macro_m8 = st.columns(4)
+macro_m5.metric("Moeda", str(macro_alert_state.get("macro_alert_currency") or "-"))
+macro_m6.metric("Evento", str(macro_alert_state.get("macro_alert_title") or "Sem evento ativo"))
+macro_m7.metric(
+    "Minutos ate evento",
+    str(macro_alert_state.get("macro_alert_minutes_to_event"))
+    if macro_alert_state.get("macro_alert_minutes_to_event") is not None
+    else "-",
+)
+macro_m8.metric("Penalidade", f"{float(macro_alert_state.get('macro_alert_penalty', 0.0) or 0.0):.2f}")
+if macro_alert_state.get("macro_alert_time"):
+    st.caption(f"Horario do evento: {format_market_timestamp(macro_alert_state.get('macro_alert_time'))}")
+st.caption(f"Motivo: {macro_alert_state.get('macro_alert_reason') or 'Nenhum evento macro ativo.'}")
+st.caption(f"Efeito operacional: {macro_alert_operational_effect(macro_alert_state)}")
+st.caption("Seguranca: filtro de risco somente; PAPER TRADING obrigatorio; nenhuma ordem real habilitada.")
 
 act_c1, act_c2 = st.columns(2)
 with act_c1:

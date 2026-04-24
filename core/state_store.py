@@ -36,6 +36,11 @@ from core.config import (
     RETENTION_RUN_INTERVAL_HOURS,
     LEGACY_MIXED_DEFAULT_WATCHLIST,
     LEGACY_VALIDATION_INITIAL_CAPITAL_BRL,
+    MACRO_ALERT_EVENT_WINDOW_MINUTES,
+    MACRO_ALERT_POST_EVENT_MINUTES,
+    MACRO_ALERT_PRE_EVENT_MINUTES,
+    MACRO_ALERTS_ENABLED,
+    MACRO_ALERTS_FILE,
     SWING_VALIDATION_RECOMMENDED_WATCHLIST,
     TRADER_REPORTS_COLUMNS,
     TRADER_REPORTS_FILE,
@@ -272,6 +277,26 @@ DEFAULT_STATE = {
         "btc_move_pct": None,
         "btc_volatility_pct": None,
     },
+    "macro_alert": {
+        "macro_alert_enabled": MACRO_ALERTS_ENABLED,
+        "macro_alert_active": False,
+        "macro_alert_level": "LOW",
+        "macro_alert_currency": "",
+        "macro_alert_title": "",
+        "macro_alert_time": "",
+        "macro_alert_window_status": "INACTIVE",
+        "macro_alert_minutes_to_event": None,
+        "macro_alert_reason": "Nenhum evento macro ativo.",
+        "macro_alert_penalty": 0.0,
+        "macro_alert_blocks_new_entries": False,
+        "macro_alert_last_update_ts": "",
+        "macro_alert_event_count": 0,
+        "macro_alert_source": "none",
+        "macro_alerts_file": MACRO_ALERTS_FILE,
+        "macro_alert_pre_event_minutes": MACRO_ALERT_PRE_EVENT_MINUTES,
+        "macro_alert_event_window_minutes": MACRO_ALERT_EVENT_WINDOW_MINUTES,
+        "macro_alert_post_event_minutes": MACRO_ALERT_POST_EVENT_MINUTES,
+    },
     "broker": {
         "provider": BROKER_PROVIDER,
         "mode": BROKER_MODE,
@@ -420,6 +445,7 @@ DEFAULT_STATE = {
                 "provider_unknown": 0,
                 "context_blocked": 0,
                 "daily_loss_guard": 0,
+                "macro_alert_guard": 0,
                 "cooldown_active": 0,
                 "duplicate_signal_blocked": 0,
                 "position_limit_reached": 0,
@@ -502,6 +528,13 @@ def load_bot_state() -> dict:
         float(risk_state.get("daily_loss_limit_brl") or DAILY_LOSS_LIMIT_BRL_DEFAULT),
     )
     state["risk"] = risk_state
+    macro_state = state.get("macro_alert", {}) or {}
+    macro_state["macro_alert_enabled"] = MACRO_ALERTS_ENABLED
+    macro_state["macro_alerts_file"] = MACRO_ALERTS_FILE
+    macro_state["macro_alert_pre_event_minutes"] = MACRO_ALERT_PRE_EVENT_MINUTES
+    macro_state["macro_alert_event_window_minutes"] = MACRO_ALERT_EVENT_WINDOW_MINUTES
+    macro_state["macro_alert_post_event_minutes"] = MACRO_ALERT_POST_EVENT_MINUTES
+    state["macro_alert"] = macro_state
     retention_state = state.get("retention", {}) or {}
     retention_state["enabled"] = RETENTION_ENABLED
     retention_state["retention_days"] = RETENTION_DAYS
@@ -866,6 +899,25 @@ def update_market_context_status(status_payload: dict | None) -> dict:
     state["market_context"] = market_context_state
     save_bot_state(state)
     return market_context_state
+
+
+def update_macro_alert_status(status_payload: dict | None) -> dict:
+    state = load_bot_state()
+    macro_state = state.get("macro_alert", {}) or {}
+    payload = status_payload or {}
+
+    for key, value in payload.items():
+        if value is not None:
+            macro_state[key] = value
+
+    macro_state["macro_alert_enabled"] = MACRO_ALERTS_ENABLED
+    macro_state["macro_alerts_file"] = MACRO_ALERTS_FILE
+    macro_state["macro_alert_pre_event_minutes"] = MACRO_ALERT_PRE_EVENT_MINUTES
+    macro_state["macro_alert_event_window_minutes"] = MACRO_ALERT_EVENT_WINDOW_MINUTES
+    macro_state["macro_alert_post_event_minutes"] = MACRO_ALERT_POST_EVENT_MINUTES
+    state["macro_alert"] = macro_state
+    save_bot_state(state)
+    return macro_state
 
 
 def update_production_status(status_payload: dict | None) -> dict:

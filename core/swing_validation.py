@@ -183,6 +183,7 @@ def _default_signal_counters() -> dict[str, Any]:
             "position_limit_reached": 0,
             "schedule_blocked": 0,
             "daily_loss_guard": 0,
+            "macro_alert_guard": 0,
         },
         "assets_observed": {},
         "assets_approved": {},

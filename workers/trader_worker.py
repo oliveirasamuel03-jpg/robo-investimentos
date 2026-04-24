@@ -148,11 +148,13 @@ def _log_validation_cycle(validation_report: dict) -> None:
 
 def _log_feed_quality_summary(market_data_status: dict | None) -> None:
     quality = build_feed_quality_snapshot(market_data_status)
+    success_rate = quality.get("twelvedata_success_rate")
+    success_rate_label = "-" if success_rate is None else f"{float(success_rate or 0.0) * 100:.1f}%"
     message = (
         "[feed_quality_summary] "
         f"status={str(quality.get('feed_status') or 'UNKNOWN').lower()};"
         f"provider={str(quality.get('provider_effective') or 'unknown').lower()};"
-        f"success_rate={'-' if quality.get('twelvedata_success_rate') is None else f'{float(quality.get('twelvedata_success_rate') or 0.0) * 100:.1f}%'};"
+        f"success_rate={success_rate_label};"
         f"live={int(quality.get('live_count') or 0)}/{int(quality.get('total_symbols') or 0)};"
         f"fallback={int(quality.get('fallback_count') or 0)};"
         f"last_success={str(quality.get('last_success_at') or 'na')};"
@@ -165,11 +167,12 @@ def _log_signal_quality_summary(validation_report: dict) -> None:
     metrics = dict(validation_report.get("metrics", {}) or {})
     consistency = dict(validation_report.get("consistency", {}) or {})
     approval_rate = consistency.get("signal_approval_rate")
+    approval_rate_label = "-" if approval_rate is None else f"{float(approval_rate or 0.0) * 100:.1f}%"
     message = (
         "[signal_quality_summary] "
         f"approved={int(metrics.get('signals_approved', 0) or 0)};"
         f"rejected={int(metrics.get('signals_rejected', 0) or 0)};"
-        f"approval_rate={'-' if approval_rate is None else f'{float(approval_rate or 0.0) * 100:.1f}%'};"
+        f"approval_rate={approval_rate_label};"
         f"sample={str(consistency.get('sample_quality_label') or 'Sem leitura').lower()};"
         f"posture={str(consistency.get('operational_posture_label') or 'Indefinida').lower()};"
         f"watchlist={'coerente' if bool(consistency.get('watchlist_phase_aligned')) else 'fora_da_fase'};"
@@ -212,6 +215,36 @@ def _log_signal_rejection_summary(validation_report: dict, cycle_result: dict | 
             for layer, count in sorted(layer_breakdown.items(), key=lambda item: int(item[1] or 0), reverse=True)
         )
         log_event("INFO", f"[signal_rejection_layer_summary] {summary}")
+
+
+def _log_macro_alert_summary(cycle_result: dict | None) -> None:
+    payload = dict(cycle_result or {})
+    alert = dict(payload.get("macro_alert", {}) or {})
+    cycle_validation = dict(payload.get("validation_cycle", {}) or {})
+    rejections = dict(cycle_validation.get("rejections", {}) or {})
+    macro_blocks = int(rejections.get("macro_alert_guard", 0) or 0)
+    log_event(
+        "INFO",
+        (
+            "[macro_alert_summary] "
+            f"active={1 if bool(alert.get('macro_alert_active', False)) else 0};"
+            f"level={str(alert.get('macro_alert_level') or 'LOW').lower()};"
+            f"window={str(alert.get('macro_alert_window_status') or 'INACTIVE').lower()};"
+            f"currency={str(alert.get('macro_alert_currency') or 'none').lower()};"
+            f"blocks_new_entries={1 if bool(alert.get('macro_alert_blocks_new_entries', False)) else 0};"
+            f"penalty={float(alert.get('macro_alert_penalty', 0.0) or 0.0):.4f};"
+            f"guard_blocks={macro_blocks}"
+        ),
+    )
+    if macro_blocks > 0:
+        log_event(
+            "WARNING",
+            (
+                "[macro_alert_guard_reason] "
+                f"reason={str(alert.get('macro_alert_reason') or 'macro_risk_active')};"
+                f"blocked_signals={macro_blocks}"
+            ),
+        )
 
 
 def _log_cycle_summary(*, action_text: str, market_data_status: dict | None, validation_report: dict) -> None:
@@ -438,6 +471,7 @@ def worker_loop() -> None:
             _log_validation_cycle(validation_report)
             _log_signal_quality_summary(validation_report)
             _log_signal_rejection_summary(validation_report, result.get("cycle_result", {}))
+            _log_macro_alert_summary(result.get("cycle_result", {}))
             _maybe_send_reporting_emails(validation_report, current_time=current_time)
             _maybe_send_final_validation_email(validation_report, current_time=current_time)
 
