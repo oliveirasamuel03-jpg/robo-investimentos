@@ -247,6 +247,34 @@ def _log_macro_alert_summary(cycle_result: dict | None) -> None:
         )
 
 
+def _log_external_signal_summary(state: dict | None = None) -> None:
+    payload = state or load_bot_state()
+    external_signal = dict(payload.get("external_signal", {}) or {})
+    status = str(external_signal.get("last_status") or "DISABLED")
+    reason = str(external_signal.get("last_reason") or "External signal webhook disabled.")
+    source = str(external_signal.get("last_source") or "none")
+    symbol = str(external_signal.get("last_symbol") or "none")
+    side = str(external_signal.get("last_side") or "none")
+    score = float(external_signal.get("last_score", 0.0) or 0.0)
+    log_event(
+        "INFO",
+        (
+            "[external_signal_summary] "
+            f"enabled={1 if bool(external_signal.get('enabled', False)) else 0};"
+            f"status={status.lower()};source={source};symbol={symbol};side={side};"
+            f"score={score:.4f};audit_only=1;trade_authority=0"
+        ),
+    )
+    if status in {"REJECTED", "EXPIRED", "DUPLICATE", "IGNORED", "DISABLED"}:
+        log_event(
+            "INFO",
+            (
+                "[external_signal_reject_reason] "
+                f"status={status.lower()};reason={reason}"
+            ),
+        )
+
+
 def _log_cycle_summary(*, action_text: str, market_data_status: dict | None, validation_report: dict) -> None:
     metrics = dict(validation_report.get("metrics", {}) or {})
     consistency = dict(validation_report.get("consistency", {}) or {})
@@ -472,6 +500,7 @@ def worker_loop() -> None:
             _log_signal_quality_summary(validation_report)
             _log_signal_rejection_summary(validation_report, result.get("cycle_result", {}))
             _log_macro_alert_summary(result.get("cycle_result", {}))
+            _log_external_signal_summary(load_bot_state())
             _maybe_send_reporting_emails(validation_report, current_time=current_time)
             _maybe_send_final_validation_email(validation_report, current_time=current_time)
 

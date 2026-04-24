@@ -16,6 +16,12 @@ from core.config import (
     BROKER_MODE,
     BROKER_PROVIDER,
     DAILY_LOSS_LIMIT_BRL_DEFAULT,
+    EXTERNAL_SIGNAL_ALLOWED_SOURCES,
+    EXTERNAL_SIGNAL_ALLOWED_TIMEFRAMES,
+    EXTERNAL_SIGNAL_DEDUPE_SECONDS,
+    EXTERNAL_SIGNAL_MAX_AGE_SECONDS,
+    EXTERNAL_SIGNAL_SECRET,
+    EXTERNAL_SIGNAL_WEBHOOK_ENABLED,
     MARKET_DATA_FALLBACK_PROVIDER,
     MARKET_DATA_BUILD_LABEL,
     MARKET_DATA_PROVIDER,
@@ -297,6 +303,28 @@ DEFAULT_STATE = {
         "macro_alert_event_window_minutes": MACRO_ALERT_EVENT_WINDOW_MINUTES,
         "macro_alert_post_event_minutes": MACRO_ALERT_POST_EVENT_MINUTES,
     },
+    "external_signal": {
+        "enabled": EXTERNAL_SIGNAL_WEBHOOK_ENABLED,
+        "webhook_configured": False,
+        "allowed_sources": EXTERNAL_SIGNAL_ALLOWED_SOURCES,
+        "allowed_timeframes": EXTERNAL_SIGNAL_ALLOWED_TIMEFRAMES,
+        "max_age_seconds": EXTERNAL_SIGNAL_MAX_AGE_SECONDS,
+        "dedupe_seconds": EXTERNAL_SIGNAL_DEDUPE_SECONDS,
+        "audit_only": True,
+        "last_ts": None,
+        "last_received_at": None,
+        "last_source": "",
+        "last_strategy": "",
+        "last_symbol": "",
+        "last_side": "",
+        "last_timeframe": "",
+        "last_alert_price": None,
+        "last_score": 0.0,
+        "last_status": "DISABLED",
+        "last_reason": "External signal webhook disabled.",
+        "last_dedupe_key": "",
+        "recent_events": [],
+    },
     "broker": {
         "provider": BROKER_PROVIDER,
         "mode": BROKER_MODE,
@@ -535,6 +563,30 @@ def load_bot_state() -> dict:
     macro_state["macro_alert_event_window_minutes"] = MACRO_ALERT_EVENT_WINDOW_MINUTES
     macro_state["macro_alert_post_event_minutes"] = MACRO_ALERT_POST_EVENT_MINUTES
     state["macro_alert"] = macro_state
+    external_signal_state = state.get("external_signal", {}) or {}
+    external_signal_state["enabled"] = EXTERNAL_SIGNAL_WEBHOOK_ENABLED
+    external_signal_state["webhook_configured"] = bool(
+        EXTERNAL_SIGNAL_WEBHOOK_ENABLED and EXTERNAL_SIGNAL_SECRET and EXTERNAL_SIGNAL_ALLOWED_SOURCES
+    )
+    external_signal_state["allowed_sources"] = EXTERNAL_SIGNAL_ALLOWED_SOURCES
+    external_signal_state["allowed_timeframes"] = EXTERNAL_SIGNAL_ALLOWED_TIMEFRAMES
+    external_signal_state["max_age_seconds"] = EXTERNAL_SIGNAL_MAX_AGE_SECONDS
+    external_signal_state["dedupe_seconds"] = EXTERNAL_SIGNAL_DEDUPE_SECONDS
+    external_signal_state["audit_only"] = True
+    external_signal_state["recent_events"] = [
+        event
+        for event in list(external_signal_state.get("recent_events", []) or [])
+        if isinstance(event, dict)
+    ][-20:]
+    if not external_signal_state.get("last_status"):
+        external_signal_state["last_status"] = "DISABLED"
+    if not external_signal_state.get("last_reason"):
+        external_signal_state["last_reason"] = (
+            "External signal webhook disabled."
+            if not EXTERNAL_SIGNAL_WEBHOOK_ENABLED
+            else "No external signal received yet."
+        )
+    state["external_signal"] = external_signal_state
     retention_state = state.get("retention", {}) or {}
     retention_state["enabled"] = RETENTION_ENABLED
     retention_state["retention_days"] = RETENTION_DAYS
@@ -918,6 +970,34 @@ def update_macro_alert_status(status_payload: dict | None) -> dict:
     state["macro_alert"] = macro_state
     save_bot_state(state)
     return macro_state
+
+
+def update_external_signal_status(status_payload: dict | None) -> dict:
+    state = load_bot_state()
+    external_signal_state = state.get("external_signal", {}) or {}
+    payload = status_payload or {}
+
+    for key, value in payload.items():
+        if value is not None:
+            external_signal_state[key] = value
+
+    external_signal_state["enabled"] = EXTERNAL_SIGNAL_WEBHOOK_ENABLED
+    external_signal_state["webhook_configured"] = bool(
+        EXTERNAL_SIGNAL_WEBHOOK_ENABLED and EXTERNAL_SIGNAL_SECRET and EXTERNAL_SIGNAL_ALLOWED_SOURCES
+    )
+    external_signal_state["allowed_sources"] = EXTERNAL_SIGNAL_ALLOWED_SOURCES
+    external_signal_state["allowed_timeframes"] = EXTERNAL_SIGNAL_ALLOWED_TIMEFRAMES
+    external_signal_state["max_age_seconds"] = EXTERNAL_SIGNAL_MAX_AGE_SECONDS
+    external_signal_state["dedupe_seconds"] = EXTERNAL_SIGNAL_DEDUPE_SECONDS
+    external_signal_state["audit_only"] = True
+    external_signal_state["recent_events"] = [
+        event
+        for event in list(external_signal_state.get("recent_events", []) or [])
+        if isinstance(event, dict)
+    ][-20:]
+    state["external_signal"] = external_signal_state
+    save_bot_state(state)
+    return external_signal_state
 
 
 def update_production_status(status_payload: dict | None) -> dict:
