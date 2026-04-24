@@ -1254,7 +1254,9 @@ robot_class = page_snapshot["robot_class"]
 market_data_status = page_snapshot.get("market_data_status", market_data_status)
 chart_market_data_status = page_snapshot.get("chart_market_data_status", chart_market_data_status)
 market_context_state = state.get("market_context", {}) or {}
-macro_alert_state = (load_bot_state().get("macro_alert", {}) or {})
+current_audit_state = load_bot_state()
+macro_alert_state = current_audit_state.get("macro_alert", {}) or {}
+external_signal_state = current_audit_state.get("external_signal", {}) or {}
 validation_state = state.get("validation", {}) or {}
 validation_last_report = (validation_state.get("last_report", {}) or {})
 validation_consistency = dict(validation_last_report.get("consistency", {}) or {})
@@ -1394,6 +1396,32 @@ st.caption(
     f"Minutos ate o evento: {macro_minutes if macro_minutes is not None else '-'}"
 )
 st.caption(f"Efeito operacional: {macro_alert_operational_effect(macro_alert_state)}")
+
+st.markdown("### External signal audit")
+st.caption(
+    "FASE 3A: sinais externos sao apenas entrada complementar de auditoria. "
+    "Nao executam trades, nao aprovam entradas e nao alteram a estrategia interna. PAPER TRADING obrigatorio."
+)
+external_enabled = bool(external_signal_state.get("enabled", False))
+external_status = str(external_signal_state.get("last_status") or ("DISABLED" if not external_enabled else "IGNORED"))
+external_score = float(external_signal_state.get("last_score", 0.0) or 0.0)
+external_c1, external_c2, external_c3, external_c4 = st.columns(4)
+external_c1.metric("Webhook externo", "Ativo" if external_enabled else "Inativo")
+external_c2.metric("Status", external_status)
+external_c3.metric("Fonte", str(external_signal_state.get("last_source") or "Sem registro"))
+external_c4.metric("Score recebido", f"{external_score:.2f}")
+external_c5, external_c6, external_c7, external_c8 = st.columns(4)
+external_c5.metric("Estrategia", str(external_signal_state.get("last_strategy") or "Sem registro"))
+external_c6.metric("Ativo", str(external_signal_state.get("last_symbol") or "Sem registro"))
+external_c7.metric("Lado", str(external_signal_state.get("last_side") or "Sem registro"))
+external_c8.metric("Timeframe", str(external_signal_state.get("last_timeframe") or "Sem registro"))
+st.caption(
+    f"Recebido em: {format_market_timestamp(external_signal_state.get('last_received_at')) if external_signal_state.get('last_received_at') else 'Sem registro'} | "
+    f"Motivo: {external_signal_state.get('last_reason') or 'Sem sinal externo recebido.'}"
+)
+st.caption("Autoridade: audit-only, sem poder de compra/venda, sem bypass de guards e sem impacto em score.")
+if external_enabled and not bool(external_signal_state.get("webhook_configured", False)):
+    st.warning("Webhook externo habilitado, mas configuracao incompleta. Sinais serao rejeitados com seguranca.")
 
 st.markdown(
     f"""

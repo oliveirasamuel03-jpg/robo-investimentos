@@ -32,6 +32,9 @@ def test_state_store_bootstraps_files_and_defaults(isolated_storage):
     assert state["email_reporting"]["enabled"] == config.REPORT_EMAIL_ENABLED
     assert state["email_reporting"]["destination"] == config.REPORT_EMAIL_TO
     assert state["email_reporting"]["last_email_delivery_status"] == ""
+    assert state["external_signal"]["enabled"] == config.EXTERNAL_SIGNAL_WEBHOOK_ENABLED
+    assert state["external_signal"]["last_status"] == "DISABLED"
+    assert state["external_signal"]["audit_only"] is True
     assert state["risk"]["daily_loss_block_active"] is False
     assert state["risk"]["daily_loss_limit_brl"] == config.DAILY_LOSS_LIMIT_BRL_DEFAULT
     assert state["retention"]["retention_days"] == config.RETENTION_DAYS
@@ -309,6 +312,29 @@ def test_update_email_reporting_status_tracks_delivery_fields(isolated_storage):
     assert email_state["last_daily_report_email_date"] == "2026-04-23"
     assert email_state["last_email_delivery_status"] == "sent"
     assert email_state["last_email_delivery_report_type"] == "daily"
+
+
+def test_update_external_signal_status_tracks_audit_only_fields(isolated_storage):
+    state_store = load_module("core.state_store")
+
+    external_state = state_store.update_external_signal_status(
+        {
+            "last_status": "ACCEPTED_FOR_AUDIT",
+            "last_reason": "accepted_for_audit_only_no_trade_authority",
+            "last_source": "tradingview",
+            "last_strategy": "audit_signal",
+            "last_symbol": "BTC-USD",
+            "last_side": "BUY",
+            "last_timeframe": "15m",
+            "last_score": 0.72,
+            "recent_events": [{"status": "ACCEPTED_FOR_AUDIT", "dedupe_key": "abc"}],
+        }
+    )
+
+    assert external_state["last_status"] == "ACCEPTED_FOR_AUDIT"
+    assert external_state["last_symbol"] == "BTC-USD"
+    assert external_state["audit_only"] is True
+    assert len(external_state["recent_events"]) == 1
 
 
 def test_state_store_migrates_legacy_default_watchlist_to_crypto_only_default(isolated_storage):

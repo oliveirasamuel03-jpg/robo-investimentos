@@ -121,6 +121,12 @@ Variaveis suportadas:
 - `MACRO_ALERT_EVENT_WINDOW_MINUTES`
 - `MACRO_ALERT_POST_EVENT_MINUTES`
 - `MACRO_ALERTS_FILE`
+- `EXTERNAL_SIGNAL_WEBHOOK_ENABLED`
+- `EXTERNAL_SIGNAL_SECRET`
+- `EXTERNAL_SIGNAL_MAX_AGE_SECONDS`
+- `EXTERNAL_SIGNAL_ALLOWED_SOURCES`
+- `EXTERNAL_SIGNAL_ALLOWED_TIMEFRAMES`
+- `EXTERNAL_SIGNAL_DEDUPE_SECONDS`
 - `DAILY_LOSS_LIMIT_BRL`
 - `ALERT_EMAIL_ENABLED`
 - `ALERT_EMAIL_PROVIDER`
@@ -471,6 +477,52 @@ Onde acompanhar:
 
 - `Trader`: bloco `Alerta macro de risco`
 - `Controle do Bot`: painel administrativo com impacto, janela, evento, penalidade e efeito operacional
+
+## FASE 3A - External signal audit
+
+A FASE 3A adiciona uma fundacao leve para providers e um intake de sinais externos em modo `audit-only`.
+
+Esta camada:
+
+- recebe, valida, registra e persiste sinais externos apenas para auditoria
+- nao aprova trades
+- nao abre nem fecha posicoes
+- nao altera score, thresholds, estrategia, guards, broker ou feed operacional
+- nao substitui o Twelve Data nem a cadeia atual de dados de mercado
+- preserva `PAPER TRADING` obrigatorio
+- rejeita com seguranca payloads invalidos, expirados, duplicados, fora da watchlist ou de fonte nao permitida
+
+Configuracao segura:
+
+```env
+EXTERNAL_SIGNAL_WEBHOOK_ENABLED=false
+EXTERNAL_SIGNAL_SECRET=
+EXTERNAL_SIGNAL_MAX_AGE_SECONDS=300
+EXTERNAL_SIGNAL_ALLOWED_SOURCES=
+EXTERNAL_SIGNAL_ALLOWED_TIMEFRAMES=30s,1m,5m,15m,1h,1d
+EXTERNAL_SIGNAL_DEDUPE_SECONDS=300
+```
+
+Com os defaults acima, nenhum sinal externo e aceito. Para validacao controlada, habilite o webhook, configure um segredo e liste fontes permitidas em `EXTERNAL_SIGNAL_ALLOWED_SOURCES`.
+
+Payload esperado pela funcao de intake auditavel:
+
+```json
+{
+  "token": "...",
+  "source": "tradingview",
+  "strategy": "alerta_externo",
+  "symbol": "BTC-USD",
+  "timeframe": "15m",
+  "side": "BUY",
+  "alert_price": 65000.0,
+  "score": 0.72,
+  "ts": "2026-04-24T12:00:00+00:00",
+  "extra": {}
+}
+```
+
+Na estrutura Streamlit atual, esta etapa nao adiciona uma rota HTTP arriscada. A validacao fica disponivel em `core.external_signals.process_external_signal_payload(...)` para uso futuro por uma rota segura ou servico separado. Os paineis `Trader` e `Controle do Bot` mostram o ultimo status de auditoria e deixam claro que sinal externo nao e gatilho de execucao.
 
 ## Watchlist padrao da validacao swing
 
