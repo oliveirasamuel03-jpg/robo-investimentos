@@ -12,6 +12,7 @@ from core.config import (
 )
 from core.broker import probe_broker_status
 from core.daily_risk import evaluate_daily_loss_guard
+from core.macro_alerts import default_macro_alert_state, evaluate_configured_macro_alert
 from core.state_store import (
     load_bot_state,
     log_event,
@@ -19,6 +20,7 @@ from core.state_store import (
     replace_storage_table,
     save_bot_state,
     update_broker_status,
+    update_macro_alert_status,
     update_market_context_status,
     update_market_data_status,
     update_risk_status,
@@ -78,6 +80,7 @@ def build_paper_cfg_from_platform_state(state: dict, risk_state: dict | None = N
         daily_realized_pnl_brl=float(risk.get("daily_realized_pnl_brl", 0.0) or 0.0),
         daily_loss_block_active=bool(risk.get("daily_loss_block_active", False)),
         daily_loss_block_reason=str(risk.get("daily_loss_block_reason") or ""),
+        macro_alert=dict(state.get("macro_alert", {}) or default_macro_alert_state()),
         min_signal_score=float(profile_config["min_signal_score"]),
         min_atr_pct=float(profile_config["min_atr_pct"]),
         max_atr_pct=float(profile_config["max_atr_pct"]),
@@ -123,6 +126,15 @@ def refresh_daily_loss_guard(state: dict | None = None) -> dict:
     base_state = state or load_bot_state()
     _previous, persisted = _refresh_daily_loss_guard(base_state)
     return persisted
+
+
+def refresh_macro_alert_state() -> dict:
+    try:
+        macro_alert = evaluate_configured_macro_alert()
+    except Exception as exc:
+        macro_alert = default_macro_alert_state(reason=f"Avaliacao macro falhou com seguranca: {exc}")
+        log_event("WARNING", f"[macro_alert_summary] evaluation_failed;error={exc}")
+    return update_macro_alert_status(macro_alert)
 
 
 def sync_platform_positions_from_paper() -> dict:
@@ -215,6 +227,8 @@ def run_trader_cycle(*, persist_market_data: bool = True) -> dict:
         log_event("INFO", "Trader desabilitado")
         return {"status": "DISABLED"}
 
+    refresh_macro_alert_state()
+    state = load_bot_state()
     cfg = build_paper_cfg_from_platform_state(state, risk_state=risk_state)
     ensure_paper_files(cfg)
 

@@ -20,6 +20,7 @@ from core.config import (
     ensure_app_directories,
 )
 from core.market_context import apply_context_filter, get_market_context
+from core.macro_alerts import apply_macro_risk_filter, default_macro_alert_state
 from core.market_data import (
     fallback_data as build_fallback_market_data,
     fetch_market_data_frame,
@@ -68,6 +69,7 @@ class PaperTradingConfig:
     daily_realized_pnl_brl: float = 0.0
     daily_loss_block_active: bool = False
     daily_loss_block_reason: str = ""
+    macro_alert: dict[str, Any] = field(default_factory=default_macro_alert_state)
     min_signal_score: float = 0.62
     min_atr_pct: float = 0.003
     max_atr_pct: float = 0.08
@@ -639,13 +641,17 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[s
     trades_executed: list[dict[str, Any]] = []
     signals: list[dict[str, Any]] = []
     market_context = get_market_context(market_data)
+    macro_alert = default_macro_alert_state()
+    macro_alert.update(dict(config.macro_alert or {}))
     cycle_validation = {
         "signals_total": 0,
         "signals_approved": 0,
         "signals_rejected": 0,
         "entries_against_trend": 0,
         "context_blocked": 0,
+        "macro_alert_blocked": 0,
         "market_context_status": str(market_context.get("market_context_status") or "NEUTRO"),
+        "macro_alert": macro_alert,
         "rejections": {
             "trend_not_confirmed": 0,
             "score_below_minimum": 0,
@@ -659,6 +665,7 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[s
             "provider_unknown": 0,
             "context_blocked": 0,
             "daily_loss_guard": 0,
+            "macro_alert_guard": 0,
             "cooldown_active": 0,
             "duplicate_signal_blocked": 0,
             "position_limit_reached": 0,
@@ -820,6 +827,31 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[s
                 feed_reason = "feed_quality_blocked"
             if feed_reason not in evaluation["rejection_reasons"]:
                 evaluation["rejection_reasons"] = [*evaluation["rejection_reasons"], feed_reason]
+        macro_filter = apply_macro_risk_filter(
+            {
+                "score": adjusted_score,
+                "base_min_signal_score": float(config.min_signal_score),
+                "effective_min_signal_score": effective_min_signal_score,
+                "data_source": data_source,
+                "trend_ok": bool(evaluation.get("trend_ok", False)),
+                "breakout_ok": bool(evaluation.get("breakout_ok", False)),
+                "momentum_ok": bool(evaluation.get("momentum_ok", False)),
+                "trend_alignment": str(evaluation.get("trend_alignment") or ""),
+            },
+            macro_alert,
+        )
+        adjusted_score = float(macro_filter.get("adjusted_score", adjusted_score) or adjusted_score)
+        effective_min_signal_score = float(
+            macro_filter.get("effective_min_signal_score", effective_min_signal_score)
+            or effective_min_signal_score
+        )
+        macro_reason_code = str(macro_filter.get("reason_code") or "")
+        macro_rejected = bool(macro_filter.get("blocked")) or adjusted_score < effective_min_signal_score
+        if macro_reason_code and macro_rejected:
+            if should_buy:
+                should_buy = False
+            if macro_reason_code not in evaluation["rejection_reasons"]:
+                evaluation["rejection_reasons"] = [*evaluation["rejection_reasons"], macro_reason_code]
 
         signal_key = _signal_snapshot_key(asset, latest, data_source)
         signal_timestamp = ""
@@ -863,6 +895,12 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[s
             "effective_min_signal_score": effective_min_signal_score,
             "context_status": str(context_filter["context_status"]),
             "context_impact": str(context_filter["impact_message"]),
+            "macro_alert_active": bool(macro_alert.get("macro_alert_active", False)),
+            "macro_alert_level": str(macro_alert.get("macro_alert_level") or "LOW"),
+            "macro_alert_window_status": str(macro_alert.get("macro_alert_window_status") or "INACTIVE"),
+            "macro_alert_penalty": float(macro_filter.get("penalty", 0.0) or 0.0),
+            "macro_alert_reason": str(macro_filter.get("reason") or ""),
+            "macro_setup_family": str(macro_filter.get("setup_family") or ""),
         }
         signals.append(signal)
         cycle_validation["signals_total"] = int(cycle_validation["signals_total"]) + 1
@@ -879,6 +917,8 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[s
             rejection_events.extend(build_signal_rejection_events(signal))
             if "context_blocked" in signal["rejection_reasons"]:
                 cycle_validation["context_blocked"] = int(cycle_validation["context_blocked"]) + 1
+            if "macro_alert_guard" in signal["rejection_reasons"]:
+                cycle_validation["macro_alert_blocked"] = int(cycle_validation["macro_alert_blocked"]) + 1
 
         if should_buy:
             candidates.append(signal)
@@ -1013,5 +1053,6 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[s
         "daily_loss_day_key": current_day_key,
         "market_data_status": market_data_status,
         "market_context": market_context,
+        "macro_alert": macro_alert,
         "validation_cycle": cycle_validation,
     }

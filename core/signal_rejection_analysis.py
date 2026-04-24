@@ -93,6 +93,11 @@ REJECTION_REASON_SPECS: dict[str, dict[str, str]] = {
         "layer": "guard",
         "strategy_name": "risk_guard",
     },
+    "macro_alert_guard": {
+        "human_reason": "Alerta macro de risco restringiu ou bloqueou o setup.",
+        "layer": "guard",
+        "strategy_name": "macro_risk_guard",
+    },
     "other_safe_reason": {
         "human_reason": "Bloqueio seguro adicional aplicado pelo runtime.",
         "layer": "runtime",
@@ -116,7 +121,7 @@ DOMINANT_LAYER_MESSAGES = {
     "runtime": "rejeicao majoritariamente operacional",
 }
 
-NON_SETUP_STRATEGY_NAMES = {"context_filter", "feed_guard", "runtime_guard", "risk_guard"}
+NON_SETUP_STRATEGY_NAMES = {"context_filter", "feed_guard", "runtime_guard", "risk_guard", "macro_risk_guard"}
 
 RAW_REASON_MAP = {
     "score_below_minimum": "score_below_minimum",
@@ -139,6 +144,7 @@ RAW_REASON_MAP = {
     "momentum_filter": "confidence_too_low",
     "strategy_conflict": "strategy_conflict",
     "daily_loss_guard": "daily_loss_guard",
+    "macro_alert_guard": "macro_alert_guard",
     "other_safe_reason": "other_safe_reason",
 }
 

@@ -116,6 +116,11 @@ Variaveis suportadas:
 - `MARKET_DATA_FALLBACK_PROVIDER`
 - `TWELVEDATA_API_KEY`
 - `TWELVEDATA_API_BASE`
+- `MACRO_ALERTS_ENABLED`
+- `MACRO_ALERT_PRE_EVENT_MINUTES`
+- `MACRO_ALERT_EVENT_WINDOW_MINUTES`
+- `MACRO_ALERT_POST_EVENT_MINUTES`
+- `MACRO_ALERTS_FILE`
 - `DAILY_LOSS_LIMIT_BRL`
 - `ALERT_EMAIL_ENABLED`
 - `ALERT_EMAIL_PROVIDER`
@@ -411,6 +416,61 @@ Observacao importante:
 - esta camada serve apenas para filtrar ou endurecer sinais
 - ordens reais continuam desabilitadas
 - o broker permanece em `paper`
+
+## Alertas macro de risco
+
+A plataforma pode carregar eventos macro configurados manualmente para atuar como filtro operacional de risco em `paper trading`.
+
+Esta camada:
+
+- nao gera compra ou venda
+- nao aprova trades sozinha
+- apenas reduz confianca, endurece setups frageis ou bloqueia novas entradas quando o risco macro esta alto
+- preserva a autoridade final da estrategia interna e dos guards fixos do codigo
+- ignora eventos invalidos com seguranca e nao interrompe o worker
+
+Configuracao minima:
+
+```env
+MACRO_ALERTS_ENABLED=false
+MACRO_ALERT_PRE_EVENT_MINUTES=60
+MACRO_ALERT_EVENT_WINDOW_MINUTES=30
+MACRO_ALERT_POST_EVENT_MINUTES=60
+MACRO_ALERTS_FILE=storage/runtime/macro_events.json
+```
+
+Exemplo de arquivo local:
+
+```json
+[
+  {
+    "title": "FOMC",
+    "currency": "USD",
+    "datetime": "2026-05-01T18:00:00Z",
+    "impact_level": "HIGH",
+    "enabled": true
+  }
+]
+```
+
+Status de janela:
+
+- `INACTIVE`: sem evento dentro da janela de risco
+- `PRE_EVENT`: evento se aproximando
+- `IN_EVENT`: evento em andamento
+- `POST_EVENT`: estabilizacao apos o evento
+
+Como influencia os sinais:
+
+- `TREND_FOLLOWING_SWING` pode seguir elegivel, mas precisa de margem de score maior
+- `BREAKOUT_CONFIRMED` fica mais seletivo durante janela macro
+- `REVERSAL_V_PATTERN` e o setup mais restrito
+- se o feed estiver em fallback e houver alerta macro alto, novas entradas sao bloqueadas
+
+Onde acompanhar:
+
+- `Trader`: bloco `Alerta macro de risco`
+- `Controle do Bot`: painel administrativo com impacto, janela, evento, penalidade e efeito operacional
 
 ## Watchlist padrao da validacao swing
 
