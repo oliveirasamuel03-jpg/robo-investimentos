@@ -127,6 +127,7 @@ Variaveis suportadas:
 - `EXTERNAL_SIGNAL_ALLOWED_SOURCES`
 - `EXTERNAL_SIGNAL_ALLOWED_TIMEFRAMES`
 - `EXTERNAL_SIGNAL_DEDUPE_SECONDS`
+- `EXTERNAL_SIGNAL_TEST_PANEL_ENABLED`
 - `DAILY_LOSS_LIMIT_BRL`
 - `ALERT_EMAIL_ENABLED`
 - `ALERT_EMAIL_PROVIDER`
@@ -501,6 +502,7 @@ EXTERNAL_SIGNAL_MAX_AGE_SECONDS=300
 EXTERNAL_SIGNAL_ALLOWED_SOURCES=
 EXTERNAL_SIGNAL_ALLOWED_TIMEFRAMES=30s,1m,5m,15m,1h,1d
 EXTERNAL_SIGNAL_DEDUPE_SECONDS=300
+EXTERNAL_SIGNAL_TEST_PANEL_ENABLED=false
 ```
 
 Com os defaults acima, nenhum sinal externo e aceito. Para validacao controlada, habilite o webhook, configure um segredo e liste fontes permitidas em `EXTERNAL_SIGNAL_ALLOWED_SOURCES`.
@@ -523,6 +525,31 @@ Payload esperado pela funcao de intake auditavel:
 ```
 
 Na estrutura Streamlit atual, esta etapa nao adiciona uma rota HTTP arriscada. A validacao fica disponivel em `core.external_signals.process_external_signal_payload(...)` para uso futuro por uma rota segura ou servico separado. Os paineis `Trader` e `Controle do Bot` mostram o ultimo status de auditoria e deixam claro que sinal externo nao e gatilho de execucao.
+
+### FASE 3B - Test harness interno
+
+A FASE 3B adiciona um painel admin-only em `Controle do Bot` para testar payloads manualmente, sem rota publica.
+
+Regras do painel:
+
+- fica desativado por padrao com `EXTERNAL_SIGNAL_TEST_PANEL_ENABLED=false`
+- quando desativado, mostra apenas leitura e nao renderiza controles de envio
+- quando ativado para validacao controlada, exige token digitado no painel
+- o token nao e exibido, logado ou persistido
+- o resultado `ACCEPTED_FOR_AUDIT` significa somente aceite para auditoria, nunca aceite de trade
+- os eventos recentes aparecem em `Trader` e `Controle do Bot`, limitados a exibicao dos 10 mais recentes
+- `state.external_signal.recent_events` continua limitado a 20 eventos e nao altera historico CSV
+
+Para um teste controlado, configure temporariamente:
+
+```env
+EXTERNAL_SIGNAL_WEBHOOK_ENABLED=true
+EXTERNAL_SIGNAL_TEST_PANEL_ENABLED=true
+EXTERNAL_SIGNAL_SECRET=um_token_de_teste
+EXTERNAL_SIGNAL_ALLOWED_SOURCES=tradingview
+```
+
+Depois da validacao, volte `EXTERNAL_SIGNAL_TEST_PANEL_ENABLED=false`.
 
 ## Watchlist padrao da validacao swing
 

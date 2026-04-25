@@ -23,6 +23,7 @@ from core.market_data import (
     format_market_timestamp,
     legacy_market_status,
 )
+from core.external_signals import format_external_signal_events_for_display
 from core.macro_alerts import macro_alert_operational_effect
 from core.signal_rejection_analysis import rejection_layer_label, rejection_reason_label
 from core.config import (
@@ -1422,6 +1423,12 @@ st.caption(
 st.caption("Autoridade: audit-only, sem poder de compra/venda, sem bypass de guards e sem impacto em score.")
 if external_enabled and not bool(external_signal_state.get("webhook_configured", False)):
     st.warning("Webhook externo habilitado, mas configuracao incompleta. Sinais serao rejeitados com seguranca.")
+recent_external_events = format_external_signal_events_for_display(external_signal_state, limit=10)
+st.caption("Eventos recentes de sinal externo: audit-only, sem execucao e sem aprovacao de trade.")
+if recent_external_events:
+    st.dataframe(pd.DataFrame(recent_external_events), hide_index=True, use_container_width=True)
+else:
+    st.caption("Sem eventos recentes de sinal externo.")
 
 st.markdown(
     f"""

@@ -46,6 +46,17 @@ def test_webhook_disabled_returns_disabled_status(isolated_storage, monkeypatch)
     assert event["execution_authority"] is False
 
 
+def test_test_panel_disabled_by_default_config(isolated_storage, monkeypatch):
+    monkeypatch.delenv("EXTERNAL_SIGNAL_TEST_PANEL_ENABLED", raising=False)
+    config = load_module("core.config")
+    state_store = load_module("core.state_store")
+
+    state = state_store.load_bot_state()
+
+    assert config.EXTERNAL_SIGNAL_TEST_PANEL_ENABLED is False
+    assert state["external_signal"]["test_panel_enabled"] is False
+
+
 def test_invalid_token_rejected(isolated_storage, monkeypatch):
     external_signals = _load_external_signals(monkeypatch)
 
@@ -159,6 +170,22 @@ def test_valid_signal_accepted_for_audit_only(isolated_storage, monkeypatch):
     assert event["execution_authority"] is False
 
 
+def test_sensitive_keys_are_redacted(isolated_storage, monkeypatch):
+    external_signals = _load_external_signals(monkeypatch)
+
+    safe = external_signals.safe_payload(
+        {
+            "token": "secret-token",
+            "source": "tradingview",
+            "extra": {"api_key": "abc", "nested": {"secret": "hidden"}},
+        }
+    )
+
+    assert safe["token"] == "[redacted]"
+    assert safe["extra"]["api_key"] == "[redacted]"
+    assert safe["extra"]["nested"]["secret"] == "[redacted]"
+
+
 def test_duplicate_signal_rejected(isolated_storage, monkeypatch):
     external_signals = _load_external_signals(monkeypatch)
     now = datetime(2026, 4, 24, 12, 1, tzinfo=timezone.utc)
@@ -176,6 +203,61 @@ def test_duplicate_signal_rejected(isolated_storage, monkeypatch):
     assert second["reason"] == "duplicate_signal"
 
 
+def test_recent_events_are_capped(isolated_storage, monkeypatch):
+    external_signals = _load_external_signals(monkeypatch)
+    previous_state = {
+        "external_signal": {
+            "recent_events": [
+                {"status": "REJECTED", "dedupe_key": str(index), "received_at": f"2026-04-24T12:{index:02d}:00+00:00"}
+                for index in range(25)
+            ]
+        }
+    }
+    event = {
+        "status": "ACCEPTED_FOR_AUDIT",
+        "reason": "accepted_for_audit_only_no_trade_authority",
+        "received_at": "2026-04-24T12:30:00+00:00",
+        "dedupe_key": "latest",
+    }
+
+    update = external_signals.build_external_signal_state_update(event, previous_state=previous_state)
+
+    assert len(update["recent_events"]) == 20
+    assert update["recent_events"][-1]["dedupe_key"] == "latest"
+
+
+def test_recent_events_display_helper_handles_empty_state(isolated_storage, monkeypatch):
+    external_signals = _load_external_signals(monkeypatch)
+
+    assert external_signals.format_external_signal_events_for_display({}, limit=10) == []
+
+
+def test_recent_events_display_helper_hides_raw_payload(isolated_storage, monkeypatch):
+    external_signals = _load_external_signals(monkeypatch)
+    rows = external_signals.format_external_signal_events_for_display(
+        {
+            "recent_events": [
+                {
+                    "received_at": "2026-04-24T12:00:00+00:00",
+                    "source": "tradingview",
+                    "strategy": "audit_signal",
+                    "symbol": "BTC-USD",
+                    "side": "BUY",
+                    "timeframe": "15m",
+                    "score": 0.5,
+                    "status": "ACCEPTED_FOR_AUDIT",
+                    "reason": "accepted",
+                    "raw_payload_safe": {"token": "[redacted]"},
+                }
+            ]
+        },
+        limit=10,
+    )
+
+    assert rows[0]["symbol"] == "BTC-USD"
+    assert "raw_payload_safe" not in rows[0]
+
+
 def test_old_state_loads_without_external_signal_keys(isolated_storage, monkeypatch):
     state_store = load_module("core.state_store")
 
@@ -186,3 +268,14 @@ def test_old_state_loads_without_external_signal_keys(isolated_storage, monkeypa
 
     assert reloaded["external_signal"]["last_status"] == "DISABLED"
     assert reloaded["external_signal"]["audit_only"] is True
+
+
+def test_old_state_loads_without_recent_events(isolated_storage, monkeypatch):
+    state_store = load_module("core.state_store")
+
+    state = state_store.load_bot_state()
+    state["external_signal"].pop("recent_events", None)
+    state_store.save_bot_state(state)
+    reloaded = state_store.load_bot_state()
+
+    assert reloaded["external_signal"]["recent_events"] == []

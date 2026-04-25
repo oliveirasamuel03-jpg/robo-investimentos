@@ -10,6 +10,7 @@ from core.config import (
     EXTERNAL_SIGNAL_DEDUPE_SECONDS,
     EXTERNAL_SIGNAL_MAX_AGE_SECONDS,
     EXTERNAL_SIGNAL_SECRET,
+    EXTERNAL_SIGNAL_TEST_PANEL_ENABLED,
     EXTERNAL_SIGNAL_WEBHOOK_ENABLED,
     SWING_VALIDATION_RECOMMENDED_WATCHLIST,
 )
@@ -67,6 +68,7 @@ def configured_external_signal_state() -> dict[str, Any]:
         "allowed_timeframes": ",".join(allowed_timeframes),
         "max_age_seconds": int(EXTERNAL_SIGNAL_MAX_AGE_SECONDS),
         "dedupe_seconds": int(EXTERNAL_SIGNAL_DEDUPE_SECONDS),
+        "test_panel_enabled": bool(EXTERNAL_SIGNAL_TEST_PANEL_ENABLED),
         "audit_only": True,
     }
 
@@ -466,6 +468,43 @@ def build_external_signal_state_update(
         "last_dedupe_key": event.get("dedupe_key") or "",
         "recent_events": recent_events,
     }
+
+
+def format_external_signal_events_for_display(
+    external_signal_state: dict[str, Any] | None,
+    *,
+    limit: int = 10,
+) -> list[dict[str, Any]]:
+    """Return compact, token-safe recent external signal events for UI display."""
+
+    def safe_score(value: Any) -> float:
+        try:
+            return float(value or 0.0)
+        except (TypeError, ValueError):
+            return 0.0
+
+    state = dict(external_signal_state or {})
+    recent_events = [
+        item
+        for item in list(state.get("recent_events", []) or [])
+        if isinstance(item, dict)
+    ]
+    rows: list[dict[str, Any]] = []
+    for event in reversed(recent_events[-max(1, int(limit)):]):
+        rows.append(
+            {
+                "received_at": event.get("received_at") or "",
+                "source": event.get("source") or "",
+                "strategy": event.get("strategy") or "",
+                "symbol": event.get("symbol") or "",
+                "side": event.get("side") or "",
+                "timeframe": event.get("timeframe") or "",
+                "score": safe_score(event.get("score")),
+                "status": event.get("status") or "",
+                "reason": event.get("reason") or "",
+            }
+        )
+    return rows
 
 
 def process_external_signal_payload(
