@@ -339,8 +339,19 @@ else:
     ] or ["15m"]
     watchlist_options = list((state.get("trader", {}) or {}).get("watchlist", []) or ["BTC-USD"])
     default_ts = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+    if "external_signal_test_ts" not in st.session_state:
+        st.session_state["external_signal_test_ts"] = default_ts
+    freeze_test_ts = st.checkbox(
+        "Freeze timestamp for repeat submissions",
+        value=True,
+        help="Use the same timestamp and same fields to test DUPLICATE. Use an old timestamp to test EXPIRED.",
+    )
+    if st.button("Refresh timestamp suggestion", disabled=freeze_test_ts, use_container_width=True):
+        st.session_state["external_signal_test_ts"] = default_ts
     with st.form("external_signal_audit_test_form"):
         st.caption("Token de teste e usado somente na submissao; nao e exibido, logado ou persistido.")
+        st.caption("Use the same timestamp and same fields to test DUPLICATE.")
+        st.caption("Use an old timestamp to test EXPIRED.")
         test_token = st.text_input("Test token", value="", type="password")
         test_source = st.text_input("Source", value=str(external_signal_state.get("last_source") or "tradingview"))
         test_strategy = st.text_input("Strategy", value="audit_test")
@@ -349,7 +360,7 @@ else:
         test_side = st.selectbox("Side", options=["BUY", "SELL", "LONG", "SHORT"], index=0)
         test_alert_price = st.number_input("Alert price", min_value=0.0, value=1.0, step=1.0)
         test_score = st.number_input("Score", min_value=0.0, max_value=1.0, value=0.5, step=0.01)
-        test_ts = st.text_input("Signal timestamp UTC", value=default_ts)
+        test_ts = st.text_input("Signal timestamp UTC", key="external_signal_test_ts")
         submitted = st.form_submit_button("Submit audit-only test signal")
 
     if submitted:
