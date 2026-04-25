@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone
 
 import pandas as pd
 import streamlit as st
@@ -10,6 +11,7 @@ from core.auth.guards import render_auth_toolbar, require_admin
 from core.broker import broker_status_label, probe_broker_status
 from core.config import ALERT_EMAIL_ENABLED, ALERT_EMAIL_FROM, ALERT_EMAIL_PROVIDER, PRODUCTION_MODE, SMTP_USERNAME
 from core.email_reports import build_email_reporting_status
+from core.external_signals import format_external_signal_events_for_display, process_external_signal_payload
 from core.market_data import build_feed_quality_snapshot, classify_feed_status, format_market_timestamp, legacy_market_status
 from core.macro_alerts import macro_alert_operational_effect
 from core.production_monitor import evaluate_production_health
@@ -321,6 +323,70 @@ if not external_enabled:
     st.info("Webhook externo desabilitado por padrao. O app continua operando como antes.")
 elif not bool(external_signal_state.get("webhook_configured", False)):
     st.warning("Webhook externo habilitado, mas segredo ou fontes permitidas nao foram configurados.")
+
+st.subheader("External signal audit test")
+st.caption(
+    "Harness interno admin-only para testar validacao e persistencia. "
+    "Nao cria rota publica, nao executa trades e nao altera score, estrategia, guards ou broker."
+)
+if not bool(external_signal_state.get("test_panel_enabled", False)):
+    st.info("Test panel disabled. Defina EXTERNAL_SIGNAL_TEST_PANEL_ENABLED=true apenas para validacao controlada.")
+else:
+    allowed_timeframes = [
+        value.strip()
+        for value in str(external_signal_state.get("allowed_timeframes") or "30s,1m,5m,15m,1h,1d").split(",")
+        if value.strip()
+    ] or ["15m"]
+    watchlist_options = list((state.get("trader", {}) or {}).get("watchlist", []) or ["BTC-USD"])
+    default_ts = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+    with st.form("external_signal_audit_test_form"):
+        st.caption("Token de teste e usado somente na submissao; nao e exibido, logado ou persistido.")
+        test_token = st.text_input("Test token", value="", type="password")
+        test_source = st.text_input("Source", value=str(external_signal_state.get("last_source") or "tradingview"))
+        test_strategy = st.text_input("Strategy", value="audit_test")
+        test_symbol = st.selectbox("Symbol", options=watchlist_options, index=0)
+        test_timeframe = st.selectbox("Timeframe", options=allowed_timeframes, index=0)
+        test_side = st.selectbox("Side", options=["BUY", "SELL", "LONG", "SHORT"], index=0)
+        test_alert_price = st.number_input("Alert price", min_value=0.0, value=1.0, step=1.0)
+        test_score = st.number_input("Score", min_value=0.0, max_value=1.0, value=0.5, step=0.01)
+        test_ts = st.text_input("Signal timestamp UTC", value=default_ts)
+        submitted = st.form_submit_button("Submit audit-only test signal")
+
+    if submitted:
+        try:
+            result = process_external_signal_payload(
+                {
+                    "token": test_token,
+                    "source": test_source,
+                    "strategy": test_strategy,
+                    "symbol": test_symbol,
+                    "timeframe": test_timeframe,
+                    "side": test_side,
+                    "alert_price": test_alert_price,
+                    "score": test_score,
+                    "ts": test_ts,
+                    "extra": {"origin": "controle_do_bot_test_panel"},
+                },
+                persist=True,
+            )
+            event = dict(result.get("event", {}) or {})
+            status = str(event.get("status") or "IGNORED")
+            reason = str(event.get("reason") or "Sem motivo registrado.")
+            if status == "ACCEPTED_FOR_AUDIT":
+                st.success(f"Sinal aceito para auditoria somente: {status}. Nenhum trade foi aprovado.")
+            else:
+                st.warning(f"Sinal de teste nao aceito para auditoria: {status} | {reason}")
+            state = load_bot_state()
+            external_signal_state = state.get("external_signal", {}) or {}
+        except Exception as exc:
+            st.error(f"Falha segura no teste audit-only: {exc}")
+
+recent_external_events = format_external_signal_events_for_display(external_signal_state, limit=10)
+st.caption("Eventos recentes de sinal externo: audit-only, sem execucao e sem aprovacao de trade.")
+if recent_external_events:
+    st.dataframe(pd.DataFrame(recent_external_events), hide_index=True, use_container_width=True)
+else:
+    st.caption("Sem eventos recentes de sinal externo.")
 
 act_c1, act_c2 = st.columns(2)
 with act_c1:

@@ -21,6 +21,7 @@ from core.config import (
     EXTERNAL_SIGNAL_DEDUPE_SECONDS,
     EXTERNAL_SIGNAL_MAX_AGE_SECONDS,
     EXTERNAL_SIGNAL_SECRET,
+    EXTERNAL_SIGNAL_TEST_PANEL_ENABLED,
     EXTERNAL_SIGNAL_WEBHOOK_ENABLED,
     MARKET_DATA_FALLBACK_PROVIDER,
     MARKET_DATA_BUILD_LABEL,
@@ -310,6 +311,7 @@ DEFAULT_STATE = {
         "allowed_timeframes": EXTERNAL_SIGNAL_ALLOWED_TIMEFRAMES,
         "max_age_seconds": EXTERNAL_SIGNAL_MAX_AGE_SECONDS,
         "dedupe_seconds": EXTERNAL_SIGNAL_DEDUPE_SECONDS,
+        "test_panel_enabled": EXTERNAL_SIGNAL_TEST_PANEL_ENABLED,
         "audit_only": True,
         "last_ts": None,
         "last_received_at": None,
@@ -572,6 +574,7 @@ def load_bot_state() -> dict:
     external_signal_state["allowed_timeframes"] = EXTERNAL_SIGNAL_ALLOWED_TIMEFRAMES
     external_signal_state["max_age_seconds"] = EXTERNAL_SIGNAL_MAX_AGE_SECONDS
     external_signal_state["dedupe_seconds"] = EXTERNAL_SIGNAL_DEDUPE_SECONDS
+    external_signal_state["test_panel_enabled"] = EXTERNAL_SIGNAL_TEST_PANEL_ENABLED
     external_signal_state["audit_only"] = True
     external_signal_state["recent_events"] = [
         event
@@ -989,6 +992,7 @@ def update_external_signal_status(status_payload: dict | None) -> dict:
     external_signal_state["allowed_timeframes"] = EXTERNAL_SIGNAL_ALLOWED_TIMEFRAMES
     external_signal_state["max_age_seconds"] = EXTERNAL_SIGNAL_MAX_AGE_SECONDS
     external_signal_state["dedupe_seconds"] = EXTERNAL_SIGNAL_DEDUPE_SECONDS
+    external_signal_state["test_panel_enabled"] = EXTERNAL_SIGNAL_TEST_PANEL_ENABLED
     external_signal_state["audit_only"] = True
     external_signal_state["recent_events"] = [
         event
