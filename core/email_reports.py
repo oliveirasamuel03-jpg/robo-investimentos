@@ -345,6 +345,25 @@ def _calibration_preview_summary(validation_report: dict[str, Any]) -> str:
     )
 
 
+def _strategy_bottleneck_summary(validation_report: dict[str, Any]) -> str:
+    bottleneck = dict(validation_report.get("strategy_bottleneck", {}) or {})
+    if not bottleneck:
+        return "Strategy bottleneck: no detailed bottleneck data yet. Diagnostic only."
+    if not bool(bottleneck.get("enabled", True)):
+        return "Strategy bottleneck: disabled. Diagnostic only."
+    dominant = _safe_text(bottleneck.get("dominant_bottleneck"), fallback="none")
+    top_reasons = list(bottleneck.get("top_filter_reasons", []) or [])
+    follow_up = ""
+    if len(top_reasons) > 1 and isinstance(top_reasons[1], dict):
+        follow_up = f", followed by {_safe_text(top_reasons[1].get('name'), fallback='none')}"
+    if dominant == "none":
+        return "Strategy bottleneck: no detailed bottleneck data yet. Diagnostic only."
+    return (
+        f"Strategy bottleneck: dominant filter {dominant}{follow_up}. "
+        "Diagnostic only; no strategy or threshold was changed."
+    )
+
+
 def _short_audit_summary(state: dict[str, Any], validation_report: dict[str, Any]) -> str:
     market_state = dict(state.get("market_data", {}) or {})
     rejection_quality = dict(validation_report.get("rejection_quality", {}) or {})
@@ -410,6 +429,7 @@ def _build_daily_email_body(state: dict[str, Any], validation_report: dict[str, 
     composite_summary = _composite_summary(validation_report, daily_reports)
     multi_timeframe_summary = _multi_timeframe_summary(validation_report)
     calibration_preview_summary = _calibration_preview_summary(validation_report)
+    strategy_bottleneck_summary = _strategy_bottleneck_summary(validation_report)
     short_audit_summary = _short_audit_summary(state, validation_report)
     feed_rejection_diag = dict(validation_report.get("feed_rejection_consistency", {}) or {})
     feed_rejection_note = _safe_text(
@@ -429,6 +449,7 @@ def _build_daily_email_body(state: dict[str, Any], validation_report: dict[str, 
         f"Dominant strategy: {dominant_strategy}",
         f"Composite score summary: {composite_summary}",
         calibration_preview_summary,
+        strategy_bottleneck_summary,
         f"Multi-timeframe summary: {multi_timeframe_summary}",
         "",
         "Signal pipeline:",

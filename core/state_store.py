@@ -345,6 +345,30 @@ DEFAULT_STATE = {
         "reason": "No calibration preview data yet.",
         "near_approved_examples": [],
     },
+    "strategy_bottleneck": {
+        "enabled": True,
+        "mode": "DIAGNOSTIC_ONLY",
+        "dominant_bottleneck": "",
+        "dominant_setup": "",
+        "dominant_asset": "",
+        "total_strategy_rejections": 0,
+        "score_below_min_count": 0,
+        "momentum_weak_count": 0,
+        "secondary_confirmation_weak_count": 0,
+        "rsi_out_of_range_count": 0,
+        "trend_not_confirmed_count": 0,
+        "volatility_filter_count": 0,
+        "context_filter_count": 0,
+        "feed_block_count": 0,
+        "guard_block_count": 0,
+        "unknown_count": 0,
+        "top_assets_blocked": [],
+        "top_setups_blocked": [],
+        "top_filter_reasons": [],
+        "closest_candidates": [],
+        "recommendation": "observe_more",
+        "reason": "No strategy bottleneck data yet.",
+    },
     "broker": {
         "provider": BROKER_PROVIDER,
         "mode": BROKER_MODE,
@@ -631,6 +655,25 @@ def load_bot_state() -> dict:
     if not calibration_preview_state.get("reason"):
         calibration_preview_state["reason"] = "No calibration preview data yet."
     state["calibration_preview"] = calibration_preview_state
+    strategy_bottleneck_state = state.get("strategy_bottleneck", {}) or {}
+    strategy_bottleneck_state["enabled"] = bool(strategy_bottleneck_state.get("enabled", True))
+    strategy_bottleneck_state["mode"] = str(strategy_bottleneck_state.get("mode") or "DIAGNOSTIC_ONLY")
+    for key in ("top_assets_blocked", "top_setups_blocked", "top_filter_reasons"):
+        strategy_bottleneck_state[key] = [
+            item
+            for item in list(strategy_bottleneck_state.get(key, []) or [])
+            if isinstance(item, dict)
+        ][:5]
+    strategy_bottleneck_state["closest_candidates"] = [
+        item
+        for item in list(strategy_bottleneck_state.get("closest_candidates", []) or [])
+        if isinstance(item, dict)
+    ][:10]
+    if not strategy_bottleneck_state.get("recommendation"):
+        strategy_bottleneck_state["recommendation"] = "observe_more"
+    if not strategy_bottleneck_state.get("reason"):
+        strategy_bottleneck_state["reason"] = "No strategy bottleneck data yet."
+    state["strategy_bottleneck"] = strategy_bottleneck_state
     retention_state = state.get("retention", {}) or {}
     retention_state["enabled"] = RETENTION_ENABLED
     retention_state["retention_days"] = RETENTION_DAYS

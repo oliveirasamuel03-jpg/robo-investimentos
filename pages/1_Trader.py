@@ -1274,6 +1274,11 @@ calibration_preview = dict(
     or state.get("calibration_preview", {})
     or {}
 )
+strategy_bottleneck = dict(
+    validation_last_report.get("strategy_bottleneck")
+    or state.get("strategy_bottleneck", {})
+    or {}
+)
 daily_loss_limit_brl = float(risk_state.get("daily_loss_limit_brl", 0.0) or 0.0)
 daily_loss_consumed_brl = float(risk_state.get("daily_loss_consumed_brl", 0.0) or 0.0)
 daily_loss_remaining_brl = float(risk_state.get("daily_loss_remaining_brl", 0.0) or 0.0)
@@ -1895,6 +1900,39 @@ if calibration_preview:
     preview_examples = list(calibration_preview.get("near_approved_examples", []) or [])[:5]
     if preview_examples:
         st.dataframe(pd.DataFrame(preview_examples), hide_index=True, use_container_width=True)
+if strategy_bottleneck:
+    st.markdown("#### Strategy Bottleneck - DIAGNOSTIC ONLY")
+    st.caption(
+        "Diagnostico interno: nao aprova trades, nao reduz thresholds, nao altera estrategia "
+        "e preserva PAPER TRADING."
+    )
+    bot_m1, bot_m2, bot_m3, bot_m4 = st.columns(4)
+    bot_m1.metric("Bottleneck dominante", strategy_bottleneck.get("dominant_bottleneck") or "-")
+    bot_m2.metric("Setup dominante", strategy_bottleneck.get("dominant_setup") or "-")
+    bot_m3.metric("Ativo dominante", strategy_bottleneck.get("dominant_asset") or "-")
+    bot_m4.metric("Rejeicoes estrategia", str(int(strategy_bottleneck.get("total_strategy_rejections", 0) or 0)))
+    bot_c1, bot_c2, bot_c3, bot_c4, bot_c5 = st.columns(5)
+    bot_c1.metric("Score baixo", str(int(strategy_bottleneck.get("score_below_min_count", 0) or 0)))
+    bot_c2.metric("Momentum fraco", str(int(strategy_bottleneck.get("momentum_weak_count", 0) or 0)))
+    bot_c3.metric("Confirmacao fraca", str(int(strategy_bottleneck.get("secondary_confirmation_weak_count", 0) or 0)))
+    bot_c4.metric("RSI fora", str(int(strategy_bottleneck.get("rsi_out_of_range_count", 0) or 0)))
+    bot_c5.metric("Trend nao confirmada", str(int(strategy_bottleneck.get("trend_not_confirmed_count", 0) or 0)))
+    st.caption(
+        f"Volatilidade: {int(strategy_bottleneck.get('volatility_filter_count', 0) or 0)} | "
+        f"Contexto: {int(strategy_bottleneck.get('context_filter_count', 0) or 0)} | "
+        f"Recomendacao: {strategy_bottleneck.get('recommendation') or 'observe_more'}"
+    )
+    st.caption(strategy_bottleneck.get("reason") or "Sem diagnostico de bottleneck ainda.")
+    for label, key in (
+        ("Top ativos bloqueados", "top_assets_blocked"),
+        ("Top setups bloqueados", "top_setups_blocked"),
+        ("Top filtros", "top_filter_reasons"),
+        ("Candidatos mais proximos", "closest_candidates"),
+    ):
+        items = list(strategy_bottleneck.get(key, []) or [])[:5]
+        if items:
+            st.caption(label)
+            st.dataframe(pd.DataFrame(items), hide_index=True, use_container_width=True)
 
 perf_chart_left, perf_chart_right = st.columns(2)
 with perf_chart_left:

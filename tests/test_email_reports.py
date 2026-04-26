@@ -99,6 +99,21 @@ def _sample_validation_report(day_number: int) -> dict:
             "reason": "Preview sample for test.",
             "near_approved_examples": [],
         },
+        "strategy_bottleneck": {
+            "enabled": True,
+            "mode": "DIAGNOSTIC_ONLY",
+            "dominant_bottleneck": "SCORE_BELOW_MIN",
+            "dominant_setup": "trend_pullback_breakout",
+            "dominant_asset": "BTC-USD",
+            "total_strategy_rejections": 6,
+            "top_filter_reasons": [
+                {"name": "SCORE_BELOW_MIN", "count": 6, "pct": 0.6},
+                {"name": "RSI_OUT_OF_RANGE", "count": 2, "pct": 0.2},
+            ],
+            "closest_candidates": [],
+            "recommendation": "observe_more",
+            "reason": "Diagnostic sample for test.",
+        },
         "successes": ["Feed confiavel e watchlist coerente."],
         "errors": ["Amostra ainda curta para calibracao fina."],
     }
@@ -131,6 +146,8 @@ def test_daily_report_email_sends_once_only_per_day(isolated_storage, monkeypatc
     assert "Feed/rejection consistency:" in captured[0][1]
     assert "Gargalo atual parece estrategico" in captured[0][1]
     assert "Preview only; no operational threshold was changed." in captured[0][1]
+    assert "Strategy bottleneck: dominant filter SCORE_BELOW_MIN" in captured[0][1]
+    assert "Diagnostic only; no strategy or threshold was changed." in captured[0][1]
     assert state["email_reporting"]["last_daily_report_email_date"] == "2026-04-23"
 
 
