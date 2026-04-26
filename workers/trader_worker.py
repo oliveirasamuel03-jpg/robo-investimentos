@@ -251,6 +251,24 @@ def _log_calibration_preview_summary(validation_report: dict) -> None:
     )
 
 
+def _log_strategy_bottleneck_summary(validation_report: dict) -> None:
+    bottleneck = dict(validation_report.get("strategy_bottleneck", {}) or {})
+    if not bottleneck:
+        return
+    log_event(
+        "INFO",
+        (
+            "[strategy_bottleneck_summary] "
+            f"mode={str(bottleneck.get('mode') or 'DIAGNOSTIC_ONLY').lower()};"
+            f"dominant={str(bottleneck.get('dominant_bottleneck') or 'none')};"
+            f"setup={str(bottleneck.get('dominant_setup') or 'none')};"
+            f"asset={str(bottleneck.get('dominant_asset') or 'none')};"
+            f"strategy_rejections={int(bottleneck.get('total_strategy_rejections', 0) or 0)};"
+            "trade_approval_changed=0"
+        ),
+    )
+
+
 def _log_macro_alert_summary(cycle_result: dict | None) -> None:
     payload = dict(cycle_result or {})
     alert = dict(payload.get("macro_alert", {}) or {})
@@ -534,6 +552,7 @@ def worker_loop() -> None:
             _log_signal_quality_summary(validation_report)
             _log_signal_rejection_summary(validation_report, result.get("cycle_result", {}))
             _log_calibration_preview_summary(validation_report)
+            _log_strategy_bottleneck_summary(validation_report)
             _log_macro_alert_summary(result.get("cycle_result", {}))
             _log_external_signal_summary(load_bot_state())
             _maybe_send_reporting_emails(validation_report, current_time=current_time)

@@ -576,6 +576,21 @@ Com `min_signal_score=0.74` e margem `0.04`, o preview observa sinais rejeitados
 
 Use esta leitura apenas para decidir se ha base para estudar calibracao futura. Nenhuma calibracao e aplicada automaticamente.
 
+## Strategy Bottleneck - FASE 2.7
+
+A camada `Strategy Bottleneck` detalha quais filtros internos mais bloqueiam os sinais rejeitados. Ela e apenas diagnostica:
+
+- nao aprova trades
+- nao reduz thresholds
+- nao altera `min_signal_score`
+- nao altera calculo de score, estrategia, guards, broker, macro alert ou sinais externos
+- nao abre nem fecha posicoes
+- preserva `PAPER TRADING`
+
+A leitura separa gargalos como `SCORE_BELOW_MIN`, `RSI_OUT_OF_RANGE`, `TREND_NOT_CONFIRMED`, `MOMENTUM_WEAK`, `SECONDARY_CONFIRMATION_WEAK`, `VOLATILITY_FILTER`, `CONTEXT_FILTER`, `FEED_BLOCK` e `GUARD_BLOCK`.
+
+Use esta camada para entender por que `trend_pullback_breakout` esta rejeitando sinais antes de qualquer calibracao futura. Nenhuma calibracao e aplicada automaticamente.
+
 ## Watchlist padrao da validacao swing
 
 Para a fase atual de validacao swing em `paper trading`, a watchlist padrao foi consolidada para um escopo `CRYPTO ONLY` com cinco ativos:

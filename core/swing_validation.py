@@ -30,6 +30,7 @@ from core.signal_rejection_analysis import (
     rejection_reason_label,
     update_validation_rejection_state,
 )
+from core.strategy_bottleneck import default_strategy_bottleneck_state, summarize_strategy_bottlenecks
 from core.trader_profiles import get_trader_profile_config, normalize_trader_profile
 from core.trader_reports import (
     calculate_equity_curve_metrics,
@@ -903,6 +904,7 @@ def _build_operational_consistency(
         watchlist_alignment=watchlist_alignment,
     )
     calibration_preview = dict(state.get("calibration_preview", {}) or default_calibration_preview_state())
+    strategy_bottleneck = dict(state.get("strategy_bottleneck", {}) or default_strategy_bottleneck_state())
     runtime_capital = float(state.get("wallet_value", 0.0) or 0.0)
     capital_phase_aligned = abs(runtime_capital - float(VALIDATION_INITIAL_CAPITAL_BRL)) < 0.01
 
@@ -952,6 +954,9 @@ def _build_operational_consistency(
         "calibration_preview_near_approved_count": int(calibration_preview.get("near_approved_count", 0) or 0),
         "calibration_preview_near_approved_rate": float(calibration_preview.get("near_approved_rate", 0.0) or 0.0),
         "calibration_preview_recommendation": str(calibration_preview.get("recommendation") or "observe_more"),
+        "strategy_bottleneck_mode": strategy_bottleneck.get("mode", "DIAGNOSTIC_ONLY"),
+        "strategy_bottleneck_dominant": str(strategy_bottleneck.get("dominant_bottleneck") or ""),
+        "strategy_bottleneck_recommendation": str(strategy_bottleneck.get("recommendation") or "observe_more"),
     }
 
 
@@ -1087,6 +1092,7 @@ def build_swing_validation_report(state: dict | None = None, now: datetime | Non
         "rejection_quality": rejection_summary,
         "feed_rejection_consistency": feed_rejection_consistency,
         "calibration_preview": dict(payload.get("calibration_preview", {}) or default_calibration_preview_state()),
+        "strategy_bottleneck": dict(payload.get("strategy_bottleneck", {}) or default_strategy_bottleneck_state()),
         "most_used_assets": most_used_assets,
         "best_assets": best_assets,
         "worst_assets": worst_assets,
@@ -1150,6 +1156,11 @@ def refresh_swing_validation_cycle(
             enabled=CALIBRATION_PREVIEW_ENABLED,
             margin=CALIBRATION_PREVIEW_MARGIN,
             max_examples=CALIBRATION_PREVIEW_MAX_EXAMPLES,
+        )
+        state["strategy_bottleneck"] = summarize_strategy_bottlenecks(
+            signals=list(cycle_result.get("signals", []) or []),
+            enabled=True,
+            max_candidates=10,
         )
     state["validation"] = validation_state
     save_bot_state(state)
@@ -1239,6 +1250,11 @@ def refresh_swing_validation_cycle(
         sanitized_report.get("calibration_preview")
         or updated_state.get("calibration_preview", {})
         or default_calibration_preview_state()
+    )
+    updated_state["strategy_bottleneck"] = dict(
+        sanitized_report.get("strategy_bottleneck")
+        or updated_state.get("strategy_bottleneck", {})
+        or default_strategy_bottleneck_state()
     )
     save_bot_state(updated_state)
     return sanitized_report

@@ -39,6 +39,9 @@ def test_state_store_bootstraps_files_and_defaults(isolated_storage):
     assert state["calibration_preview"]["enabled"] == config.CALIBRATION_PREVIEW_ENABLED
     assert state["calibration_preview"]["mode"] == "PREVIEW_ONLY"
     assert state["calibration_preview"]["near_approved_examples"] == []
+    assert state["strategy_bottleneck"]["enabled"] is True
+    assert state["strategy_bottleneck"]["mode"] == "DIAGNOSTIC_ONLY"
+    assert state["strategy_bottleneck"]["closest_candidates"] == []
     assert state["risk"]["daily_loss_block_active"] is False
     assert state["risk"]["daily_loss_limit_brl"] == config.DAILY_LOSS_LIMIT_BRL_DEFAULT
     assert state["retention"]["retention_days"] == config.RETENTION_DAYS
