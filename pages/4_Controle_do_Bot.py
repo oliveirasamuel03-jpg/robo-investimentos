@@ -579,6 +579,11 @@ feed_rejection_consistency = dict(
     or (state.get("validation", {}) or {}).get("feed_rejection_consistency", {})
     or {}
 )
+calibration_preview = dict(
+    validation_report.get("calibration_preview")
+    or state.get("calibration_preview", {})
+    or {}
+)
 rejection_top_reasons = rejection_quality.get("top_reasons", []) or []
 st.subheader("Qualidade de rejeicao de sinal")
 rej_c1, rej_c2, rej_c3, rej_c4 = st.columns(4)
@@ -647,6 +652,33 @@ if feed_rejection_consistency:
         f"{int(feed_rejection_consistency.get('guard_rejection_current_cycle_count', 0) or 0)}/"
         f"{int(feed_rejection_consistency.get('guard_rejection_accumulated_count', 0) or 0)}"
     )
+if calibration_preview:
+    st.subheader("Calibration Preview - PREVIEW ONLY")
+    st.caption(
+        "Camada diagnostica conservadora: nao aprova trades, nao reduz thresholds, nao altera estrategia "
+        "e mantem PAPER TRADING obrigatorio."
+    )
+    cal_c1, cal_c2, cal_c3, cal_c4, cal_c5 = st.columns(5)
+    min_score = calibration_preview.get("min_score_current")
+    preview_floor = calibration_preview.get("preview_score_floor")
+    best_score = calibration_preview.get("best_score_seen")
+    avg_gap = calibration_preview.get("avg_score_gap")
+    avg_gap_label = "-" if avg_gap is None else f"{float(avg_gap):.3f}"
+    cal_c1.metric("Min score atual", "-" if min_score is None else f"{float(min_score):.2f}")
+    cal_c2.metric("Piso preview", "-" if preview_floor is None else f"{float(preview_floor):.2f}")
+    cal_c3.metric("Quase aprovados", str(int(calibration_preview.get("near_approved_count", 0) or 0)))
+    cal_c4.metric("Taxa preview", pct_label(calibration_preview.get("near_approved_rate")))
+    cal_c5.metric("Melhor score visto", "-" if best_score is None else f"{float(best_score):.2f}")
+    st.caption(
+        f"Gap medio: {avg_gap_label} | "
+        f"Top ativo: {calibration_preview.get('top_asset') or '-'} | "
+        f"Top setup: {calibration_preview.get('top_setup') or '-'} | "
+        f"Recomendacao: {calibration_preview.get('recommendation') or 'observe_more'}"
+    )
+    st.caption(calibration_preview.get("reason") or "Sem leitura de preview ainda.")
+    preview_examples = list(calibration_preview.get("near_approved_examples", []) or [])[:5]
+    if preview_examples:
+        st.dataframe(pd.DataFrame(preview_examples), hide_index=True, use_container_width=True)
 
 val_actions1, val_actions2 = st.columns(2)
 with val_actions1:

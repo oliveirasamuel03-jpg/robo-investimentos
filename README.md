@@ -128,6 +128,9 @@ Variaveis suportadas:
 - `EXTERNAL_SIGNAL_ALLOWED_TIMEFRAMES`
 - `EXTERNAL_SIGNAL_DEDUPE_SECONDS`
 - `EXTERNAL_SIGNAL_TEST_PANEL_ENABLED`
+- `CALIBRATION_PREVIEW_ENABLED`
+- `CALIBRATION_PREVIEW_MARGIN`
+- `CALIBRATION_PREVIEW_MAX_EXAMPLES`
 - `DAILY_LOSS_LIMIT_BRL`
 - `ALERT_EMAIL_ENABLED`
 - `ALERT_EMAIL_PROVIDER`
@@ -550,6 +553,28 @@ EXTERNAL_SIGNAL_ALLOWED_SOURCES=tradingview
 ```
 
 Depois da validacao, volte `EXTERNAL_SIGNAL_TEST_PANEL_ENABLED=false`.
+
+## Calibration Preview - FASE 2.6
+
+A camada `Calibration Preview` mostra sinais rejeitados que ficaram perto do score minimo sob condicoes seguras. Ela e apenas diagnostica:
+
+- nao aprova trades
+- nao reduz thresholds
+- nao altera estrategia, score, guards, broker, macro alert ou sinais externos
+- nao abre nem fecha posicoes
+- preserva `PAPER TRADING`
+
+Configuracao:
+
+```env
+CALIBRATION_PREVIEW_ENABLED=true
+CALIBRATION_PREVIEW_MARGIN=0.04
+CALIBRATION_PREVIEW_MAX_EXAMPLES=10
+```
+
+Com `min_signal_score=0.74` e margem `0.04`, o preview observa sinais rejeitados entre `0.70` e `0.74`, desde que o feed esteja `LIVE`, sem fallback no ciclo, macro alert inativo, contexto `FAVORAVEL`/`NEUTRO`, broker `PAPER`, ativo na watchlist e sem trava diaria ativa.
+
+Use esta leitura apenas para decidir se ha base para estudar calibracao futura. Nenhuma calibracao e aplicada automaticamente.
 
 ## Watchlist padrao da validacao swing
 

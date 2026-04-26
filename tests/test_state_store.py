@@ -36,6 +36,9 @@ def test_state_store_bootstraps_files_and_defaults(isolated_storage):
     assert state["external_signal"]["last_status"] == "DISABLED"
     assert state["external_signal"]["audit_only"] is True
     assert state["external_signal"]["test_panel_enabled"] == config.EXTERNAL_SIGNAL_TEST_PANEL_ENABLED
+    assert state["calibration_preview"]["enabled"] == config.CALIBRATION_PREVIEW_ENABLED
+    assert state["calibration_preview"]["mode"] == "PREVIEW_ONLY"
+    assert state["calibration_preview"]["near_approved_examples"] == []
     assert state["risk"]["daily_loss_block_active"] is False
     assert state["risk"]["daily_loss_limit_brl"] == config.DAILY_LOSS_LIMIT_BRL_DEFAULT
     assert state["retention"]["retention_days"] == config.RETENTION_DAYS
