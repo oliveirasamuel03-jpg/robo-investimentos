@@ -15,6 +15,7 @@ from core.config import (
     BOT_STATE_FILE,
     BROKER_MODE,
     BROKER_PROVIDER,
+    CALIBRATION_PREVIEW_ENABLED,
     DAILY_LOSS_LIMIT_BRL_DEFAULT,
     EXTERNAL_SIGNAL_ALLOWED_SOURCES,
     EXTERNAL_SIGNAL_ALLOWED_TIMEFRAMES,
@@ -327,6 +328,23 @@ DEFAULT_STATE = {
         "last_dedupe_key": "",
         "recent_events": [],
     },
+    "calibration_preview": {
+        "enabled": CALIBRATION_PREVIEW_ENABLED,
+        "mode": "PREVIEW_ONLY",
+        "near_approved_count": 0,
+        "near_approved_rate": 0.0,
+        "min_score_current": None,
+        "preview_score_floor": None,
+        "avg_score_gap": None,
+        "best_score_seen": None,
+        "top_asset": "",
+        "top_setup": "",
+        "safe_conditions_met_count": 0,
+        "unsafe_conditions_count": 0,
+        "recommendation": "observe_more",
+        "reason": "No calibration preview data yet.",
+        "near_approved_examples": [],
+    },
     "broker": {
         "provider": BROKER_PROVIDER,
         "mode": BROKER_MODE,
@@ -600,6 +618,19 @@ def load_bot_state() -> dict:
             else "No external signal received yet."
         )
     state["external_signal"] = external_signal_state
+    calibration_preview_state = state.get("calibration_preview", {}) or {}
+    calibration_preview_state["enabled"] = CALIBRATION_PREVIEW_ENABLED
+    calibration_preview_state["mode"] = str(calibration_preview_state.get("mode") or "PREVIEW_ONLY")
+    calibration_preview_state["near_approved_examples"] = [
+        event
+        for event in list(calibration_preview_state.get("near_approved_examples", []) or [])
+        if isinstance(event, dict)
+    ][-20:]
+    if not calibration_preview_state.get("recommendation"):
+        calibration_preview_state["recommendation"] = "observe_more"
+    if not calibration_preview_state.get("reason"):
+        calibration_preview_state["reason"] = "No calibration preview data yet."
+    state["calibration_preview"] = calibration_preview_state
     retention_state = state.get("retention", {}) or {}
     retention_state["enabled"] = RETENTION_ENABLED
     retention_state["retention_days"] = RETENTION_DAYS

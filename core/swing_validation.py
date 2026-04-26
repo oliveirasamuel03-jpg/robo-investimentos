@@ -8,6 +8,9 @@ import pandas as pd
 from core.config import (
     BOT_LOG_COLUMNS,
     BOT_LOG_FILE,
+    CALIBRATION_PREVIEW_ENABLED,
+    CALIBRATION_PREVIEW_MARGIN,
+    CALIBRATION_PREVIEW_MAX_EXAMPLES,
     SWING_VALIDATION_RECOMMENDED_WATCHLIST,
     TRADER_ORDERS_COLUMNS,
     TRADER_ORDERS_FILE,
@@ -17,6 +20,7 @@ from core.config import (
     VALIDATION_MODE_DISPLAY,
     VALIDATION_TRADING_MODE,
 )
+from core.calibration_preview import build_calibration_preview, default_calibration_preview_state
 from core.market_data import build_feed_quality_snapshot
 from core.state_store import load_bot_state, read_storage_table, save_bot_state
 from core.signal_rejection_analysis import (
@@ -898,6 +902,7 @@ def _build_operational_consistency(
         posture=posture,
         watchlist_alignment=watchlist_alignment,
     )
+    calibration_preview = dict(state.get("calibration_preview", {}) or default_calibration_preview_state())
     runtime_capital = float(state.get("wallet_value", 0.0) or 0.0)
     capital_phase_aligned = abs(runtime_capital - float(VALIDATION_INITIAL_CAPITAL_BRL)) < 0.01
 
@@ -943,6 +948,10 @@ def _build_operational_consistency(
         "fine_tuning_ready": bool(validation_reading["fine_tuning_ready"]),
         "max_drawdown_brl": equity_metrics.get("max_drawdown_brl"),
         "max_drawdown_pct": equity_metrics.get("max_drawdown_pct"),
+        "calibration_preview_mode": calibration_preview.get("mode", "PREVIEW_ONLY"),
+        "calibration_preview_near_approved_count": int(calibration_preview.get("near_approved_count", 0) or 0),
+        "calibration_preview_near_approved_rate": float(calibration_preview.get("near_approved_rate", 0.0) or 0.0),
+        "calibration_preview_recommendation": str(calibration_preview.get("recommendation") or "observe_more"),
     }
 
 
@@ -1077,6 +1086,7 @@ def build_swing_validation_report(state: dict | None = None, now: datetime | Non
         "performance": performance,
         "rejection_quality": rejection_summary,
         "feed_rejection_consistency": feed_rejection_consistency,
+        "calibration_preview": dict(payload.get("calibration_preview", {}) or default_calibration_preview_state()),
         "most_used_assets": most_used_assets,
         "best_assets": best_assets,
         "worst_assets": worst_assets,
@@ -1130,6 +1140,17 @@ def refresh_swing_validation_cycle(
     validation_state["last_evaluated_at"] = current_time.isoformat()
 
     validation_state = _update_signal_counters(validation_state, cycle_result)
+    if isinstance(cycle_result, dict):
+        state["calibration_preview"] = build_calibration_preview(
+            signals=list(cycle_result.get("signals", []) or []),
+            state=state,
+            paper_state=dict(cycle_result.get("state", {}) or {}),
+            market_data_status=dict(cycle_result.get("market_data_status", {}) or {}),
+            macro_alert=dict(cycle_result.get("macro_alert", {}) or {}),
+            enabled=CALIBRATION_PREVIEW_ENABLED,
+            margin=CALIBRATION_PREVIEW_MARGIN,
+            max_examples=CALIBRATION_PREVIEW_MAX_EXAMPLES,
+        )
     state["validation"] = validation_state
     save_bot_state(state)
 
@@ -1213,6 +1234,11 @@ def refresh_swing_validation_cycle(
                 ),
             ),
         }
+    )
+    updated_state["calibration_preview"] = dict(
+        sanitized_report.get("calibration_preview")
+        or updated_state.get("calibration_preview", {})
+        or default_calibration_preview_state()
     )
     save_bot_state(updated_state)
     return sanitized_report

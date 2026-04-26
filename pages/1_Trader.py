@@ -1269,6 +1269,11 @@ validation_feed_rejection_consistency = dict(
     or validation_state.get("feed_rejection_consistency", {})
     or {}
 )
+calibration_preview = dict(
+    validation_last_report.get("calibration_preview")
+    or state.get("calibration_preview", {})
+    or {}
+)
 daily_loss_limit_brl = float(risk_state.get("daily_loss_limit_brl", 0.0) or 0.0)
 daily_loss_consumed_brl = float(risk_state.get("daily_loss_consumed_brl", 0.0) or 0.0)
 daily_loss_remaining_brl = float(risk_state.get("daily_loss_remaining_brl", 0.0) or 0.0)
@@ -1863,6 +1868,33 @@ if validation_feed_rejection_consistency:
         f"{int(validation_feed_rejection_consistency.get('strategy_rejection_current_cycle_count', 0) or 0)}/"
         f"{int(validation_feed_rejection_consistency.get('strategy_rejection_accumulated_count', 0) or 0)}"
     )
+if calibration_preview:
+    st.markdown("#### Calibration Preview - PREVIEW ONLY")
+    st.caption(
+        "Diagnostico conservador: nao aprova trades, nao reduz thresholds, nao altera estrategia "
+        "e preserva PAPER TRADING."
+    )
+    cal_m1, cal_m2, cal_m3, cal_m4, cal_m5 = st.columns(5)
+    min_score = calibration_preview.get("min_score_current")
+    preview_floor = calibration_preview.get("preview_score_floor")
+    best_score = calibration_preview.get("best_score_seen")
+    avg_gap = calibration_preview.get("avg_score_gap")
+    avg_gap_label = "-" if avg_gap is None else f"{float(avg_gap):.3f}"
+    cal_m1.metric("Min score atual", "-" if min_score is None else f"{float(min_score):.2f}")
+    cal_m2.metric("Piso preview", "-" if preview_floor is None else f"{float(preview_floor):.2f}")
+    cal_m3.metric("Quase aprovados", str(int(calibration_preview.get("near_approved_count", 0) or 0)))
+    cal_m4.metric("Taxa preview", pct_label(calibration_preview.get("near_approved_rate")))
+    cal_m5.metric("Melhor score visto", "-" if best_score is None else f"{float(best_score):.2f}")
+    st.caption(
+        f"Gap medio: {avg_gap_label} | "
+        f"Top ativo: {calibration_preview.get('top_asset') or '-'} | "
+        f"Top setup: {calibration_preview.get('top_setup') or '-'} | "
+        f"Recomendacao: {calibration_preview.get('recommendation') or 'observe_more'}"
+    )
+    st.caption(calibration_preview.get("reason") or "Sem leitura de preview ainda.")
+    preview_examples = list(calibration_preview.get("near_approved_examples", []) or [])[:5]
+    if preview_examples:
+        st.dataframe(pd.DataFrame(preview_examples), hide_index=True, use_container_width=True)
 
 perf_chart_left, perf_chart_right = st.columns(2)
 with perf_chart_left:

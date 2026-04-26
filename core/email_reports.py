@@ -325,6 +325,26 @@ def _multi_timeframe_summary(validation_report: dict[str, Any]) -> str:
     )
 
 
+def _calibration_preview_summary(validation_report: dict[str, Any]) -> str:
+    preview = dict(validation_report.get("calibration_preview", {}) or {})
+    if not preview:
+        return "Calibration preview: no near-approved sample yet. Preview only; no threshold was changed."
+    if not bool(preview.get("enabled", True)):
+        return "Calibration preview: disabled. Preview only; no threshold was changed."
+    near_count = int(preview.get("near_approved_count", 0) or 0)
+    margin_text = "-"
+    min_score = preview.get("min_score_current")
+    floor = preview.get("preview_score_floor")
+    if min_score is not None and floor is not None:
+        margin_text = f"{float(min_score) - float(floor):.2f}"
+    if near_count <= 0:
+        return "Calibration preview: no near-approved sample yet. Preview only; no threshold was changed."
+    return (
+        f"Calibration preview: {near_count} near-approved signal(s) within {margin_text} of threshold "
+        "under safe conditions. Preview only; no operational threshold was changed."
+    )
+
+
 def _short_audit_summary(state: dict[str, Any], validation_report: dict[str, Any]) -> str:
     market_state = dict(state.get("market_data", {}) or {})
     rejection_quality = dict(validation_report.get("rejection_quality", {}) or {})
@@ -389,6 +409,7 @@ def _build_daily_email_body(state: dict[str, Any], validation_report: dict[str, 
     validation_reading_text = _safe_text(consistency.get("validation_reading_message"))
     composite_summary = _composite_summary(validation_report, daily_reports)
     multi_timeframe_summary = _multi_timeframe_summary(validation_report)
+    calibration_preview_summary = _calibration_preview_summary(validation_report)
     short_audit_summary = _short_audit_summary(state, validation_report)
     feed_rejection_diag = dict(validation_report.get("feed_rejection_consistency", {}) or {})
     feed_rejection_note = _safe_text(
@@ -407,6 +428,7 @@ def _build_daily_email_body(state: dict[str, Any], validation_report: dict[str, 
         f"Context status: {_safe_text((state.get('market_context', {}) or {}).get('market_context_status'), fallback='NEUTRO')}",
         f"Dominant strategy: {dominant_strategy}",
         f"Composite score summary: {composite_summary}",
+        calibration_preview_summary,
         f"Multi-timeframe summary: {multi_timeframe_summary}",
         "",
         "Signal pipeline:",

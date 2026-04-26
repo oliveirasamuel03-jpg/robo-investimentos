@@ -232,6 +232,25 @@ def _log_signal_rejection_summary(validation_report: dict, cycle_result: dict | 
         )
 
 
+def _log_calibration_preview_summary(validation_report: dict) -> None:
+    preview = dict(validation_report.get("calibration_preview", {}) or {})
+    if not preview:
+        return
+    log_event(
+        "INFO",
+        (
+            "[calibration_preview_summary] "
+            f"mode={str(preview.get('mode') or 'PREVIEW_ONLY').lower()};"
+            f"near={int(preview.get('near_approved_count', 0) or 0)};"
+            f"rate={float(preview.get('near_approved_rate', 0.0) or 0.0):.4f};"
+            f"best={preview.get('best_score_seen') if preview.get('best_score_seen') is not None else 'none'};"
+            f"min={preview.get('min_score_current') if preview.get('min_score_current') is not None else 'none'};"
+            f"floor={preview.get('preview_score_floor') if preview.get('preview_score_floor') is not None else 'none'};"
+            "trade_approval_changed=0"
+        ),
+    )
+
+
 def _log_macro_alert_summary(cycle_result: dict | None) -> None:
     payload = dict(cycle_result or {})
     alert = dict(payload.get("macro_alert", {}) or {})
@@ -514,6 +533,7 @@ def worker_loop() -> None:
             _log_validation_cycle(validation_report)
             _log_signal_quality_summary(validation_report)
             _log_signal_rejection_summary(validation_report, result.get("cycle_result", {}))
+            _log_calibration_preview_summary(validation_report)
             _log_macro_alert_summary(result.get("cycle_result", {}))
             _log_external_signal_summary(load_bot_state())
             _maybe_send_reporting_emails(validation_report, current_time=current_time)

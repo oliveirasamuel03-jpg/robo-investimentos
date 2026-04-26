@@ -425,6 +425,12 @@ def build_feed_rejection_consistency_diagnostic(
         dominant_scope = "unknown"
 
     is_current_feed_live = bool(feed_status == "LIVE" and fallback_assets_count == 0)
+    is_feed_rejection_current = bool(
+        any(current_reason == reason for reason in FEED_REJECTION_REASON_CODES)
+        or current_layer == "feed"
+        or int(scope_counts.get("fallback_rejection_current_cycle_count", 0) or 0) > 0
+        or (dominant_scope == "current_cycle" and dominant_reason in FEED_REJECTION_REASON_CODES)
+    )
     is_fallback_rejection_current = bool(
         int(scope_counts.get("fallback_rejection_current_cycle_count", 0) or 0) > 0
         or (dominant_scope == "current_cycle" and dominant_reason in FALLBACK_REJECTION_REASON_CODES)
@@ -432,11 +438,11 @@ def build_feed_rejection_consistency_diagnostic(
     possible_stale_fallback_label = bool(
         is_current_feed_live
         and int(scope_counts.get("fallback_rejection_accumulated_count", 0) or 0) > 0
-        and not is_fallback_rejection_current
+        and not is_feed_rejection_current
     )
 
-    if is_fallback_rejection_current or fallback_assets_count > 0 or feed_status == "FALLBACK":
-        diagnostic_note = "Ciclo atual tem bloqueio ou dependencia de fallback; revisar qualidade do feed antes de calibrar."
+    if is_feed_rejection_current or fallback_assets_count > 0 or feed_status == "FALLBACK":
+        diagnostic_note = "Ciclo atual tem bloqueio de feed ou dependencia de fallback; revisar qualidade do feed antes de calibrar."
     elif possible_stale_fallback_label:
         diagnostic_note = (
             "Rejeicao por fallback parece acumulada/historica; "
@@ -461,6 +467,7 @@ def build_feed_rejection_consistency_diagnostic(
         "dominant_rejection_layer": dominant_layer,
         "dominant_rejection_scope": dominant_scope,
         "is_current_feed_live": is_current_feed_live,
+        "is_feed_rejection_current": is_feed_rejection_current,
         "is_fallback_rejection_current": is_fallback_rejection_current,
         "possible_stale_fallback_label": possible_stale_fallback_label,
         "diagnostic_note": diagnostic_note,
