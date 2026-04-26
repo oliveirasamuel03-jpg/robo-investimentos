@@ -79,6 +79,16 @@ def _sample_validation_report(day_number: int) -> dict:
                 }
             ],
         },
+        "feed_rejection_consistency": {
+            "feed_status": "LIVE",
+            "provider_effective": "twelvedata",
+            "live_assets_count": 5,
+            "fallback_assets_count": 0,
+            "dominant_rejection_reason": "score_below_minimum",
+            "dominant_rejection_scope": "current_cycle",
+            "possible_stale_fallback_label": False,
+            "diagnostic_note": "Gargalo atual parece estrategico, com feed operacional sem fallback no ciclo.",
+        },
         "successes": ["Feed confiavel e watchlist coerente."],
         "errors": ["Amostra ainda curta para calibracao fina."],
     }
@@ -108,6 +118,8 @@ def test_daily_report_email_sends_once_only_per_day(isolated_storage, monkeypatc
     assert not second["sent"]
     assert captured[0][0] == "[PAPER] Daily Trading Report - 2026-04-23"
     assert captured[0][1].startswith("[PAPER MODE]")
+    assert "Feed/rejection consistency:" in captured[0][1]
+    assert "Gargalo atual parece estrategico" in captured[0][1]
     assert state["email_reporting"]["last_daily_report_email_date"] == "2026-04-23"
 
 

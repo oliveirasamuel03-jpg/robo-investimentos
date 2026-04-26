@@ -68,3 +68,90 @@ def test_refresh_swing_validation_cycle_persists_rejection_breakdowns(isolated_s
     assert validation_state["rejection_layer_breakdown"]["feed"] == 1
     assert report["metrics"]["rejection_top_reason"] in {"score_below_minimum", "fallback_blocked"}
     assert isinstance(report["rejection_quality"]["top_reasons"], list)
+    assert "feed_rejection_consistency" in report
+
+
+def test_feed_live_with_accumulated_fallback_marks_possible_stale_label(isolated_storage):
+    rejection_analysis = load_module("core.signal_rejection_analysis")
+
+    diagnostic = rejection_analysis.build_feed_rejection_consistency_diagnostic(
+        feed_quality={
+            "feed_status": "LIVE",
+            "provider_effective": "twelvedata",
+            "live_count": 5,
+            "fallback_count": 0,
+            "total_symbols": 5,
+        },
+        current_cycle_summary={
+            "total_rejection_events": 3,
+            "rejected_by_reason": {"score_below_minimum": 3},
+            "rejected_by_layer": {"strategy": 3},
+            "top_rejection_reason": "score_below_minimum",
+            "top_rejection_layer": "strategy",
+        },
+        accumulated_summary={
+            "total_rejection_events": 20,
+            "reason_breakdown": {"fallback_blocked": 12, "score_below_minimum": 8},
+            "layer_breakdown": {"feed": 12, "strategy": 8},
+            "top_reason": "fallback_blocked",
+            "top_layer": "feed",
+        },
+    )
+
+    assert diagnostic["is_current_feed_live"] is True
+    assert diagnostic["is_fallback_rejection_current"] is False
+    assert diagnostic["possible_stale_fallback_label"] is True
+    assert diagnostic["dominant_rejection_scope"] == "current_cycle"
+
+
+def test_current_fallback_blocks_are_marked_as_feed_issue(isolated_storage):
+    rejection_analysis = load_module("core.signal_rejection_analysis")
+
+    diagnostic = rejection_analysis.build_feed_rejection_consistency_diagnostic(
+        feed_quality={
+            "feed_status": "FALLBACK",
+            "provider_effective": "synthetic",
+            "live_count": 0,
+            "fallback_count": 5,
+            "total_symbols": 5,
+        },
+        current_cycle_summary={
+            "total_rejection_events": 5,
+            "rejected_by_reason": {"fallback_blocked": 5},
+            "rejected_by_layer": {"feed": 5},
+            "top_rejection_reason": "fallback_blocked",
+            "top_rejection_layer": "feed",
+        },
+        accumulated_summary={},
+    )
+
+    assert diagnostic["is_current_feed_live"] is False
+    assert diagnostic["is_fallback_rejection_current"] is True
+    assert diagnostic["possible_stale_fallback_label"] is False
+    assert diagnostic["dominant_rejection_scope"] == "current_cycle"
+
+
+def test_strategy_dominant_with_live_feed_marks_strategy_bottleneck(isolated_storage):
+    rejection_analysis = load_module("core.signal_rejection_analysis")
+
+    diagnostic = rejection_analysis.build_feed_rejection_consistency_diagnostic(
+        feed_quality={
+            "feed_status": "LIVE",
+            "provider_effective": "twelvedata",
+            "live_count": 5,
+            "fallback_count": 0,
+            "total_symbols": 5,
+        },
+        current_cycle_summary={
+            "total_rejection_events": 7,
+            "rejected_by_reason": {"trend_not_confirmed": 7},
+            "rejected_by_layer": {"strategy": 7},
+            "top_rejection_reason": "trend_not_confirmed",
+            "top_rejection_layer": "strategy",
+        },
+        accumulated_summary={},
+    )
+
+    assert diagnostic["dominant_rejection_layer"] == "strategy"
+    assert diagnostic["strategy_rejection_current_cycle_count"] == 7
+    assert "estrategico" in diagnostic["diagnostic_note"]

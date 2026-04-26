@@ -44,6 +44,9 @@ def test_state_store_bootstraps_files_and_defaults(isolated_storage):
     assert state["validation"]["validation_mode_label"] == config.VALIDATION_MODE_DISPLAY
     assert state["validation"]["trading_mode"] == config.VALIDATION_TRADING_MODE
     assert state["validation"]["final_email_sent"] is False
+    assert state["validation"]["current_cycle_rejection_reason"] == ""
+    assert state["validation"]["fallback_rejection_current_cycle_count"] == 0
+    assert state["validation"]["feed_rejection_consistency"] == {}
     assert state["trader"]["watchlist"] == config.SWING_VALIDATION_RECOMMENDED_WATCHLIST
 
     logs = state_store.read_storage_table(config.BOT_LOG_FILE, columns=config.BOT_LOG_COLUMNS)

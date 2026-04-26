@@ -122,6 +122,8 @@ DOMINANT_LAYER_MESSAGES = {
 }
 
 NON_SETUP_STRATEGY_NAMES = {"context_filter", "feed_guard", "runtime_guard", "risk_guard", "macro_risk_guard"}
+FALLBACK_REJECTION_REASON_CODES = {"fallback_blocked"}
+FEED_REJECTION_REASON_CODES = {"fallback_blocked", "feed_quality_blocked", "provider_unknown"}
 
 RAW_REASON_MAP = {
     "score_below_minimum": "score_below_minimum",
@@ -155,6 +157,13 @@ def _utc_now_iso() -> str:
 
 def _safe_text(value: Any) -> str:
     return str(value or "").strip()
+
+
+def _safe_int(value: Any) -> int:
+    try:
+        return int(value or 0)
+    except (TypeError, ValueError):
+        return 0
 
 
 def rejection_reason_label(reason_code: str | None) -> str:
@@ -315,6 +324,151 @@ def summarize_rejection_events(
     }
 
 
+def _summary_reason_breakdown(summary: dict[str, Any] | None) -> dict[str, int]:
+    payload = dict(summary or {})
+    raw = dict(payload.get("rejected_by_reason") or payload.get("reason_breakdown") or {})
+    return {str(key): _safe_int(value) for key, value in raw.items() if str(key)}
+
+
+def _summary_layer_breakdown(summary: dict[str, Any] | None) -> dict[str, int]:
+    payload = dict(summary or {})
+    raw = dict(payload.get("rejected_by_layer") or payload.get("layer_breakdown") or {})
+    return {str(key).lower(): _safe_int(value) for key, value in raw.items() if str(key)}
+
+
+def _summary_total_events(summary: dict[str, Any] | None) -> int:
+    payload = dict(summary or {})
+    explicit_total = payload.get("total_rejection_events")
+    if explicit_total is not None:
+        return _safe_int(explicit_total)
+    return int(sum(_summary_reason_breakdown(payload).values()))
+
+
+def _summary_top_reason(summary: dict[str, Any] | None) -> str:
+    payload = dict(summary or {})
+    explicit = _safe_text(payload.get("top_rejection_reason") or payload.get("top_reason"))
+    if explicit:
+        return explicit
+    reason_breakdown = _summary_reason_breakdown(payload)
+    if not reason_breakdown:
+        return ""
+    return sorted(reason_breakdown.items(), key=lambda item: int(item[1] or 0), reverse=True)[0][0]
+
+
+def _summary_top_layer(summary: dict[str, Any] | None) -> str:
+    payload = dict(summary or {})
+    explicit = _safe_text(payload.get("top_rejection_layer") or payload.get("top_layer")).lower()
+    if explicit:
+        return explicit
+    layer_breakdown = _summary_layer_breakdown(payload)
+    if not layer_breakdown:
+        return ""
+    return sorted(layer_breakdown.items(), key=lambda item: int(item[1] or 0), reverse=True)[0][0]
+
+
+def build_rejection_scope_counters(
+    current_cycle_summary: dict[str, Any] | None = None,
+    accumulated_summary: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    current_reasons = _summary_reason_breakdown(current_cycle_summary)
+    current_layers = _summary_layer_breakdown(current_cycle_summary)
+    accumulated_reasons = _summary_reason_breakdown(accumulated_summary)
+    accumulated_layers = _summary_layer_breakdown(accumulated_summary)
+
+    return {
+        "current_cycle_rejection_reason": _summary_top_reason(current_cycle_summary),
+        "accumulated_rejection_reason": _summary_top_reason(accumulated_summary),
+        "fallback_rejection_current_cycle_count": int(
+            sum(current_reasons.get(reason, 0) for reason in FALLBACK_REJECTION_REASON_CODES)
+        ),
+        "fallback_rejection_accumulated_count": int(
+            sum(accumulated_reasons.get(reason, 0) for reason in FALLBACK_REJECTION_REASON_CODES)
+        ),
+        "strategy_rejection_current_cycle_count": int(current_layers.get("strategy", 0) or 0),
+        "strategy_rejection_accumulated_count": int(accumulated_layers.get("strategy", 0) or 0),
+        "guard_rejection_current_cycle_count": int(current_layers.get("guard", 0) or 0),
+        "guard_rejection_accumulated_count": int(accumulated_layers.get("guard", 0) or 0),
+    }
+
+
+def build_feed_rejection_consistency_diagnostic(
+    *,
+    feed_quality: dict[str, Any] | None = None,
+    current_cycle_summary: dict[str, Any] | None = None,
+    accumulated_summary: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    quality = dict(feed_quality or {})
+    scope_counts = build_rejection_scope_counters(current_cycle_summary, accumulated_summary)
+    feed_status = _safe_text(quality.get("feed_status")).upper() or "UNKNOWN"
+    provider_effective = _safe_text(quality.get("provider_effective")) or "unknown"
+    live_assets_count = _safe_int(quality.get("live_count"))
+    fallback_assets_count = _safe_int(quality.get("fallback_count"))
+    total_symbols = _safe_int(quality.get("total_symbols"))
+    current_total_events = _summary_total_events(current_cycle_summary)
+    accumulated_total_events = _summary_total_events(accumulated_summary)
+    current_reason = str(scope_counts.get("current_cycle_rejection_reason") or "")
+    accumulated_reason = str(scope_counts.get("accumulated_rejection_reason") or "")
+    current_layer = _summary_top_layer(current_cycle_summary)
+    accumulated_layer = _summary_top_layer(accumulated_summary)
+
+    if current_total_events > 0 and current_reason:
+        dominant_reason = current_reason
+        dominant_layer = current_layer
+        dominant_scope = "current_cycle"
+    elif accumulated_total_events > 0 and accumulated_reason:
+        dominant_reason = accumulated_reason
+        dominant_layer = accumulated_layer
+        dominant_scope = "accumulated"
+    else:
+        dominant_reason = ""
+        dominant_layer = ""
+        dominant_scope = "unknown"
+
+    is_current_feed_live = bool(feed_status == "LIVE" and fallback_assets_count == 0)
+    is_fallback_rejection_current = bool(
+        int(scope_counts.get("fallback_rejection_current_cycle_count", 0) or 0) > 0
+        or (dominant_scope == "current_cycle" and dominant_reason in FALLBACK_REJECTION_REASON_CODES)
+    )
+    possible_stale_fallback_label = bool(
+        is_current_feed_live
+        and int(scope_counts.get("fallback_rejection_accumulated_count", 0) or 0) > 0
+        and not is_fallback_rejection_current
+    )
+
+    if is_fallback_rejection_current or fallback_assets_count > 0 or feed_status == "FALLBACK":
+        diagnostic_note = "Ciclo atual tem bloqueio ou dependencia de fallback; revisar qualidade do feed antes de calibrar."
+    elif possible_stale_fallback_label:
+        diagnostic_note = (
+            "Rejeicao por fallback parece acumulada/historica; "
+            f"feed atual esta LIVE com {live_assets_count}/{total_symbols} ativos live."
+        )
+    elif dominant_scope == "current_cycle" and dominant_layer == "strategy":
+        diagnostic_note = "Gargalo atual parece estrategico, com feed operacional sem fallback no ciclo."
+    elif dominant_scope == "accumulated" and accumulated_layer == "strategy":
+        diagnostic_note = "Gargalo dominante acumulado parece estrategico; confirmar mais ciclos antes de calibrar."
+    elif dominant_scope == "unknown":
+        diagnostic_note = "Escopo da rejeicao ainda indefinido; observar mais um ciclo antes de ajustar thresholds."
+    else:
+        diagnostic_note = "Leitura de rejeicao e feed sem conflito operacional evidente no ciclo atual."
+
+    payload = {
+        "feed_status": feed_status,
+        "provider_effective": provider_effective,
+        "live_assets_count": live_assets_count,
+        "fallback_assets_count": fallback_assets_count,
+        "total_symbols": total_symbols,
+        "dominant_rejection_reason": dominant_reason,
+        "dominant_rejection_layer": dominant_layer,
+        "dominant_rejection_scope": dominant_scope,
+        "is_current_feed_live": is_current_feed_live,
+        "is_fallback_rejection_current": is_fallback_rejection_current,
+        "possible_stale_fallback_label": possible_stale_fallback_label,
+        "diagnostic_note": diagnostic_note,
+    }
+    payload.update(scope_counts)
+    return payload
+
+
 def update_validation_rejection_state(
     validation_state: dict[str, Any],
     cycle_result: dict[str, Any] | None,
@@ -324,6 +478,12 @@ def update_validation_rejection_state(
 
     cycle_validation = dict(cycle_result.get("validation_cycle", {}) or {})
     raw_events = [dict(item or {}) for item in (cycle_validation.get("rejection_events") or []) if isinstance(item, dict)]
+    cycle_summary = dict(cycle_validation.get("rejection_summary", {}) or {})
+    if not cycle_summary:
+        cycle_summary = summarize_rejection_events(
+            raw_events,
+            rejected_signal_count=_safe_int(cycle_validation.get("signals_rejected")),
+        )
 
     seen_keys = dict(validation_state.get("last_rejection_event_keys", {}) or {})
     reason_breakdown = Counter(dict(validation_state.get("rejection_reason_breakdown", {}) or {}))
@@ -355,6 +515,16 @@ def update_validation_rejection_state(
         top_strategy = strategy_breakdown.most_common(1)[0][0] if strategy_breakdown else ""
     total_rejection_events = int(sum(reason_breakdown.values()))
     rejected_signal_count = int((validation_state.get("signal_counters", {}) or {}).get("signals_rejected", 0) or 0)
+    accumulated_summary = {
+        "total_rejection_events": total_rejection_events,
+        "reason_breakdown": dict(reason_breakdown),
+        "layer_breakdown": dict(layer_breakdown),
+        "strategy_breakdown": dict(strategy_breakdown),
+        "top_reason": top_reason,
+        "top_layer": top_layer,
+        "top_strategy": top_strategy,
+    }
+    scope_counts = build_rejection_scope_counters(cycle_summary, accumulated_summary)
 
     validation_state["rejection_top_reason"] = top_reason
     validation_state["rejection_top_layer"] = top_layer
@@ -365,5 +535,7 @@ def update_validation_rejection_state(
     validation_state["rejection_has_minimum_sample"] = bool(
         max(rejected_signal_count, total_rejection_events) >= 8
     )
+    validation_state["last_cycle_rejection_summary"] = cycle_summary
+    validation_state.update(scope_counts)
     validation_state["last_rejection_event_keys"] = seen_keys
     return validation_state
