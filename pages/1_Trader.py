@@ -1263,6 +1263,12 @@ validation_last_report = (validation_state.get("last_report", {}) or {})
 validation_consistency = dict(validation_last_report.get("consistency", {}) or {})
 validation_metrics = dict(validation_last_report.get("metrics", {}) or {})
 validation_rejection_quality = dict(validation_last_report.get("rejection_quality", {}) or {})
+validation_feed_rejection_consistency = dict(
+    validation_last_report.get("feed_rejection_consistency")
+    or validation_metrics.get("feed_rejection_consistency")
+    or validation_state.get("feed_rejection_consistency", {})
+    or {}
+)
 daily_loss_limit_brl = float(risk_state.get("daily_loss_limit_brl", 0.0) or 0.0)
 daily_loss_consumed_brl = float(risk_state.get("daily_loss_consumed_brl", 0.0) or 0.0)
 daily_loss_remaining_brl = float(risk_state.get("daily_loss_remaining_brl", 0.0) or 0.0)
@@ -1841,6 +1847,22 @@ if top_reasons:
     )
 elif validation_metrics.get("signals_rejected", 0):
     st.caption("Ja existem rejeicoes no ciclo, mas ainda sem detalhe consolidado suficiente.")
+if validation_feed_rejection_consistency:
+    st.caption(
+        "Diagnostico feed x rejeicao: "
+        f"{validation_feed_rejection_consistency.get('diagnostic_note') or 'Sem leitura consolidada.'}"
+    )
+    st.caption(
+        "Escopo da rejeicao: "
+        f"atual={rejection_reason_label(validation_feed_rejection_consistency.get('current_cycle_rejection_reason'))} | "
+        f"acumulado={rejection_reason_label(validation_feed_rejection_consistency.get('accumulated_rejection_reason'))} | "
+        f"fallback atual/acumulado="
+        f"{int(validation_feed_rejection_consistency.get('fallback_rejection_current_cycle_count', 0) or 0)}/"
+        f"{int(validation_feed_rejection_consistency.get('fallback_rejection_accumulated_count', 0) or 0)} | "
+        f"estrategia atual/acumulado="
+        f"{int(validation_feed_rejection_consistency.get('strategy_rejection_current_cycle_count', 0) or 0)}/"
+        f"{int(validation_feed_rejection_consistency.get('strategy_rejection_accumulated_count', 0) or 0)}"
+    )
 
 perf_chart_left, perf_chart_right = st.columns(2)
 with perf_chart_left:

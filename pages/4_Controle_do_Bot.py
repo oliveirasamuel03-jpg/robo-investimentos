@@ -573,6 +573,12 @@ with signal_d2:
         st.caption(f"Validacao: {val_consistency.get('validation_reading_message')}")
 
 rejection_quality = dict(validation_report.get("rejection_quality", {}) or {})
+feed_rejection_consistency = dict(
+    validation_report.get("feed_rejection_consistency")
+    or val_metrics.get("feed_rejection_consistency")
+    or (state.get("validation", {}) or {}).get("feed_rejection_consistency", {})
+    or {}
+)
 rejection_top_reasons = rejection_quality.get("top_reasons", []) or []
 st.subheader("Qualidade de rejeicao de sinal")
 rej_c1, rej_c2, rej_c3, rej_c4 = st.columns(4)
@@ -624,6 +630,23 @@ with rej_d2:
             reverse=True,
         )[0]
         st.caption(f"Estrategia mais bloqueada: {top_strategy} ({int(top_strategy_count or 0)})")
+if feed_rejection_consistency:
+    st.caption(
+        "Diagnostico feed x rejeicao: "
+        f"{feed_rejection_consistency.get('diagnostic_note') or 'Sem leitura consolidada.'}"
+    )
+    st.caption(
+        "Escopo: "
+        f"dominante={feed_rejection_consistency.get('dominant_rejection_scope') or 'unknown'} | "
+        f"atual={rejection_reason_label(feed_rejection_consistency.get('current_cycle_rejection_reason'))} | "
+        f"acumulado={rejection_reason_label(feed_rejection_consistency.get('accumulated_rejection_reason'))} | "
+        f"fallback atual/acumulado="
+        f"{int(feed_rejection_consistency.get('fallback_rejection_current_cycle_count', 0) or 0)}/"
+        f"{int(feed_rejection_consistency.get('fallback_rejection_accumulated_count', 0) or 0)} | "
+        f"guards atual/acumulado="
+        f"{int(feed_rejection_consistency.get('guard_rejection_current_cycle_count', 0) or 0)}/"
+        f"{int(feed_rejection_consistency.get('guard_rejection_accumulated_count', 0) or 0)}"
+    )
 
 val_actions1, val_actions2 = st.columns(2)
 with val_actions1:

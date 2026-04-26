@@ -184,11 +184,11 @@ def _log_signal_quality_summary(validation_report: dict) -> None:
 def _log_signal_rejection_summary(validation_report: dict, cycle_result: dict | None) -> None:
     cycle_validation = dict((cycle_result or {}).get("validation_cycle", {}) or {})
     rejection_summary = dict(cycle_validation.get("rejection_summary", {}) or validation_report.get("rejection_quality", {}) or {})
-    top_reason = str(rejection_summary.get("top_rejection_reason") or "")
-    top_layer = str(rejection_summary.get("top_rejection_layer") or "")
-    top_strategy = str(rejection_summary.get("top_rejection_strategy") or "")
-    reason_breakdown = dict(rejection_summary.get("rejected_by_reason", {}) or {})
-    layer_breakdown = dict(rejection_summary.get("rejected_by_layer", {}) or {})
+    top_reason = str(rejection_summary.get("top_rejection_reason") or rejection_summary.get("top_reason") or "")
+    top_layer = str(rejection_summary.get("top_rejection_layer") or rejection_summary.get("top_layer") or "")
+    top_strategy = str(rejection_summary.get("top_rejection_strategy") or rejection_summary.get("top_strategy") or "")
+    reason_breakdown = dict(rejection_summary.get("rejected_by_reason", {}) or rejection_summary.get("reason_breakdown", {}) or {})
+    layer_breakdown = dict(rejection_summary.get("rejected_by_layer", {}) or rejection_summary.get("layer_breakdown", {}) or {})
     log_event(
         "INFO",
         (
@@ -215,6 +215,21 @@ def _log_signal_rejection_summary(validation_report: dict, cycle_result: dict | 
             for layer, count in sorted(layer_breakdown.items(), key=lambda item: int(item[1] or 0), reverse=True)
         )
         log_event("INFO", f"[signal_rejection_layer_summary] {summary}")
+    feed_diag = dict(validation_report.get("feed_rejection_consistency", {}) or {})
+    if feed_diag:
+        log_event(
+            "INFO",
+            (
+                "[feed_rejection_consistency] "
+                f"feed_status={str(feed_diag.get('feed_status') or 'UNKNOWN').lower()};"
+                f"provider={str(feed_diag.get('provider_effective') or 'unknown').lower()};"
+                f"live={int(feed_diag.get('live_assets_count', 0) or 0)};"
+                f"fallback={int(feed_diag.get('fallback_assets_count', 0) or 0)};"
+                f"scope={str(feed_diag.get('dominant_rejection_scope') or 'unknown')};"
+                f"stale_fallback={1 if bool(feed_diag.get('possible_stale_fallback_label')) else 0};"
+                f"current_fallback={1 if bool(feed_diag.get('is_fallback_rejection_current')) else 0}"
+            ),
+        )
 
 
 def _log_macro_alert_summary(cycle_result: dict | None) -> None:

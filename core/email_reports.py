@@ -296,14 +296,23 @@ def _signal_pipeline_lines(validation_report: dict[str, Any]) -> list[str]:
 def _composite_summary(validation_report: dict[str, Any], reports_df: pd.DataFrame) -> str:
     consistency = dict(validation_report.get("consistency", {}) or {})
     avg_entry_score = _avg_entry_score(reports_df)
-    top_reason = rejection_reason_label((validation_report.get("rejection_quality", {}) or {}).get("top_reason"))
+    feed_rejection_diag = dict(validation_report.get("feed_rejection_consistency", {}) or {})
+    rejection_quality = dict(validation_report.get("rejection_quality", {}) or {})
+    top_reason = rejection_reason_label(
+        feed_rejection_diag.get("dominant_rejection_reason") or rejection_quality.get("top_reason")
+    )
+    scope = str(feed_rejection_diag.get("dominant_rejection_scope") or "accumulated")
+    scope_label = {
+        "current_cycle": "do ciclo atual",
+        "accumulated": "acumulado",
+    }.get(scope, "de escopo ainda indefinido")
     if avg_entry_score is not None:
         return f"Media de entry_score das operacoes fechadas no periodo: {avg_entry_score:.3f}."
     approval_rate = consistency.get("signal_approval_rate")
     if approval_rate is not None:
         return (
             f"Sem score medio fechado suficiente; aprovacao atual em {float(approval_rate or 0.0) * 100:.1f}% "
-            f"com gargalo dominante em '{top_reason}'."
+            f"com gargalo dominante {scope_label} em '{top_reason}'."
         )
     return f"Sem leitura consolidada de composite score; principal bloqueio atual: {top_reason}."
 
@@ -319,12 +328,16 @@ def _multi_timeframe_summary(validation_report: dict[str, Any]) -> str:
 def _short_audit_summary(state: dict[str, Any], validation_report: dict[str, Any]) -> str:
     market_state = dict(state.get("market_data", {}) or {})
     rejection_quality = dict(validation_report.get("rejection_quality", {}) or {})
+    feed_rejection_diag = dict(validation_report.get("feed_rejection_consistency", {}) or {})
     provider_effective = _safe_text(market_state.get("provider_effective"), fallback="desconhecido")
     last_stage = _safe_text(market_state.get("last_stage"), fallback="sem registro")
-    top_reason = rejection_reason_label(rejection_quality.get("top_reason"))
+    top_reason = rejection_reason_label(feed_rejection_diag.get("dominant_rejection_reason") or rejection_quality.get("top_reason"))
+    scope = _safe_text(feed_rejection_diag.get("dominant_rejection_scope"), fallback="unknown")
+    note = _safe_text(feed_rejection_diag.get("diagnostic_note"), fallback="Sem diagnostico feed x rejeicao consolidado.")
     return (
         f"Worker escreveu o estado via '{_safe_text(market_state.get('state_writer'), fallback='sem registro')}', "
-        f"provider efetivo '{provider_effective}', estagio '{last_stage}' e rejeicao dominante '{top_reason}'."
+        f"provider efetivo '{provider_effective}', estagio '{last_stage}' e rejeicao dominante "
+        f"({scope}) '{top_reason}'. {note}"
     )
 
 
@@ -377,6 +390,11 @@ def _build_daily_email_body(state: dict[str, Any], validation_report: dict[str, 
     composite_summary = _composite_summary(validation_report, daily_reports)
     multi_timeframe_summary = _multi_timeframe_summary(validation_report)
     short_audit_summary = _short_audit_summary(state, validation_report)
+    feed_rejection_diag = dict(validation_report.get("feed_rejection_consistency", {}) or {})
+    feed_rejection_note = _safe_text(
+        feed_rejection_diag.get("diagnostic_note"),
+        fallback="Sem diagnostico feed x rejeicao consolidado.",
+    )
 
     lines = [
         "[PAPER MODE] Nenhuma ordem real foi enviada.",
@@ -404,6 +422,7 @@ def _build_daily_email_body(state: dict[str, Any], validation_report: dict[str, 
         "Short audit notes:",
         f"- {short_audit_summary}",
         f"- Feed quality: live={live_count}/{total_symbols} | fallback={fallback_count} | last_success={last_success_text}",
+        f"- Feed/rejection consistency: {feed_rejection_note}",
         f"- Operational health: {health_level_text} | {health_message_text}",
         f"- Validation reading: {validation_reading_text}",
     ]

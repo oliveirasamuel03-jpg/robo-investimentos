@@ -17,8 +17,11 @@ from core.config import (
     VALIDATION_MODE_DISPLAY,
     VALIDATION_TRADING_MODE,
 )
+from core.market_data import build_feed_quality_snapshot
 from core.state_store import load_bot_state, read_storage_table, save_bot_state
 from core.signal_rejection_analysis import (
+    build_feed_rejection_consistency_diagnostic,
+    build_rejection_scope_counters,
     rejection_dominant_message,
     rejection_reason_label,
     update_validation_rejection_state,
@@ -226,6 +229,16 @@ def default_validation_state() -> dict[str, Any]:
         "rejection_layer_breakdown": {},
         "rejection_strategy_breakdown": {},
         "rejection_has_minimum_sample": False,
+        "last_cycle_rejection_summary": {},
+        "current_cycle_rejection_reason": "",
+        "accumulated_rejection_reason": "",
+        "fallback_rejection_current_cycle_count": 0,
+        "fallback_rejection_accumulated_count": 0,
+        "strategy_rejection_current_cycle_count": 0,
+        "strategy_rejection_accumulated_count": 0,
+        "guard_rejection_current_cycle_count": 0,
+        "guard_rejection_accumulated_count": 0,
+        "feed_rejection_consistency": {},
         "signal_counters": _default_signal_counters(),
         "last_signal_keys": {},
         "last_rejection_event_keys": {},
@@ -766,6 +779,18 @@ def _rejection_quality_payload(validation_state: dict[str, Any]) -> dict[str, An
     top_reason = str(validation_state.get("rejection_top_reason") or "")
     top_layer = str(validation_state.get("rejection_top_layer") or "")
     top_strategy = str(validation_state.get("rejection_top_strategy") or "")
+    scope_counts = build_rejection_scope_counters(
+        dict(validation_state.get("last_cycle_rejection_summary", {}) or {}),
+        {
+            "total_rejection_events": total_events,
+            "reason_breakdown": reason_breakdown,
+            "layer_breakdown": layer_breakdown,
+            "strategy_breakdown": strategy_breakdown,
+            "top_reason": top_reason,
+            "top_layer": top_layer,
+            "top_strategy": top_strategy,
+        },
+    )
 
     top_reasons: list[dict[str, Any]] = []
     if total_events > 0:
@@ -792,6 +817,7 @@ def _rejection_quality_payload(validation_state: dict[str, Any]) -> dict[str, An
         "strategy_breakdown": strategy_breakdown,
         "top_reasons": top_reasons,
         "has_minimum_sample": bool(validation_state.get("rejection_has_minimum_sample", False)),
+        **scope_counts,
     }
 
 
@@ -968,6 +994,12 @@ def build_swing_validation_report(state: dict | None = None, now: datetime | Non
     signal_counters = dict(validation_state.get("signal_counters", {}) or _default_signal_counters())
     signal_rejections = dict(signal_counters.get("rejections", {}) or {})
     rejection_summary = _rejection_quality_payload(validation_state)
+    feed_quality = build_feed_quality_snapshot(dict(payload.get("market_data", {}) or {}))
+    feed_rejection_consistency = build_feed_rejection_consistency_diagnostic(
+        feed_quality=feed_quality,
+        current_cycle_summary=dict(validation_state.get("last_cycle_rejection_summary", {}) or {}),
+        accumulated_summary=rejection_summary,
+    )
 
     performance_metrics = calculate_trade_report_metrics(reports_df)
     early_closed, late_held = _early_and_late_trades(reports_df)
@@ -993,6 +1025,15 @@ def build_swing_validation_report(state: dict | None = None, now: datetime | Non
         "rejection_layer_breakdown": dict(rejection_summary["layer_breakdown"]),
         "rejection_strategy_breakdown": dict(rejection_summary["strategy_breakdown"]),
         "rejection_has_minimum_sample": bool(rejection_summary["has_minimum_sample"]),
+        "current_cycle_rejection_reason": rejection_summary["current_cycle_rejection_reason"],
+        "accumulated_rejection_reason": rejection_summary["accumulated_rejection_reason"],
+        "fallback_rejection_current_cycle_count": int(rejection_summary["fallback_rejection_current_cycle_count"]),
+        "fallback_rejection_accumulated_count": int(rejection_summary["fallback_rejection_accumulated_count"]),
+        "strategy_rejection_current_cycle_count": int(rejection_summary["strategy_rejection_current_cycle_count"]),
+        "strategy_rejection_accumulated_count": int(rejection_summary["strategy_rejection_accumulated_count"]),
+        "guard_rejection_current_cycle_count": int(rejection_summary["guard_rejection_current_cycle_count"]),
+        "guard_rejection_accumulated_count": int(rejection_summary["guard_rejection_accumulated_count"]),
+        "feed_rejection_consistency": dict(feed_rejection_consistency),
         "context_status_counts": dict(signal_counters.get("context_status_counts", {}) or {}),
         "context_blocked_signals": int(signal_counters.get("context_blocked_signals", 0) or 0),
         "open_positions": len(payload.get("positions", []) or []),
@@ -1035,6 +1076,7 @@ def build_swing_validation_report(state: dict | None = None, now: datetime | Non
         "metrics": metrics,
         "performance": performance,
         "rejection_quality": rejection_summary,
+        "feed_rejection_consistency": feed_rejection_consistency,
         "most_used_assets": most_used_assets,
         "best_assets": best_assets,
         "worst_assets": worst_assets,
@@ -1129,6 +1171,46 @@ def refresh_swing_validation_cycle(
             "rejection_has_minimum_sample": sanitized_report.get("metrics", {}).get(
                 "rejection_has_minimum_sample",
                 validation_state.get("rejection_has_minimum_sample", False),
+            ),
+            "last_cycle_rejection_summary": validation_state.get("last_cycle_rejection_summary", {}),
+            "current_cycle_rejection_reason": sanitized_report.get("metrics", {}).get(
+                "current_cycle_rejection_reason",
+                validation_state.get("current_cycle_rejection_reason", ""),
+            ),
+            "accumulated_rejection_reason": sanitized_report.get("metrics", {}).get(
+                "accumulated_rejection_reason",
+                validation_state.get("accumulated_rejection_reason", ""),
+            ),
+            "fallback_rejection_current_cycle_count": sanitized_report.get("metrics", {}).get(
+                "fallback_rejection_current_cycle_count",
+                validation_state.get("fallback_rejection_current_cycle_count", 0),
+            ),
+            "fallback_rejection_accumulated_count": sanitized_report.get("metrics", {}).get(
+                "fallback_rejection_accumulated_count",
+                validation_state.get("fallback_rejection_accumulated_count", 0),
+            ),
+            "strategy_rejection_current_cycle_count": sanitized_report.get("metrics", {}).get(
+                "strategy_rejection_current_cycle_count",
+                validation_state.get("strategy_rejection_current_cycle_count", 0),
+            ),
+            "strategy_rejection_accumulated_count": sanitized_report.get("metrics", {}).get(
+                "strategy_rejection_accumulated_count",
+                validation_state.get("strategy_rejection_accumulated_count", 0),
+            ),
+            "guard_rejection_current_cycle_count": sanitized_report.get("metrics", {}).get(
+                "guard_rejection_current_cycle_count",
+                validation_state.get("guard_rejection_current_cycle_count", 0),
+            ),
+            "guard_rejection_accumulated_count": sanitized_report.get("metrics", {}).get(
+                "guard_rejection_accumulated_count",
+                validation_state.get("guard_rejection_accumulated_count", 0),
+            ),
+            "feed_rejection_consistency": sanitized_report.get(
+                "feed_rejection_consistency",
+                sanitized_report.get("metrics", {}).get(
+                    "feed_rejection_consistency",
+                    validation_state.get("feed_rejection_consistency", {}),
+                ),
             ),
         }
     )
