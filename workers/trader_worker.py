@@ -269,6 +269,24 @@ def _log_strategy_bottleneck_summary(validation_report: dict) -> None:
     )
 
 
+def _log_phase2_fine_tune_summary(validation_report: dict) -> None:
+    fine_tune = dict(validation_report.get("phase2_fine_tune", {}) or {})
+    if not fine_tune:
+        return
+    log_event(
+        "INFO",
+        (
+            "[phase2_fine_tune_summary] "
+            f"enabled={int(bool(fine_tune.get('fine_tune_enabled', False)))};"
+            f"target={str(fine_tune.get('fine_tune_target') or 'none')};"
+            f"applied={int(fine_tune.get('fine_tune_applied_count', 0) or 0)};"
+            f"blocked={int(fine_tune.get('fine_tune_blocked_count', 0) or 0)};"
+            f"last_guard={str(fine_tune.get('fine_tune_last_guard_reason') or 'none')};"
+            "paper_only=1"
+        ),
+    )
+
+
 def _log_macro_alert_summary(cycle_result: dict | None) -> None:
     payload = dict(cycle_result or {})
     alert = dict(payload.get("macro_alert", {}) or {})
@@ -553,6 +571,7 @@ def worker_loop() -> None:
             _log_signal_rejection_summary(validation_report, result.get("cycle_result", {}))
             _log_calibration_preview_summary(validation_report)
             _log_strategy_bottleneck_summary(validation_report)
+            _log_phase2_fine_tune_summary(validation_report)
             _log_macro_alert_summary(result.get("cycle_result", {}))
             _log_external_signal_summary(load_bot_state())
             _maybe_send_reporting_emails(validation_report, current_time=current_time)

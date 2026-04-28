@@ -591,6 +591,24 @@ A leitura separa gargalos como `SCORE_BELOW_MIN`, `RSI_OUT_OF_RANGE`, `TREND_NOT
 
 Use esta camada para entender por que `trend_pullback_breakout` esta rejeitando sinais antes de qualquer calibracao futura. Nenhuma calibracao e aplicada automaticamente.
 
+## Ajuste Fino Conservador - FASE 2
+
+A camada `Ajuste Fino FASE 2` aplica um unico relaxamento pequeno e reversivel no setup dominante `trend_pullback_breakout`: quando a unica falha e a confirmacao secundaria `breakout_not_confirmed`, o setup pode continuar elegivel se `breakout_20` estiver no maximo `0.005` abaixo de `breakout_min`.
+
+Este ajuste nao reduz `min_signal_score` global, nao altera ticket, nao aumenta posicoes, nao muda broker e nao ativa ordem real. Ele so pode aplicar quando todos os guards abaixo estao limpos:
+
+- broker e validacao em `PAPER`
+- feed operacional `LIVE` com provider conhecido
+- contexto diferente de `CRITICO`
+- macro alert inativo
+- trava diaria de perda liberada
+- limite de posicoes com espaco disponivel
+- score ajustado ja acima do minimo efetivo
+- tendencia, RSI, ATR, pullback e momentum primario/medio aprovados
+- unica rejeicao original igual a `breakout_not_confirmed`
+
+A auditoria aparece em `Trader`, `Controle do Bot`, estado compartilhado e logs `[phase2_fine_tune_summary]` com contadores de aplicado/bloqueado por guard.
+
 ## Watchlist padrao da validacao swing
 
 Para a fase atual de validacao swing em `paper trading`, a watchlist padrao foi consolidada para um escopo `CRYPTO ONLY` com cinco ativos:
