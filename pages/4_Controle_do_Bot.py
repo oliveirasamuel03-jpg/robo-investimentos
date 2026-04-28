@@ -589,6 +589,11 @@ strategy_bottleneck = dict(
     or state.get("strategy_bottleneck", {})
     or {}
 )
+phase2_fine_tune = dict(
+    validation_report.get("phase2_fine_tune")
+    or state.get("phase2_fine_tune", {})
+    or {}
+)
 rejection_top_reasons = rejection_quality.get("top_reasons", []) or []
 st.subheader("Qualidade de rejeicao de sinal")
 rej_c1, rej_c2, rej_c3, rej_c4 = st.columns(4)
@@ -717,6 +722,26 @@ if strategy_bottleneck:
         if items:
             st.caption(label)
             st.dataframe(pd.DataFrame(items), hide_index=True, use_container_width=True)
+if phase2_fine_tune:
+    st.subheader("Ajuste Fino FASE 2")
+    st.caption(
+        "Relaxamento pequeno, auditavel e reversivel. PAPER only; nao altera threshold global, "
+        "nao muda broker e nao remove guards."
+    )
+    fine_status = "Ativo" if bool(phase2_fine_tune.get("fine_tune_enabled", False)) else "Inativo"
+    ft_c1, ft_c2, ft_c3, ft_c4 = st.columns(4)
+    ft_c1.metric("Status", fine_status)
+    ft_c2.metric("Alvo", str(phase2_fine_tune.get("fine_tune_target") or "-"))
+    ft_c3.metric("Aplicado no ciclo", str(int(phase2_fine_tune.get("fine_tune_applied_count", 0) or 0)))
+    ft_c4.metric("Bloqueado por guard", str(int(phase2_fine_tune.get("fine_tune_blocked_count", 0) or 0)))
+    st.caption(f"Motivo: {phase2_fine_tune.get('fine_tune_reason') or 'Sem motivo registrado.'}")
+    st.caption(
+        f"Antes: {phase2_fine_tune.get('fine_tune_before') or '-'} | "
+        f"Depois: {phase2_fine_tune.get('fine_tune_after') or '-'}"
+    )
+    if phase2_fine_tune.get("fine_tune_last_guard_reason"):
+        st.caption(f"Ultimo guard acionado: {phase2_fine_tune.get('fine_tune_last_guard_reason')}")
+    st.caption("Observacao: PAPER only, reversivel e sem autoridade para ordem real.")
 
 val_actions1, val_actions2 = st.columns(2)
 with val_actions1:

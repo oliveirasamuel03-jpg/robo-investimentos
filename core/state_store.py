@@ -369,6 +369,16 @@ DEFAULT_STATE = {
         "recommendation": "observe_more",
         "reason": "No strategy bottleneck data yet.",
     },
+    "phase2_fine_tune": {
+        "fine_tune_enabled": True,
+        "fine_tune_reason": "Relaxamento conservador de confirmacao secundaria marginal em PAPER.",
+        "fine_tune_target": "trend_pullback_breakout_secondary_breakout_confirmation",
+        "fine_tune_before": "breakout_20 >= breakout_min",
+        "fine_tune_after": "breakout_20 >= breakout_min - 0.005, apenas com score minimo preservado e guards seguros",
+        "fine_tune_applied_count": 0,
+        "fine_tune_blocked_count": 0,
+        "fine_tune_last_guard_reason": "",
+    },
     "broker": {
         "provider": BROKER_PROVIDER,
         "mode": BROKER_MODE,
@@ -674,6 +684,19 @@ def load_bot_state() -> dict:
     if not strategy_bottleneck_state.get("reason"):
         strategy_bottleneck_state["reason"] = "No strategy bottleneck data yet."
     state["strategy_bottleneck"] = strategy_bottleneck_state
+    phase2_fine_tune_state = state.get("phase2_fine_tune", {}) or {}
+    phase2_fine_tune_state["fine_tune_enabled"] = bool(phase2_fine_tune_state.get("fine_tune_enabled", True))
+    for key, fallback in (
+        ("fine_tune_reason", "Relaxamento conservador de confirmacao secundaria marginal em PAPER."),
+        ("fine_tune_target", "trend_pullback_breakout_secondary_breakout_confirmation"),
+        ("fine_tune_before", "breakout_20 >= breakout_min"),
+        ("fine_tune_after", "breakout_20 >= breakout_min - 0.005, apenas com score minimo preservado e guards seguros"),
+        ("fine_tune_last_guard_reason", ""),
+    ):
+        phase2_fine_tune_state[key] = str(phase2_fine_tune_state.get(key) or fallback)
+    phase2_fine_tune_state["fine_tune_applied_count"] = int(phase2_fine_tune_state.get("fine_tune_applied_count", 0) or 0)
+    phase2_fine_tune_state["fine_tune_blocked_count"] = int(phase2_fine_tune_state.get("fine_tune_blocked_count", 0) or 0)
+    state["phase2_fine_tune"] = phase2_fine_tune_state
     retention_state = state.get("retention", {}) or {}
     retention_state["enabled"] = RETENTION_ENABLED
     retention_state["retention_days"] = RETENTION_DAYS

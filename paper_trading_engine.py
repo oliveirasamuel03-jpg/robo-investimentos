@@ -11,12 +11,14 @@ import pandas as pd
 import plotly.graph_objects as go
 
 from core.config import (
+    BROKER_MODE,
     LEGACY_VALIDATION_INITIAL_CAPITAL_BRL,
     MARKET_DATA_HISTORY_LIMIT,
     RUNTIME_DIR,
     SWING_VALIDATION_RECOMMENDED_WATCHLIST,
     VALIDATION_DEFAULT_MAX_OPEN_POSITIONS,
     VALIDATION_INITIAL_CAPITAL_BRL,
+    VALIDATION_TRADING_MODE,
     ensure_app_directories,
 )
 from core.market_context import apply_context_filter, get_market_context
@@ -49,6 +51,13 @@ PAPER_STATE_FILE = RUNTIME_DIR / "paper_state.json"
 PAPER_TRADES_FILE = RUNTIME_DIR / "paper_trades.json"
 PAPER_STATE_NAMESPACE = "paper_state"
 PAPER_TRADES_NAMESPACE = "paper_trades"
+# FASE 2: one reversible PAPER-only relaxation for marginal secondary breakout confirmation.
+PHASE2_FINE_TUNE_ENABLED = True
+PHASE2_FINE_TUNE_TARGET = "trend_pullback_breakout_secondary_breakout_confirmation"
+PHASE2_FINE_TUNE_REASON = "Relaxamento conservador de confirmacao secundaria marginal em PAPER."
+PHASE2_FINE_TUNE_BEFORE = "breakout_20 >= breakout_min"
+PHASE2_FINE_TUNE_AFTER = "breakout_20 >= breakout_min - 0.005, apenas com score minimo preservado e guards seguros"
+PHASE2_FINE_TUNE_BREAKOUT_BUFFER = 0.005
 
 
 @dataclass
@@ -480,6 +489,95 @@ def _evaluate_buy_signal(latest: pd.Series, config: PaperTradingConfig) -> dict[
     }
 
 
+def _phase2_fine_tune_default_summary() -> dict[str, Any]:
+    return {
+        "fine_tune_enabled": bool(PHASE2_FINE_TUNE_ENABLED),
+        "fine_tune_reason": PHASE2_FINE_TUNE_REASON,
+        "fine_tune_target": PHASE2_FINE_TUNE_TARGET,
+        "fine_tune_before": PHASE2_FINE_TUNE_BEFORE,
+        "fine_tune_after": PHASE2_FINE_TUNE_AFTER,
+        "fine_tune_applied_count": 0,
+        "fine_tune_blocked_count": 0,
+        "fine_tune_last_guard_reason": "",
+    }
+
+
+def _phase2_fine_tune_result(*, evaluated: bool = False, applied: bool = False, guard_reason: str = "") -> dict[str, Any]:
+    return {
+        "evaluated": bool(evaluated),
+        "applied": bool(applied),
+        "guard_reason": str(guard_reason or ""),
+        "reason": PHASE2_FINE_TUNE_REASON,
+        "target": PHASE2_FINE_TUNE_TARGET,
+        "before": PHASE2_FINE_TUNE_BEFORE,
+        "after": PHASE2_FINE_TUNE_AFTER,
+    }
+
+
+def _phase2_fine_tune_paper_guard() -> bool:
+    return str(BROKER_MODE or "paper").strip().lower() == "paper" and str(VALIDATION_TRADING_MODE).strip().lower() == "paper"
+
+
+def _evaluate_phase2_secondary_confirmation_fine_tune(
+    *,
+    latest: pd.Series,
+    evaluation: dict[str, Any],
+    adjusted_score: float,
+    effective_min_signal_score: float,
+    data_source: str,
+    provider_effective: str,
+    context_status: str,
+    context_blocked: bool,
+    macro_alert_active: bool,
+    daily_loss_block_active: bool,
+    slots_left: int,
+    config: PaperTradingConfig,
+) -> dict[str, Any]:
+    if not PHASE2_FINE_TUNE_ENABLED:
+        return _phase2_fine_tune_result()
+
+    original_reasons = list(evaluation.get("rejection_reasons", []) or [])
+    if "breakout_not_confirmed" not in original_reasons:
+        return _phase2_fine_tune_result()
+
+    if set(original_reasons) != {"breakout_not_confirmed"}:
+        return _phase2_fine_tune_result(evaluated=True, guard_reason="other_rejection_reasons_present")
+    if not _phase2_fine_tune_paper_guard():
+        return _phase2_fine_tune_result(evaluated=True, guard_reason="paper_mode_not_confirmed")
+    normalized_source = str(data_source or "").strip().lower()
+    normalized_provider = str(provider_effective or "").strip().lower()
+    if (
+        not _is_live_market_source(data_source)
+        or normalized_source in {"", "fallback", "unknown"}
+        or normalized_provider in {"", "fallback", "synthetic", "unknown"}
+    ):
+        return _phase2_fine_tune_result(evaluated=True, guard_reason="feed_not_live_or_provider_unknown")
+    if str(context_status or "").upper() == "CRITICO" or bool(context_blocked):
+        return _phase2_fine_tune_result(evaluated=True, guard_reason="context_not_safe")
+    if bool(macro_alert_active):
+        return _phase2_fine_tune_result(evaluated=True, guard_reason="macro_alert_active")
+    if bool(daily_loss_block_active):
+        return _phase2_fine_tune_result(evaluated=True, guard_reason="daily_loss_guard_active")
+    if int(slots_left or 0) <= 0:
+        return _phase2_fine_tune_result(evaluated=True, guard_reason="position_limit_reached")
+    if float(adjusted_score) < float(effective_min_signal_score):
+        return _phase2_fine_tune_result(evaluated=True, guard_reason="score_below_required_minimum")
+
+    primary_checks_ok = all(
+        bool(evaluation.get(key, False))
+        for key in ("trend_ok", "score_ok", "rsi_ok", "atr_ok", "pullback_ok", "momentum_short_ok", "momentum_medium_ok")
+    )
+    if not primary_checks_ok:
+        return _phase2_fine_tune_result(evaluated=True, guard_reason="primary_checks_not_clean")
+
+    breakout_20 = float(latest.get("breakout_20", 0.0) or 0.0)
+    relaxed_breakout_min = float(config.breakout_min) - float(PHASE2_FINE_TUNE_BREAKOUT_BUFFER)
+    if breakout_20 < relaxed_breakout_min:
+        return _phase2_fine_tune_result(evaluated=True, guard_reason="breakout_too_far_from_threshold")
+
+    return _phase2_fine_tune_result(evaluated=True, applied=True)
+
+
 def _should_buy(latest: pd.Series, config: PaperTradingConfig) -> tuple[bool, float]:
     evaluation = _evaluate_buy_signal(latest, config)
     return bool(evaluation["buy"]), float(evaluation["score"])
@@ -672,7 +770,9 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[s
             "schedule_blocked": 0,
         },
         "rejection_events": [],
+        "phase2_fine_tune": _phase2_fine_tune_default_summary(),
     }
+    phase2_fine_tune = cycle_validation["phase2_fine_tune"]
     rejection_events: list[dict[str, Any]] = []
 
     open_positions = dict(state.get("positions", {}) or {})
@@ -799,6 +899,7 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[s
 
         latest = data.iloc[-1]
         data_source = _frame_data_source(data)
+        provider_effective = str(latest.get("provider_name", "unknown") or "unknown").strip().lower()
         evaluation = _evaluate_buy_signal(latest, config)
         should_buy = bool(evaluation["buy"])
         score = float(evaluation["score"])
@@ -853,6 +954,33 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[s
             if macro_reason_code not in evaluation["rejection_reasons"]:
                 evaluation["rejection_reasons"] = [*evaluation["rejection_reasons"], macro_reason_code]
 
+        fine_tune_result = _evaluate_phase2_secondary_confirmation_fine_tune(
+            latest=latest,
+            evaluation=evaluation,
+            adjusted_score=adjusted_score,
+            effective_min_signal_score=effective_min_signal_score,
+            data_source=data_source,
+            provider_effective=provider_effective,
+            context_status=str(context_filter["context_status"]),
+            context_blocked=bool(context_filter["blocked"]),
+            macro_alert_active=bool(macro_alert.get("macro_alert_active", False)),
+            daily_loss_block_active=daily_loss_block_active,
+            slots_left=slots_left,
+            config=config,
+        )
+        if bool(fine_tune_result.get("evaluated")):
+            if bool(fine_tune_result.get("applied")):
+                should_buy = True
+                evaluation["rejection_reasons"] = [
+                    reason for reason in list(evaluation.get("rejection_reasons", []) or []) if reason != "breakout_not_confirmed"
+                ]
+                phase2_fine_tune["fine_tune_applied_count"] = int(phase2_fine_tune.get("fine_tune_applied_count", 0) or 0) + 1
+            else:
+                phase2_fine_tune["fine_tune_blocked_count"] = int(phase2_fine_tune.get("fine_tune_blocked_count", 0) or 0) + 1
+                phase2_fine_tune["fine_tune_last_guard_reason"] = str(fine_tune_result.get("guard_reason") or "")
+        else:
+            fine_tune_result = _phase2_fine_tune_result()
+
         signal_key = _signal_snapshot_key(asset, latest, data_source)
         signal_timestamp = ""
         raw_datetime = latest.get("datetime")
@@ -877,6 +1005,7 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[s
             "raw_score": score,
             "buy": should_buy,
             "data_source": data_source,
+            "provider_effective": provider_effective,
             "signal_key": signal_key,
             "strategy_name": DEFAULT_STRATEGY_NAME,
             "trend_ok": bool(evaluation["trend_ok"]),
@@ -901,6 +1030,12 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[s
             "macro_alert_penalty": float(macro_filter.get("penalty", 0.0) or 0.0),
             "macro_alert_reason": str(macro_filter.get("reason") or ""),
             "macro_setup_family": str(macro_filter.get("setup_family") or ""),
+            "fine_tune_applied": bool(fine_tune_result.get("applied", False)),
+            "fine_tune_reason": str(fine_tune_result.get("reason") or ""),
+            "fine_tune_target": str(fine_tune_result.get("target") or ""),
+            "fine_tune_before": str(fine_tune_result.get("before") or ""),
+            "fine_tune_after": str(fine_tune_result.get("after") or ""),
+            "fine_tune_guard_reason": str(fine_tune_result.get("guard_reason") or ""),
         }
         signals.append(signal)
         cycle_validation["signals_total"] = int(cycle_validation["signals_total"]) + 1
@@ -1013,6 +1148,7 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[s
     state["run_count"] = int(state.get("run_count", 0)) + 1
     state["updated_at"] = _utc_now_iso()
     state["equity"] = _portfolio_equity(state)
+    state["phase2_fine_tune"] = phase2_fine_tune
 
     history = state.get("history", []) or []
     history.append(
@@ -1055,4 +1191,5 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[s
         "market_context": market_context,
         "macro_alert": macro_alert,
         "validation_cycle": cycle_validation,
+        "phase2_fine_tune": phase2_fine_tune,
     }

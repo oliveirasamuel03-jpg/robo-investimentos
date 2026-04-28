@@ -364,6 +364,21 @@ def _strategy_bottleneck_summary(validation_report: dict[str, Any]) -> str:
     )
 
 
+def _phase2_fine_tune_summary(validation_report: dict[str, Any]) -> str:
+    fine_tune = dict(validation_report.get("phase2_fine_tune", {}) or {})
+    if not fine_tune:
+        return "Phase 2 fine tune: no audit data yet. PAPER only; no global threshold was changed."
+    if not bool(fine_tune.get("fine_tune_enabled", False)):
+        return "Phase 2 fine tune: inactive. PAPER only; no global threshold was changed."
+    applied = int(fine_tune.get("fine_tune_applied_count", 0) or 0)
+    blocked = int(fine_tune.get("fine_tune_blocked_count", 0) or 0)
+    target = _safe_text(fine_tune.get("fine_tune_target"), fallback="secondary_confirmation")
+    return (
+        f"Phase 2 fine tune: target={target}; applied={applied}; blocked_by_guard={blocked}. "
+        "PAPER only; no global min score, broker, or real execution path was changed."
+    )
+
+
 def _short_audit_summary(state: dict[str, Any], validation_report: dict[str, Any]) -> str:
     market_state = dict(state.get("market_data", {}) or {})
     rejection_quality = dict(validation_report.get("rejection_quality", {}) or {})
@@ -430,6 +445,7 @@ def _build_daily_email_body(state: dict[str, Any], validation_report: dict[str, 
     multi_timeframe_summary = _multi_timeframe_summary(validation_report)
     calibration_preview_summary = _calibration_preview_summary(validation_report)
     strategy_bottleneck_summary = _strategy_bottleneck_summary(validation_report)
+    phase2_fine_tune_summary = _phase2_fine_tune_summary(validation_report)
     short_audit_summary = _short_audit_summary(state, validation_report)
     feed_rejection_diag = dict(validation_report.get("feed_rejection_consistency", {}) or {})
     feed_rejection_note = _safe_text(
@@ -450,6 +466,7 @@ def _build_daily_email_body(state: dict[str, Any], validation_report: dict[str, 
         f"Composite score summary: {composite_summary}",
         calibration_preview_summary,
         strategy_bottleneck_summary,
+        phase2_fine_tune_summary,
         f"Multi-timeframe summary: {multi_timeframe_summary}",
         "",
         "Signal pipeline:",
