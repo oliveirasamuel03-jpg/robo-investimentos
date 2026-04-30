@@ -609,6 +609,32 @@ Este ajuste nao reduz `min_signal_score` global, nao altera ticket, nao aumenta 
 
 A auditoria aparece em `Trader`, `Controle do Bot`, estado compartilhado e logs `[phase2_fine_tune_summary]` com contadores de aplicado/bloqueado por guard.
 
+### Ajuste Fino FASE 2.1
+
+A camada `phase2_multi_minor_confirmation_fine_tune` cobre o caso observado no ciclo limpo: sinais quase elegiveis com pequenas falhas combinadas de confirmacao secundaria, momentum e score muito proximo do minimo.
+
+Ela so atua no setup `trend_pullback_breakout` e apenas quando os motivos de rejeicao estao restritos a:
+
+- `breakout_not_confirmed`
+- `confidence_too_low`
+- `score_below_minimum`
+
+Guards obrigatorios:
+
+- `PAPER` confirmado e broker real sem autoridade
+- feed operacional `LIVE`
+- provider efetivo `twelvedata` ou `mixed`
+- fallback atual igual a `0`
+- contexto diferente de `CRITICO`
+- macro alert inativo
+- trava diaria de perda liberada
+- posicoes abertas abaixo do limite
+- score gap no maximo `0.015`
+- tendencia, RSI, ATR e pullback limpos
+- breakout e momentum apenas marginalmente abaixo dos limites
+
+Se qualquer falha primaria aparecer, como `trend_not_confirmed`, `reversal_not_eligible`, `volatility_out_of_range`, feed fallback, contexto critico, daily risk ativo ou limite de posicao atingido, o ajuste fica bloqueado. A auditoria aparece como `Ajuste Fino FASE 2.1`, nos logs `[phase2_1_fine_tune_summary]`, `[phase2_1_fine_tune_applied]` e `[phase2_1_fine_tune_blocked]`.
+
 ## Watchlist padrao da validacao swing
 
 Para a fase atual de validacao swing em `paper trading`, a watchlist padrao foi consolidada para um escopo `CRYPTO ONLY` com cinco ativos:

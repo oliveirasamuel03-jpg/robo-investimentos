@@ -1285,6 +1285,12 @@ phase2_fine_tune = dict(
     or state.get("phase2_fine_tune", {})
     or {}
 )
+phase2_1_fine_tune = dict(
+    validation_last_report.get("phase2_1_fine_tune")
+    or current_audit_state.get("phase2_1_fine_tune", {})
+    or state.get("phase2_1_fine_tune", {})
+    or {}
+)
 daily_loss_limit_brl = float(risk_state.get("daily_loss_limit_brl", 0.0) or 0.0)
 daily_loss_consumed_brl = float(risk_state.get("daily_loss_consumed_brl", 0.0) or 0.0)
 daily_loss_remaining_brl = float(risk_state.get("daily_loss_remaining_brl", 0.0) or 0.0)
@@ -1959,6 +1965,33 @@ if phase2_fine_tune:
     if phase2_fine_tune.get("fine_tune_last_guard_reason"):
         st.caption(f"Ultimo guard acionado: {phase2_fine_tune.get('fine_tune_last_guard_reason')}")
     st.caption("Observacao: ajuste PAPER only, reversivel e sem autoridade para ordem real.")
+if phase2_1_fine_tune:
+    st.markdown("#### Ajuste Fino FASE 2.1")
+    st.caption(
+        "Ajuste conservador para multiplas falhas pequenas de momentum/confirmacao secundaria. "
+        "PAPER only, reversivel, sem ordem real e sem reducao global de score."
+    )
+    ft21_status = "Ativo" if bool(phase2_1_fine_tune.get("phase2_1_fine_tune_enabled", False)) else "Inativo"
+    ft21_gap = phase2_1_fine_tune.get("phase2_1_fine_tune_score_gap")
+    ft21_gap_label = "-" if ft21_gap is None else f"{float(ft21_gap):.4f}"
+    ft21_c1, ft21_c2, ft21_c3, ft21_c4 = st.columns(4)
+    ft21_c1.metric("Status", ft21_status)
+    ft21_c2.metric("Alvo", str(phase2_1_fine_tune.get("phase2_1_fine_tune_target") or "-"))
+    ft21_c3.metric("Aplicado no ciclo", str(int(phase2_1_fine_tune.get("phase2_1_fine_tune_applied_count", 0) or 0)))
+    ft21_c4.metric("Bloqueado no ciclo", str(int(phase2_1_fine_tune.get("phase2_1_fine_tune_blocked_count", 0) or 0)))
+    st.caption(
+        f"Ultima decisao: {phase2_1_fine_tune.get('phase2_1_fine_tune_last_decision') or '-'} | "
+        f"Ultimo guard: {phase2_1_fine_tune.get('phase2_1_fine_tune_last_guard') or '-'} | "
+        f"Score gap: {ft21_gap_label}"
+    )
+    st.caption(
+        "Motivos permitidos: "
+        f"{symbol_list_label(phase2_1_fine_tune.get('phase2_1_fine_tune_allowed_reasons'))} | "
+        "Motivos bloqueadores: "
+        f"{symbol_list_label(phase2_1_fine_tune.get('phase2_1_fine_tune_blocked_reasons'))}"
+    )
+    st.caption(f"Motivo: {phase2_1_fine_tune.get('phase2_1_fine_tune_reason') or 'Sem motivo registrado.'}")
+    st.caption("Observacao: nao altera min_signal_score global, broker, webhook, FASE 3 ou execucao real.")
 
 perf_chart_left, perf_chart_right = st.columns(2)
 with perf_chart_left:

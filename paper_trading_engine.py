@@ -44,6 +44,7 @@ from core.signal_rejection_analysis import (
     build_signal_rejection_events,
     summarize_rejection_events,
 )
+from core.state_store import log_event
 from core.trader_reports import append_trade_report, build_closed_trade_report
 
 
@@ -58,6 +59,14 @@ PHASE2_FINE_TUNE_REASON = "Relaxamento conservador de confirmacao secundaria mar
 PHASE2_FINE_TUNE_BEFORE = "breakout_20 >= breakout_min"
 PHASE2_FINE_TUNE_AFTER = "breakout_20 >= breakout_min - 0.005, apenas com score minimo preservado e guards seguros"
 PHASE2_FINE_TUNE_BREAKOUT_BUFFER = 0.005
+PHASE2_1_FINE_TUNE_ENABLED = True
+PHASE2_1_FINE_TUNE_TARGET = "trend_pullback_breakout_multi_minor_confirmation"
+PHASE2_1_FINE_TUNE_REASON = "Relaxamento conservador de multiplas falhas pequenas de momentum/confirmacao secundaria em PAPER."
+PHASE2_1_FINE_TUNE_SCORE_GAP_MAX = 0.015
+PHASE2_1_FINE_TUNE_BREAKOUT_BUFFER = 0.005
+PHASE2_1_FINE_TUNE_MOMENTUM_BUFFER = 0.003
+PHASE2_1_FINE_TUNE_MOMENTUM_8_BUFFER = 0.006
+PHASE2_1_FINE_TUNE_ALLOWED_REASONS = {"breakout_not_confirmed", "confidence_too_low", "score_below_minimum"}
 
 
 @dataclass
@@ -578,6 +587,223 @@ def _evaluate_phase2_secondary_confirmation_fine_tune(
     return _phase2_fine_tune_result(evaluated=True, applied=True)
 
 
+def _phase2_1_fine_tune_default_summary() -> dict[str, Any]:
+    return {
+        "phase2_1_fine_tune_enabled": bool(PHASE2_1_FINE_TUNE_ENABLED),
+        "phase2_1_fine_tune_target": PHASE2_1_FINE_TUNE_TARGET,
+        "phase2_1_fine_tune_reason": PHASE2_1_FINE_TUNE_REASON,
+        "phase2_1_fine_tune_applied_count": 0,
+        "phase2_1_fine_tune_blocked_count": 0,
+        "phase2_1_fine_tune_last_guard": "",
+        "phase2_1_fine_tune_last_decision": "",
+        "phase2_1_fine_tune_score_gap": None,
+        "phase2_1_fine_tune_allowed_reasons": [],
+        "phase2_1_fine_tune_blocked_reasons": [],
+    }
+
+
+def _phase2_1_fine_tune_result(
+    *,
+    evaluated: bool = False,
+    applied: bool = False,
+    guard_reason: str = "",
+    decision: str = "not_evaluated",
+    score_gap: float | None = None,
+    allowed_reasons: list[str] | None = None,
+    blocked_reasons: list[str] | None = None,
+) -> dict[str, Any]:
+    return {
+        "evaluated": bool(evaluated),
+        "applied": bool(applied),
+        "guard_reason": str(guard_reason or ""),
+        "decision": str(decision or ("applied" if applied else "blocked" if evaluated else "not_evaluated")),
+        "score_gap": None if score_gap is None else round(float(score_gap), 6),
+        "allowed_reasons": list(allowed_reasons or []),
+        "blocked_reasons": list(blocked_reasons or []),
+        "reason": PHASE2_1_FINE_TUNE_REASON,
+        "target": PHASE2_1_FINE_TUNE_TARGET,
+    }
+
+
+def _evaluate_phase2_1_multi_minor_confirmation_fine_tune(
+    *,
+    latest: pd.Series,
+    evaluation: dict[str, Any],
+    adjusted_score: float,
+    effective_min_signal_score: float,
+    data_source: str,
+    provider_effective: str,
+    context_status: str,
+    context_blocked: bool,
+    macro_alert_active: bool,
+    daily_loss_block_active: bool,
+    slots_left: int,
+    fallback_current_count: int,
+    setup_name: str,
+    config: PaperTradingConfig,
+) -> dict[str, Any]:
+    if not PHASE2_1_FINE_TUNE_ENABLED:
+        return _phase2_1_fine_tune_result()
+
+    original_reasons = sorted(set(str(reason) for reason in list(evaluation.get("rejection_reasons", []) or []) if str(reason)))
+    allowed_reasons = sorted(set(original_reasons).intersection(PHASE2_1_FINE_TUNE_ALLOWED_REASONS))
+    blocked_reasons = sorted(set(original_reasons).difference(PHASE2_1_FINE_TUNE_ALLOWED_REASONS))
+    if str(setup_name or "").strip() != DEFAULT_STRATEGY_NAME:
+        return _phase2_1_fine_tune_result()
+    if len(original_reasons) < 2 or not allowed_reasons:
+        return _phase2_1_fine_tune_result()
+
+    score_gap = max(0.0, float(effective_min_signal_score) - float(adjusted_score))
+    if blocked_reasons:
+        return _phase2_1_fine_tune_result(
+            evaluated=True,
+            guard_reason="primary_or_critical_rejection_present",
+            decision="blocked",
+            score_gap=score_gap,
+            allowed_reasons=allowed_reasons,
+            blocked_reasons=blocked_reasons,
+        )
+    if not _phase2_fine_tune_paper_guard():
+        return _phase2_1_fine_tune_result(
+            evaluated=True,
+            guard_reason="paper_mode_not_confirmed",
+            decision="blocked",
+            score_gap=score_gap,
+            allowed_reasons=allowed_reasons,
+        )
+
+    normalized_source = str(data_source or "").strip().lower()
+    normalized_provider = str(provider_effective or "").strip().lower()
+    if (
+        not _is_live_market_source(data_source)
+        or normalized_source in {"", "fallback", "unknown"}
+        or normalized_provider not in {"twelvedata", "mixed"}
+        or int(fallback_current_count or 0) > 0
+    ):
+        return _phase2_1_fine_tune_result(
+            evaluated=True,
+            guard_reason="feed_or_provider_not_safe",
+            decision="blocked",
+            score_gap=score_gap,
+            allowed_reasons=allowed_reasons,
+        )
+    if str(context_status or "").upper() == "CRITICO" or bool(context_blocked):
+        return _phase2_1_fine_tune_result(
+            evaluated=True,
+            guard_reason="context_not_safe",
+            decision="blocked",
+            score_gap=score_gap,
+            allowed_reasons=allowed_reasons,
+        )
+    if bool(macro_alert_active):
+        return _phase2_1_fine_tune_result(
+            evaluated=True,
+            guard_reason="macro_alert_active",
+            decision="blocked",
+            score_gap=score_gap,
+            allowed_reasons=allowed_reasons,
+        )
+    if bool(daily_loss_block_active):
+        return _phase2_1_fine_tune_result(
+            evaluated=True,
+            guard_reason="daily_loss_guard_active",
+            decision="blocked",
+            score_gap=score_gap,
+            allowed_reasons=allowed_reasons,
+        )
+    if int(slots_left or 0) <= 0:
+        return _phase2_1_fine_tune_result(
+            evaluated=True,
+            guard_reason="position_limit_reached",
+            decision="blocked",
+            score_gap=score_gap,
+            allowed_reasons=allowed_reasons,
+        )
+    if score_gap > float(PHASE2_1_FINE_TUNE_SCORE_GAP_MAX):
+        return _phase2_1_fine_tune_result(
+            evaluated=True,
+            guard_reason="score_gap_too_large",
+            decision="blocked",
+            score_gap=score_gap,
+            allowed_reasons=allowed_reasons,
+        )
+
+    primary_checks_ok = all(bool(evaluation.get(key, False)) for key in ("trend_ok", "rsi_ok", "atr_ok", "pullback_ok"))
+    if not primary_checks_ok or str(evaluation.get("trend_alignment") or "").lower() == "countertrend":
+        return _phase2_1_fine_tune_result(
+            evaluated=True,
+            guard_reason="primary_checks_not_clean",
+            decision="blocked",
+            score_gap=score_gap,
+            allowed_reasons=allowed_reasons,
+        )
+
+    if "breakout_not_confirmed" in original_reasons:
+        breakout_20 = float(latest.get("breakout_20", 0.0) or 0.0)
+        relaxed_breakout_min = float(config.breakout_min) - float(PHASE2_1_FINE_TUNE_BREAKOUT_BUFFER)
+        if breakout_20 < relaxed_breakout_min:
+            return _phase2_1_fine_tune_result(
+                evaluated=True,
+                guard_reason="breakout_gap_too_large",
+                decision="blocked",
+                score_gap=score_gap,
+                allowed_reasons=allowed_reasons,
+            )
+    if "confidence_too_low" in original_reasons:
+        momentum = float(latest.get("momentum", 0.0) or 0.0)
+        momentum_8 = float(latest.get("momentum_8", 0.0) or 0.0)
+        short_floor = float(config.momentum_min) - float(PHASE2_1_FINE_TUNE_MOMENTUM_BUFFER)
+        medium_floor = float(config.momentum_8_min) - float(PHASE2_1_FINE_TUNE_MOMENTUM_8_BUFFER)
+        if momentum < short_floor or momentum_8 < medium_floor:
+            return _phase2_1_fine_tune_result(
+                evaluated=True,
+                guard_reason="momentum_gap_too_large",
+                decision="blocked",
+                score_gap=score_gap,
+                allowed_reasons=allowed_reasons,
+            )
+
+    return _phase2_1_fine_tune_result(
+        evaluated=True,
+        applied=True,
+        decision="applied",
+        score_gap=score_gap,
+        allowed_reasons=allowed_reasons,
+    )
+
+
+def _record_phase2_1_fine_tune_event(
+    *,
+    asset: str,
+    setup_name: str,
+    score: float,
+    min_score: float,
+    result: dict[str, Any],
+) -> None:
+    if not bool(result.get("evaluated")):
+        return
+    prefix = "[phase2_1_fine_tune_applied]" if bool(result.get("applied")) else "[phase2_1_fine_tune_blocked]"
+    try:
+        log_event(
+            "INFO",
+            (
+                f"{prefix} "
+                f"symbol={str(asset).upper()};"
+                f"setup={setup_name};"
+                f"score={float(score):.4f};"
+                f"min_score={float(min_score):.4f};"
+                f"score_gap={float(result.get('score_gap') or 0.0):.4f};"
+                f"allowed={','.join(result.get('allowed_reasons', []) or []) or 'none'};"
+                f"blocked={','.join(result.get('blocked_reasons', []) or []) or 'none'};"
+                f"guard={str(result.get('guard_reason') or 'none')};"
+                f"decision={str(result.get('decision') or 'not_evaluated')};"
+                "paper_only=1"
+            ),
+        )
+    except Exception:
+        return
+
+
 def _should_buy(latest: pd.Series, config: PaperTradingConfig) -> tuple[bool, float]:
     evaluation = _evaluate_buy_signal(latest, config)
     return bool(evaluation["buy"]), float(evaluation["score"])
@@ -771,8 +997,10 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[s
         },
         "rejection_events": [],
         "phase2_fine_tune": _phase2_fine_tune_default_summary(),
+        "phase2_1_fine_tune": _phase2_1_fine_tune_default_summary(),
     }
     phase2_fine_tune = cycle_validation["phase2_fine_tune"]
+    phase2_1_fine_tune = cycle_validation["phase2_1_fine_tune"]
     rejection_events: list[dict[str, Any]] = []
 
     open_positions = dict(state.get("positions", {}) or {})
@@ -981,6 +1209,54 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[s
         else:
             fine_tune_result = _phase2_fine_tune_result()
 
+        source_breakdown = dict(market_data_status.get("source_breakdown", {}) or {})
+        fallback_current_count = int(source_breakdown.get("fallback", 0) or 0)
+        phase2_1_result = _phase2_1_fine_tune_result()
+        if not should_buy:
+            phase2_1_result = _evaluate_phase2_1_multi_minor_confirmation_fine_tune(
+                latest=latest,
+                evaluation=evaluation,
+                adjusted_score=adjusted_score,
+                effective_min_signal_score=effective_min_signal_score,
+                data_source=data_source,
+                provider_effective=provider_effective,
+                context_status=str(context_filter["context_status"]),
+                context_blocked=bool(context_filter["blocked"]),
+                macro_alert_active=bool(macro_alert.get("macro_alert_active", False)),
+                daily_loss_block_active=daily_loss_block_active,
+                slots_left=slots_left,
+                fallback_current_count=fallback_current_count,
+                setup_name=DEFAULT_STRATEGY_NAME,
+                config=config,
+            )
+            if bool(phase2_1_result.get("evaluated")):
+                phase2_1_fine_tune["phase2_1_fine_tune_last_guard"] = str(phase2_1_result.get("guard_reason") or "")
+                phase2_1_fine_tune["phase2_1_fine_tune_last_decision"] = str(phase2_1_result.get("decision") or "")
+                phase2_1_fine_tune["phase2_1_fine_tune_score_gap"] = phase2_1_result.get("score_gap")
+                phase2_1_fine_tune["phase2_1_fine_tune_allowed_reasons"] = list(phase2_1_result.get("allowed_reasons", []) or [])
+                phase2_1_fine_tune["phase2_1_fine_tune_blocked_reasons"] = list(phase2_1_result.get("blocked_reasons", []) or [])
+                if bool(phase2_1_result.get("applied")):
+                    should_buy = True
+                    evaluation["rejection_reasons"] = [
+                        reason
+                        for reason in list(evaluation.get("rejection_reasons", []) or [])
+                        if reason not in PHASE2_1_FINE_TUNE_ALLOWED_REASONS
+                    ]
+                    phase2_1_fine_tune["phase2_1_fine_tune_applied_count"] = (
+                        int(phase2_1_fine_tune.get("phase2_1_fine_tune_applied_count", 0) or 0) + 1
+                    )
+                else:
+                    phase2_1_fine_tune["phase2_1_fine_tune_blocked_count"] = (
+                        int(phase2_1_fine_tune.get("phase2_1_fine_tune_blocked_count", 0) or 0) + 1
+                    )
+                _record_phase2_1_fine_tune_event(
+                    asset=asset,
+                    setup_name=DEFAULT_STRATEGY_NAME,
+                    score=adjusted_score,
+                    min_score=effective_min_signal_score,
+                    result=phase2_1_result,
+                )
+
         signal_key = _signal_snapshot_key(asset, latest, data_source)
         signal_timestamp = ""
         raw_datetime = latest.get("datetime")
@@ -1036,6 +1312,14 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[s
             "fine_tune_before": str(fine_tune_result.get("before") or ""),
             "fine_tune_after": str(fine_tune_result.get("after") or ""),
             "fine_tune_guard_reason": str(fine_tune_result.get("guard_reason") or ""),
+            "phase2_1_fine_tune_applied": bool(phase2_1_result.get("applied", False)),
+            "phase2_1_fine_tune_reason": str(phase2_1_result.get("reason") or ""),
+            "phase2_1_fine_tune_target": str(phase2_1_result.get("target") or ""),
+            "phase2_1_fine_tune_guard": str(phase2_1_result.get("guard_reason") or ""),
+            "phase2_1_fine_tune_decision": str(phase2_1_result.get("decision") or ""),
+            "phase2_1_fine_tune_score_gap": phase2_1_result.get("score_gap"),
+            "phase2_1_fine_tune_allowed_reasons": list(phase2_1_result.get("allowed_reasons", []) or []),
+            "phase2_1_fine_tune_blocked_reasons": list(phase2_1_result.get("blocked_reasons", []) or []),
         }
         signals.append(signal)
         cycle_validation["signals_total"] = int(cycle_validation["signals_total"]) + 1
@@ -1149,6 +1433,7 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[s
     state["updated_at"] = _utc_now_iso()
     state["equity"] = _portfolio_equity(state)
     state["phase2_fine_tune"] = phase2_fine_tune
+    state["phase2_1_fine_tune"] = phase2_1_fine_tune
 
     history = state.get("history", []) or []
     history.append(
@@ -1192,4 +1477,5 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[s
         "macro_alert": macro_alert,
         "validation_cycle": cycle_validation,
         "phase2_fine_tune": phase2_fine_tune,
+        "phase2_1_fine_tune": phase2_1_fine_tune,
     }
