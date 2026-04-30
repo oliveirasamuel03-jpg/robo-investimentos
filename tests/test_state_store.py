@@ -46,6 +46,10 @@ def test_state_store_bootstraps_files_and_defaults(isolated_storage):
     assert state["phase2_fine_tune"]["fine_tune_target"] == "trend_pullback_breakout_secondary_breakout_confirmation"
     assert state["phase2_fine_tune"]["fine_tune_applied_count"] == 0
     assert state["phase2_fine_tune"]["fine_tune_blocked_count"] == 0
+    assert state["phase2_1_fine_tune"]["phase2_1_fine_tune_enabled"] is True
+    assert state["phase2_1_fine_tune"]["phase2_1_fine_tune_target"] == "trend_pullback_breakout_multi_minor_confirmation"
+    assert state["phase2_1_fine_tune"]["phase2_1_fine_tune_applied_count"] == 0
+    assert state["phase2_1_fine_tune"]["phase2_1_fine_tune_blocked_count"] == 0
     assert state["risk"]["daily_loss_block_active"] is False
     assert state["risk"]["daily_loss_limit_brl"] == config.DAILY_LOSS_LIMIT_BRL_DEFAULT
     assert state["retention"]["retention_days"] == config.RETENTION_DAYS

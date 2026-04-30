@@ -379,6 +379,18 @@ DEFAULT_STATE = {
         "fine_tune_blocked_count": 0,
         "fine_tune_last_guard_reason": "",
     },
+    "phase2_1_fine_tune": {
+        "phase2_1_fine_tune_enabled": True,
+        "phase2_1_fine_tune_target": "trend_pullback_breakout_multi_minor_confirmation",
+        "phase2_1_fine_tune_reason": "Relaxamento conservador de multiplas falhas pequenas de momentum/confirmacao secundaria em PAPER.",
+        "phase2_1_fine_tune_applied_count": 0,
+        "phase2_1_fine_tune_blocked_count": 0,
+        "phase2_1_fine_tune_last_guard": "",
+        "phase2_1_fine_tune_last_decision": "",
+        "phase2_1_fine_tune_score_gap": None,
+        "phase2_1_fine_tune_allowed_reasons": [],
+        "phase2_1_fine_tune_blocked_reasons": [],
+    },
     "broker": {
         "provider": BROKER_PROVIDER,
         "mode": BROKER_MODE,
@@ -697,6 +709,33 @@ def load_bot_state() -> dict:
     phase2_fine_tune_state["fine_tune_applied_count"] = int(phase2_fine_tune_state.get("fine_tune_applied_count", 0) or 0)
     phase2_fine_tune_state["fine_tune_blocked_count"] = int(phase2_fine_tune_state.get("fine_tune_blocked_count", 0) or 0)
     state["phase2_fine_tune"] = phase2_fine_tune_state
+    phase2_1_state = state.get("phase2_1_fine_tune", {}) or {}
+    phase2_1_state["phase2_1_fine_tune_enabled"] = bool(phase2_1_state.get("phase2_1_fine_tune_enabled", True))
+    for key, fallback in (
+        ("phase2_1_fine_tune_target", "trend_pullback_breakout_multi_minor_confirmation"),
+        ("phase2_1_fine_tune_reason", "Relaxamento conservador de multiplas falhas pequenas de momentum/confirmacao secundaria em PAPER."),
+        ("phase2_1_fine_tune_last_guard", ""),
+        ("phase2_1_fine_tune_last_decision", ""),
+    ):
+        phase2_1_state[key] = str(phase2_1_state.get(key) or fallback)
+    phase2_1_state["phase2_1_fine_tune_applied_count"] = int(
+        phase2_1_state.get("phase2_1_fine_tune_applied_count", 0) or 0
+    )
+    phase2_1_state["phase2_1_fine_tune_blocked_count"] = int(
+        phase2_1_state.get("phase2_1_fine_tune_blocked_count", 0) or 0
+    )
+    score_gap = phase2_1_state.get("phase2_1_fine_tune_score_gap")
+    try:
+        phase2_1_state["phase2_1_fine_tune_score_gap"] = None if score_gap in (None, "") else float(score_gap or 0.0)
+    except (TypeError, ValueError):
+        phase2_1_state["phase2_1_fine_tune_score_gap"] = None
+    phase2_1_state["phase2_1_fine_tune_allowed_reasons"] = [
+        str(item) for item in list(phase2_1_state.get("phase2_1_fine_tune_allowed_reasons", []) or [])
+    ][:10]
+    phase2_1_state["phase2_1_fine_tune_blocked_reasons"] = [
+        str(item) for item in list(phase2_1_state.get("phase2_1_fine_tune_blocked_reasons", []) or [])
+    ][:10]
+    state["phase2_1_fine_tune"] = phase2_1_state
     retention_state = state.get("retention", {}) or {}
     retention_state["enabled"] = RETENTION_ENABLED
     retention_state["retention_days"] = RETENTION_DAYS

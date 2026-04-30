@@ -906,6 +906,7 @@ def _build_operational_consistency(
     calibration_preview = dict(state.get("calibration_preview", {}) or default_calibration_preview_state())
     strategy_bottleneck = dict(state.get("strategy_bottleneck", {}) or default_strategy_bottleneck_state())
     phase2_fine_tune = dict(state.get("phase2_fine_tune", {}) or {})
+    phase2_1_fine_tune = dict(state.get("phase2_1_fine_tune", {}) or {})
     runtime_capital = float(state.get("wallet_value", 0.0) or 0.0)
     capital_phase_aligned = abs(runtime_capital - float(VALIDATION_INITIAL_CAPITAL_BRL)) < 0.01
 
@@ -961,6 +962,9 @@ def _build_operational_consistency(
         "phase2_fine_tune_enabled": bool(phase2_fine_tune.get("fine_tune_enabled", False)),
         "phase2_fine_tune_target": str(phase2_fine_tune.get("fine_tune_target") or ""),
         "phase2_fine_tune_applied_count": int(phase2_fine_tune.get("fine_tune_applied_count", 0) or 0),
+        "phase2_1_fine_tune_enabled": bool(phase2_1_fine_tune.get("phase2_1_fine_tune_enabled", False)),
+        "phase2_1_fine_tune_target": str(phase2_1_fine_tune.get("phase2_1_fine_tune_target") or ""),
+        "phase2_1_fine_tune_applied_count": int(phase2_1_fine_tune.get("phase2_1_fine_tune_applied_count", 0) or 0),
     }
 
 
@@ -1098,6 +1102,7 @@ def build_swing_validation_report(state: dict | None = None, now: datetime | Non
         "calibration_preview": dict(payload.get("calibration_preview", {}) or default_calibration_preview_state()),
         "strategy_bottleneck": dict(payload.get("strategy_bottleneck", {}) or default_strategy_bottleneck_state()),
         "phase2_fine_tune": dict(payload.get("phase2_fine_tune", {}) or {}),
+        "phase2_1_fine_tune": dict(payload.get("phase2_1_fine_tune", {}) or {}),
         "most_used_assets": most_used_assets,
         "best_assets": best_assets,
         "worst_assets": worst_assets,
@@ -1171,6 +1176,12 @@ def refresh_swing_validation_cycle(
             cycle_result.get("phase2_fine_tune")
             or (cycle_result.get("validation_cycle", {}) or {}).get("phase2_fine_tune", {})
             or state.get("phase2_fine_tune", {})
+            or {}
+        )
+        state["phase2_1_fine_tune"] = dict(
+            cycle_result.get("phase2_1_fine_tune")
+            or (cycle_result.get("validation_cycle", {}) or {}).get("phase2_1_fine_tune", {})
+            or state.get("phase2_1_fine_tune", {})
             or {}
         )
     state["validation"] = validation_state
@@ -1270,6 +1281,11 @@ def refresh_swing_validation_cycle(
     updated_state["phase2_fine_tune"] = dict(
         sanitized_report.get("phase2_fine_tune")
         or updated_state.get("phase2_fine_tune", {})
+        or {}
+    )
+    updated_state["phase2_1_fine_tune"] = dict(
+        sanitized_report.get("phase2_1_fine_tune")
+        or updated_state.get("phase2_1_fine_tune", {})
         or {}
     )
     save_bot_state(updated_state)
