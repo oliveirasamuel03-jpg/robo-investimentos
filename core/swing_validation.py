@@ -30,6 +30,7 @@ from core.signal_rejection_analysis import (
     rejection_reason_label,
     update_validation_rejection_state,
 )
+from core.strategy_structure_audit import build_strategy_structure_audit, default_strategy_structure_audit_state
 from core.strategy_bottleneck import default_strategy_bottleneck_state, summarize_strategy_bottlenecks
 from core.trader_profiles import get_trader_profile_config, normalize_trader_profile
 from core.trader_reports import (
@@ -905,6 +906,7 @@ def _build_operational_consistency(
     )
     calibration_preview = dict(state.get("calibration_preview", {}) or default_calibration_preview_state())
     strategy_bottleneck = dict(state.get("strategy_bottleneck", {}) or default_strategy_bottleneck_state())
+    strategy_structure_audit = dict(state.get("strategy_structure_audit", {}) or default_strategy_structure_audit_state())
     phase2_fine_tune = dict(state.get("phase2_fine_tune", {}) or {})
     phase2_1_fine_tune = dict(state.get("phase2_1_fine_tune", {}) or {})
     runtime_capital = float(state.get("wallet_value", 0.0) or 0.0)
@@ -959,6 +961,12 @@ def _build_operational_consistency(
         "strategy_bottleneck_mode": strategy_bottleneck.get("mode", "DIAGNOSTIC_ONLY"),
         "strategy_bottleneck_dominant": str(strategy_bottleneck.get("dominant_bottleneck") or ""),
         "strategy_bottleneck_recommendation": str(strategy_bottleneck.get("recommendation") or "observe_more"),
+        "structural_audit_mode": strategy_structure_audit.get("structural_audit_mode", "SHADOW_ONLY"),
+        "structural_audit_top_setup": str(strategy_structure_audit.get("structural_audit_top_setup") or ""),
+        "structural_audit_top_symbol": str(strategy_structure_audit.get("structural_audit_top_symbol") or ""),
+        "structural_audit_recommendation": str(
+            strategy_structure_audit.get("structural_audit_recommendation") or "sem dados suficientes"
+        ),
         "phase2_fine_tune_enabled": bool(phase2_fine_tune.get("fine_tune_enabled", False)),
         "phase2_fine_tune_target": str(phase2_fine_tune.get("fine_tune_target") or ""),
         "phase2_fine_tune_applied_count": int(phase2_fine_tune.get("fine_tune_applied_count", 0) or 0),
@@ -1101,6 +1109,9 @@ def build_swing_validation_report(state: dict | None = None, now: datetime | Non
         "feed_rejection_consistency": feed_rejection_consistency,
         "calibration_preview": dict(payload.get("calibration_preview", {}) or default_calibration_preview_state()),
         "strategy_bottleneck": dict(payload.get("strategy_bottleneck", {}) or default_strategy_bottleneck_state()),
+        "strategy_structure_audit": dict(
+            payload.get("strategy_structure_audit", {}) or default_strategy_structure_audit_state()
+        ),
         "phase2_fine_tune": dict(payload.get("phase2_fine_tune", {}) or {}),
         "phase2_1_fine_tune": dict(payload.get("phase2_1_fine_tune", {}) or {}),
         "most_used_assets": most_used_assets,
@@ -1171,6 +1182,11 @@ def refresh_swing_validation_cycle(
             signals=list(cycle_result.get("signals", []) or []),
             enabled=True,
             max_candidates=10,
+        )
+        state["strategy_structure_audit"] = dict(
+            cycle_result.get("strategy_structure_audit")
+            or (cycle_result.get("validation_cycle", {}) or {}).get("strategy_structure_audit", {})
+            or build_strategy_structure_audit(list(cycle_result.get("signals", []) or []))
         )
         state["phase2_fine_tune"] = dict(
             cycle_result.get("phase2_fine_tune")
@@ -1277,6 +1293,11 @@ def refresh_swing_validation_cycle(
         sanitized_report.get("strategy_bottleneck")
         or updated_state.get("strategy_bottleneck", {})
         or default_strategy_bottleneck_state()
+    )
+    updated_state["strategy_structure_audit"] = dict(
+        sanitized_report.get("strategy_structure_audit")
+        or updated_state.get("strategy_structure_audit", {})
+        or default_strategy_structure_audit_state()
     )
     updated_state["phase2_fine_tune"] = dict(
         sanitized_report.get("phase2_fine_tune")

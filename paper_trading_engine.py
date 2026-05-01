@@ -45,6 +45,7 @@ from core.signal_rejection_analysis import (
     summarize_rejection_events,
 )
 from core.state_store import log_event
+from core.strategy_structure_audit import build_strategy_structure_audit
 from core.trader_reports import append_trade_report, build_closed_trade_report
 
 
@@ -1343,6 +1344,9 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[s
             candidates.append(signal)
 
     candidates.sort(key=lambda item: item["score"], reverse=True)
+    strategy_structure_audit = build_strategy_structure_audit(signals)
+    cycle_validation["strategy_structure_audit"] = strategy_structure_audit
+
     if not config.allow_new_entries:
         for candidate in candidates:
             rejection_events.append(
@@ -1434,6 +1438,7 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[s
     state["equity"] = _portfolio_equity(state)
     state["phase2_fine_tune"] = phase2_fine_tune
     state["phase2_1_fine_tune"] = phase2_1_fine_tune
+    state["strategy_structure_audit"] = strategy_structure_audit
 
     history = state.get("history", []) or []
     history.append(
@@ -1478,4 +1483,5 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[s
         "validation_cycle": cycle_validation,
         "phase2_fine_tune": phase2_fine_tune,
         "phase2_1_fine_tune": phase2_1_fine_tune,
+        "strategy_structure_audit": strategy_structure_audit,
     }

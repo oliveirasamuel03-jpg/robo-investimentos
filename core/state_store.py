@@ -369,6 +369,33 @@ DEFAULT_STATE = {
         "recommendation": "observe_more",
         "reason": "No strategy bottleneck data yet.",
     },
+    "strategy_structure_audit": {
+        "structural_audit_enabled": True,
+        "structural_audit_mode": "SHADOW_ONLY",
+        "structural_audit_last_run_at": "",
+        "structural_audit_candidates": 0,
+        "structural_audit_top_setup": "",
+        "structural_audit_top_symbol": "",
+        "structural_audit_top_score": None,
+        "structural_audit_top_gap": None,
+        "structural_audit_primary_blocker": "",
+        "structural_audit_secondary_blocker": "",
+        "structural_audit_recommendation": "sem dados suficientes",
+        "structural_audit_should_adjust_strategy": False,
+        "structural_audit_setup_comparison": [],
+        "structural_audit_total_candidates_by_setup": {},
+        "structural_audit_near_candidates_by_setup": {},
+        "structural_audit_primary_blockers_by_setup": {},
+        "structural_audit_secondary_blockers_by_setup": {},
+        "structural_audit_average_score_by_setup": {},
+        "structural_audit_average_gap_by_setup": {},
+        "structural_audit_best_candidate_by_setup": {},
+        "structural_audit_timeframe_note": "Inconclusivo: sem amostra estrutural suficiente.",
+        "structural_audit_rsi_momentum_note": "Inconclusivo: sem amostra estrutural suficiente.",
+        "structural_audit_reversal_note": "Inconclusivo: sem amostra estrutural suficiente.",
+        "structural_audit_recent_candidates": [],
+        "structural_audit_reason": "No structural audit data yet.",
+    },
     "phase2_fine_tune": {
         "fine_tune_enabled": True,
         "fine_tune_reason": "Relaxamento conservador de confirmacao secundaria marginal em PAPER.",
@@ -696,6 +723,60 @@ def load_bot_state() -> dict:
     if not strategy_bottleneck_state.get("reason"):
         strategy_bottleneck_state["reason"] = "No strategy bottleneck data yet."
     state["strategy_bottleneck"] = strategy_bottleneck_state
+    strategy_structure_state = state.get("strategy_structure_audit", {}) or {}
+    strategy_structure_state["structural_audit_enabled"] = bool(
+        strategy_structure_state.get("structural_audit_enabled", True)
+    )
+    strategy_structure_state["structural_audit_mode"] = str(
+        strategy_structure_state.get("structural_audit_mode") or "SHADOW_ONLY"
+    )
+    for key, fallback in (
+        ("structural_audit_last_run_at", ""),
+        ("structural_audit_top_setup", ""),
+        ("structural_audit_top_symbol", ""),
+        ("structural_audit_primary_blocker", ""),
+        ("structural_audit_secondary_blocker", ""),
+        ("structural_audit_recommendation", "sem dados suficientes"),
+        ("structural_audit_timeframe_note", "Inconclusivo: sem amostra estrutural suficiente."),
+        ("structural_audit_rsi_momentum_note", "Inconclusivo: sem amostra estrutural suficiente."),
+        ("structural_audit_reversal_note", "Inconclusivo: sem amostra estrutural suficiente."),
+        ("structural_audit_reason", "No structural audit data yet."),
+    ):
+        strategy_structure_state[key] = str(strategy_structure_state.get(key) or fallback)
+    strategy_structure_state["structural_audit_candidates"] = int(
+        strategy_structure_state.get("structural_audit_candidates", 0) or 0
+    )
+    strategy_structure_state["structural_audit_should_adjust_strategy"] = bool(
+        strategy_structure_state.get("structural_audit_should_adjust_strategy", False)
+    )
+    for key in ("structural_audit_top_score", "structural_audit_top_gap"):
+        value = strategy_structure_state.get(key)
+        try:
+            strategy_structure_state[key] = None if value in (None, "") else float(value or 0.0)
+        except (TypeError, ValueError):
+            strategy_structure_state[key] = None
+    strategy_structure_state["structural_audit_setup_comparison"] = [
+        item
+        for item in list(strategy_structure_state.get("structural_audit_setup_comparison", []) or [])
+        if isinstance(item, dict)
+    ][:10]
+    for key in (
+        "structural_audit_total_candidates_by_setup",
+        "structural_audit_near_candidates_by_setup",
+        "structural_audit_primary_blockers_by_setup",
+        "structural_audit_secondary_blockers_by_setup",
+        "structural_audit_average_score_by_setup",
+        "structural_audit_average_gap_by_setup",
+        "structural_audit_best_candidate_by_setup",
+    ):
+        value = strategy_structure_state.get(key, {}) or {}
+        strategy_structure_state[key] = dict(value) if isinstance(value, dict) else {}
+    strategy_structure_state["structural_audit_recent_candidates"] = [
+        item
+        for item in list(strategy_structure_state.get("structural_audit_recent_candidates", []) or [])
+        if isinstance(item, dict)
+    ][:15]
+    state["strategy_structure_audit"] = strategy_structure_state
     phase2_fine_tune_state = state.get("phase2_fine_tune", {}) or {}
     phase2_fine_tune_state["fine_tune_enabled"] = bool(phase2_fine_tune_state.get("fine_tune_enabled", True))
     for key, fallback in (

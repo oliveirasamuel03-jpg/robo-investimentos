@@ -1279,6 +1279,12 @@ strategy_bottleneck = dict(
     or state.get("strategy_bottleneck", {})
     or {}
 )
+strategy_structure_audit = dict(
+    validation_last_report.get("strategy_structure_audit")
+    or current_audit_state.get("strategy_structure_audit", {})
+    or state.get("strategy_structure_audit", {})
+    or {}
+)
 phase2_fine_tune = dict(
     validation_last_report.get("phase2_fine_tune")
     or current_audit_state.get("phase2_fine_tune", {})
@@ -1945,6 +1951,48 @@ if strategy_bottleneck:
         if items:
             st.caption(label)
             st.dataframe(pd.DataFrame(items), hide_index=True, use_container_width=True)
+if strategy_structure_audit:
+    st.markdown("#### AUDITORIA ESTRUTURAL DA ESTRATEGIA")
+    st.caption(
+        "SHADOW ONLY: compara setups internos sem aprovar trades, sem reduzir thresholds, "
+        "sem alterar score real, broker ou execucao. PAPER TRADING permanece obrigatorio."
+    )
+    shadow_score = strategy_structure_audit.get("structural_audit_top_score")
+    shadow_gap = strategy_structure_audit.get("structural_audit_top_gap")
+    shadow_score_label = "-" if shadow_score is None else f"{float(shadow_score):.2f}"
+    shadow_gap_label = "-" if shadow_gap is None else f"{float(shadow_gap):.4f}"
+    shadow_c1, shadow_c2, shadow_c3, shadow_c4, shadow_c5 = st.columns(5)
+    shadow_c1.metric("Setup shadow", strategy_structure_audit.get("structural_audit_top_setup") or "-")
+    shadow_c2.metric("Ativo shadow", strategy_structure_audit.get("structural_audit_top_symbol") or "-")
+    shadow_c3.metric("Melhor score", shadow_score_label)
+    shadow_c4.metric("Gap ate aprovacao", shadow_gap_label)
+    shadow_c5.metric("Candidatos shadow", str(int(strategy_structure_audit.get("structural_audit_candidates", 0) or 0)))
+    st.caption(
+        f"Bloqueador primario: {strategy_structure_audit.get('structural_audit_primary_blocker') or '-'} | "
+        f"Bloqueador secundario: {strategy_structure_audit.get('structural_audit_secondary_blocker') or '-'} | "
+        f"Recomendacao: {strategy_structure_audit.get('structural_audit_recommendation') or 'sem dados suficientes'}"
+    )
+    st.caption(f"Temporalidade: {strategy_structure_audit.get('structural_audit_timeframe_note') or 'Inconclusivo.'}")
+    st.caption(f"RSI/momentum: {strategy_structure_audit.get('structural_audit_rsi_momentum_note') or 'Inconclusivo.'}")
+    st.caption(f"Reversal: {strategy_structure_audit.get('structural_audit_reversal_note') or 'Inconclusivo.'}")
+    st.caption(strategy_structure_audit.get("structural_audit_reason") or "Sem auditoria estrutural consolidada ainda.")
+    setup_rows = list(strategy_structure_audit.get("structural_audit_setup_comparison", []) or [])[:5]
+    if setup_rows:
+        display_rows = [
+            {
+                "setup": row.get("setup"),
+                "candidatos shadow": row.get("shadow_candidates"),
+                "melhor ativo": row.get("best_symbol"),
+                "melhor score": row.get("best_score"),
+                "gap medio": row.get("average_gap"),
+                "bloqueador dominante": row.get("dominant_blocker"),
+                "recomendacao": row.get("recommendation"),
+            }
+            for row in setup_rows
+            if isinstance(row, dict)
+        ]
+        if display_rows:
+            st.dataframe(pd.DataFrame(display_rows), hide_index=True, use_container_width=True)
 if phase2_fine_tune:
     st.markdown("#### Ajuste Fino FASE 2")
     st.caption(
