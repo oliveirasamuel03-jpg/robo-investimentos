@@ -269,6 +269,59 @@ def _log_strategy_bottleneck_summary(validation_report: dict) -> None:
     )
 
 
+def _log_strategy_structure_audit_summary(validation_report: dict) -> None:
+    audit = dict(validation_report.get("strategy_structure_audit", {}) or {})
+    if not audit:
+        return
+    comparison = list(audit.get("structural_audit_setup_comparison", []) or [])
+    recent = list(audit.get("structural_audit_recent_candidates", []) or [])
+    log_event(
+        "INFO",
+        (
+            "[strategy_structure_audit_summary] "
+            f"mode={str(audit.get('structural_audit_mode') or 'SHADOW_ONLY').lower()};"
+            f"candidates={int(audit.get('structural_audit_candidates', 0) or 0)};"
+            f"top_setup={str(audit.get('structural_audit_top_setup') or 'none')};"
+            f"top_symbol={str(audit.get('structural_audit_top_symbol') or 'none')};"
+            f"top_score={audit.get('structural_audit_top_score') if audit.get('structural_audit_top_score') is not None else 'none'};"
+            f"top_gap={audit.get('structural_audit_top_gap') if audit.get('structural_audit_top_gap') is not None else 'none'};"
+            f"recommendation={str(audit.get('structural_audit_recommendation') or 'sem_dados_suficientes').replace(' ', '_')};"
+            "trade_approval_changed=0"
+        ),
+    )
+    if recent:
+        top = dict(recent[0] or {})
+        log_event(
+            "INFO",
+            (
+                "[strategy_structure_audit_top_candidate] "
+                f"setup={str(top.get('setup_name') or 'none')};"
+                f"symbol={str(top.get('symbol') or 'none')};"
+                f"score={top.get('score') if top.get('score') is not None else 'none'};"
+                f"gap={top.get('score_gap') if top.get('score_gap') is not None else 'none'};"
+                f"primary={','.join(list(top.get('primary_blockers', []) or [])) or 'none'};"
+                f"secondary={','.join(list(top.get('secondary_blockers', []) or [])) or 'none'};"
+                f"recommendation={str(top.get('recommendation') or 'none').replace(' ', '_')};"
+                "shadow_only=1"
+            ),
+        )
+    for item in comparison[:3]:
+        row = dict(item or {})
+        log_event(
+            "INFO",
+            (
+                "[strategy_structure_audit_setup_comparison] "
+                f"setup={str(row.get('setup') or 'unknown')};"
+                f"shadow_candidates={int(row.get('shadow_candidates', 0) or 0)};"
+                f"best_symbol={str(row.get('best_symbol') or 'none')};"
+                f"average_gap={row.get('average_gap') if row.get('average_gap') is not None else 'none'};"
+                f"dominant_blocker={str(row.get('dominant_blocker') or 'none')};"
+                f"recommendation={str(row.get('recommendation') or 'none').replace(' ', '_')};"
+                "shadow_only=1"
+            ),
+        )
+
+
 def _log_phase2_fine_tune_summary(validation_report: dict) -> None:
     fine_tune = dict(validation_report.get("phase2_fine_tune", {}) or {})
     if not fine_tune:
@@ -591,6 +644,7 @@ def worker_loop() -> None:
             _log_signal_rejection_summary(validation_report, result.get("cycle_result", {}))
             _log_calibration_preview_summary(validation_report)
             _log_strategy_bottleneck_summary(validation_report)
+            _log_strategy_structure_audit_summary(validation_report)
             _log_phase2_fine_tune_summary(validation_report)
             _log_phase2_1_fine_tune_summary(validation_report)
             _log_macro_alert_summary(result.get("cycle_result", {}))

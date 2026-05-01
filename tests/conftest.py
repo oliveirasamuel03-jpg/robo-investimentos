@@ -24,6 +24,7 @@ MODULES_TO_CLEAR = [
     "core.retention",
     "core.calibration_preview",
     "core.strategy_bottleneck",
+    "core.strategy_structure_audit",
     "core.signal_rejection_analysis",
     "core.swing_validation",
     "core.trader_profiles",
