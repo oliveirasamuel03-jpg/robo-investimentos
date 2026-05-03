@@ -599,6 +599,11 @@ market_structure_audit = dict(
     or state.get("market_structure_audit", {})
     or {}
 )
+fib_alignment_audit = dict(
+    validation_report.get("fib_alignment_audit")
+    or state.get("fib_alignment_audit", {})
+    or {}
+)
 phase2_fine_tune = dict(
     validation_report.get("phase2_fine_tune")
     or state.get("phase2_fine_tune", {})
@@ -835,6 +840,44 @@ if market_structure_audit:
         ]
         if display_rows:
             st.dataframe(pd.DataFrame(display_rows), hide_index=True, use_container_width=True)
+if fib_alignment_audit:
+    st.subheader("ADERENCIA AO VIDEO/PDF FIBONACCI")
+    st.caption(
+        "SHADOW ONLY: esta camada mede aderencia objetiva a um checklist inspirado no video/PDF. "
+        "Nao afirma equivalencia da estrategia, nao aprova trade e nao altera score real, broker ou thresholds."
+    )
+    alignment_score = fib_alignment_audit.get("fib_alignment_score")
+    alignment_score_label = "-" if alignment_score is None else f"{float(alignment_score):.2f}"
+    fa_c1, fa_c2, fa_c3, fa_c4 = st.columns(4)
+    fa_c1.metric("Ativo analisado", fib_alignment_audit.get("fib_alignment_top_symbol") or "-")
+    fa_c2.metric("Score aderencia", alignment_score_label)
+    fa_c3.metric("Status", fib_alignment_audit.get("fib_alignment_status") or "insufficient_data")
+    fa_c4.metric("Modo", fib_alignment_audit.get("fib_alignment_mode") or "SHADOW_ONLY")
+    fa_d1, fa_d2, fa_d3, fa_d4, fa_d5 = st.columns(5)
+    fa_d1.metric("Ancora fundo", fib_alignment_audit.get("fib_alignment_anchor_low_status") or "insufficient")
+    fa_d2.metric("Ancora topo", fib_alignment_audit.get("fib_alignment_anchor_high_status") or "insufficient")
+    fa_d3.metric("Zona Fibonacci", fib_alignment_audit.get("fib_alignment_zone_status") or "insufficient")
+    fa_d4.metric("Pivo", fib_alignment_audit.get("fib_alignment_pivot_status") or "insufficient")
+    fa_d5.metric("BOS", fib_alignment_audit.get("fib_alignment_bos_status") or "insufficient")
+    st.caption(
+        f"Confirmacao de entrada: {fib_alignment_audit.get('fib_alignment_entry_confirmation_status') or 'insufficient'} | "
+        f"Confluencia setup: {fib_alignment_audit.get('fib_alignment_confluence_status') or 'insufficient'} | "
+        f"Principal divergencia: {fib_alignment_audit.get('fib_alignment_why_differs') or '-'} | "
+        f"Recomendacao: {fib_alignment_audit.get('fib_alignment_recommendation') or 'keep_shadow_only'}"
+    )
+    checklist_rows = [
+        {
+            "regra": row.get("item"),
+            "esperado": row.get("esperado_pelo_video_pdf"),
+            "detectado": row.get("detectado_pelo_app"),
+            "status": row.get("status"),
+            "motivo": row.get("motivo"),
+        }
+        for row in list(fib_alignment_audit.get("fib_alignment_checklist", []) or [])
+        if isinstance(row, dict)
+    ]
+    if checklist_rows:
+        st.dataframe(pd.DataFrame(checklist_rows[:8]), hide_index=True, use_container_width=True)
 if phase2_fine_tune:
     st.subheader("Ajuste Fino FASE 2")
     st.caption(

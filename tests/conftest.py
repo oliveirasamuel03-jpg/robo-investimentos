@@ -23,6 +23,7 @@ MODULES_TO_CLEAR = [
     "core.daily_risk",
     "core.retention",
     "core.calibration_preview",
+    "core.fibonacci_alignment_audit",
     "core.market_structure_audit",
     "core.strategy_bottleneck",
     "core.strategy_structure_audit",

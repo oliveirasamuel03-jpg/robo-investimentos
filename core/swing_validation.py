@@ -21,6 +21,7 @@ from core.config import (
     VALIDATION_TRADING_MODE,
 )
 from core.calibration_preview import build_calibration_preview, default_calibration_preview_state
+from core.fibonacci_alignment_audit import default_fib_alignment_audit_state
 from core.market_structure_audit import default_market_structure_audit_state
 from core.market_data import build_feed_quality_snapshot
 from core.state_store import load_bot_state, read_storage_table, save_bot_state
@@ -909,6 +910,7 @@ def _build_operational_consistency(
     strategy_bottleneck = dict(state.get("strategy_bottleneck", {}) or default_strategy_bottleneck_state())
     strategy_structure_audit = dict(state.get("strategy_structure_audit", {}) or default_strategy_structure_audit_state())
     market_structure_audit = dict(state.get("market_structure_audit", {}) or default_market_structure_audit_state())
+    fib_alignment_audit = dict(state.get("fib_alignment_audit", {}) or default_fib_alignment_audit_state())
     phase2_fine_tune = dict(state.get("phase2_fine_tune", {}) or {})
     phase2_1_fine_tune = dict(state.get("phase2_1_fine_tune", {}) or {})
     runtime_capital = float(state.get("wallet_value", 0.0) or 0.0)
@@ -973,6 +975,11 @@ def _build_operational_consistency(
         "market_structure_top_symbol": str(market_structure_audit.get("market_structure_top_symbol") or ""),
         "market_structure_top_recommendation": str(
             market_structure_audit.get("market_structure_top_recommendation") or "sem dados suficientes"
+        ),
+        "fib_alignment_status": str(fib_alignment_audit.get("fib_alignment_status") or "insufficient_data"),
+        "fib_alignment_top_symbol": str(fib_alignment_audit.get("fib_alignment_top_symbol") or ""),
+        "fib_alignment_recommendation": str(
+            fib_alignment_audit.get("fib_alignment_recommendation") or "insufficient_data"
         ),
         "phase2_fine_tune_enabled": bool(phase2_fine_tune.get("fine_tune_enabled", False)),
         "phase2_fine_tune_target": str(phase2_fine_tune.get("fine_tune_target") or ""),
@@ -1120,6 +1127,7 @@ def build_swing_validation_report(state: dict | None = None, now: datetime | Non
             payload.get("strategy_structure_audit", {}) or default_strategy_structure_audit_state()
         ),
         "market_structure_audit": dict(payload.get("market_structure_audit", {}) or default_market_structure_audit_state()),
+        "fib_alignment_audit": dict(payload.get("fib_alignment_audit", {}) or default_fib_alignment_audit_state()),
         "phase2_fine_tune": dict(payload.get("phase2_fine_tune", {}) or {}),
         "phase2_1_fine_tune": dict(payload.get("phase2_1_fine_tune", {}) or {}),
         "most_used_assets": most_used_assets,
@@ -1201,6 +1209,12 @@ def refresh_swing_validation_cycle(
             or (cycle_result.get("validation_cycle", {}) or {}).get("market_structure_audit", {})
             or state.get("market_structure_audit", {})
             or default_market_structure_audit_state()
+        )
+        state["fib_alignment_audit"] = dict(
+            cycle_result.get("fib_alignment_audit")
+            or (cycle_result.get("validation_cycle", {}) or {}).get("fib_alignment_audit", {})
+            or state.get("fib_alignment_audit", {})
+            or default_fib_alignment_audit_state()
         )
         state["phase2_fine_tune"] = dict(
             cycle_result.get("phase2_fine_tune")
@@ -1317,6 +1331,11 @@ def refresh_swing_validation_cycle(
         sanitized_report.get("market_structure_audit")
         or updated_state.get("market_structure_audit", {})
         or default_market_structure_audit_state()
+    )
+    updated_state["fib_alignment_audit"] = dict(
+        sanitized_report.get("fib_alignment_audit")
+        or updated_state.get("fib_alignment_audit", {})
+        or default_fib_alignment_audit_state()
     )
     updated_state["phase2_fine_tune"] = dict(
         sanitized_report.get("phase2_fine_tune")
