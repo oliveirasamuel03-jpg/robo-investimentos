@@ -47,6 +47,10 @@ def test_state_store_bootstraps_files_and_defaults(isolated_storage):
     assert state["strategy_structure_audit"]["structural_audit_setup_comparison"] == []
     assert state["strategy_structure_audit"]["structural_audit_total_candidates_by_setup"] == {}
     assert state["strategy_structure_audit"]["structural_audit_recent_candidates"] == []
+    assert state["market_structure_audit"]["market_structure_audit_enabled"] is True
+    assert state["market_structure_audit"]["market_structure_audit_mode"] == "SHADOW_ONLY"
+    assert state["market_structure_audit"]["market_structure_best_candidates"] == []
+    assert state["market_structure_audit"]["market_structure_minimum_sample_met"] is False
     assert state["phase2_fine_tune"]["fine_tune_enabled"] is True
     assert state["phase2_fine_tune"]["fine_tune_target"] == "trend_pullback_breakout_secondary_breakout_confirmation"
     assert state["phase2_fine_tune"]["fine_tune_applied_count"] == 0
@@ -106,6 +110,9 @@ def test_state_store_backfills_strategy_structure_audit_for_old_state(isolated_s
     assert state["strategy_structure_audit"]["structural_audit_mode"] == "SHADOW_ONLY"
     assert state["strategy_structure_audit"]["structural_audit_candidates"] == 0
     assert state["strategy_structure_audit"]["structural_audit_setup_comparison"] == []
+    assert state["market_structure_audit"]["market_structure_audit_enabled"] is True
+    assert state["market_structure_audit"]["market_structure_audit_mode"] == "SHADOW_ONLY"
+    assert state["market_structure_audit"]["market_structure_candidates_count"] == 0
 
 
 def test_update_market_data_status_tracks_last_success_and_error(isolated_storage):

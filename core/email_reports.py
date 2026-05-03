@@ -383,6 +383,25 @@ def _strategy_structure_audit_summary(validation_report: dict[str, Any]) -> str:
     )
 
 
+def _market_structure_audit_summary(validation_report: dict[str, Any]) -> str:
+    audit = dict(validation_report.get("market_structure_audit", {}) or {})
+    if not audit:
+        return "Market structure/Fibonacci audit: no structural sample yet. Shadow only."
+    if not bool(audit.get("market_structure_audit_enabled", True)):
+        return "Market structure/Fibonacci audit: disabled. Shadow only."
+    top_symbol = _safe_text(audit.get("market_structure_top_symbol"), fallback="none")
+    top_score = audit.get("market_structure_top_score")
+    top_score_text = "-" if top_score is None else f"{float(top_score):.2f}"
+    fib_zone = _safe_text(audit.get("market_structure_top_zone"), fallback="none")
+    candidates = int(audit.get("market_structure_candidates_count", 0) or 0)
+    recommendation = _safe_text(audit.get("market_structure_top_recommendation"), fallback="sem dados suficientes")
+    return (
+        f"Market structure/Fibonacci audit: top={top_symbol}; score={top_score_text}; "
+        f"fib_zone={fib_zone}; shadow_candidates={candidates}; recommendation={recommendation}. "
+        "Shadow only; no trade decision, score, broker, or threshold was changed."
+    )
+
+
 def _phase2_fine_tune_summary(validation_report: dict[str, Any]) -> str:
     fine_tune = dict(validation_report.get("phase2_fine_tune", {}) or {})
     if not fine_tune:
@@ -482,6 +501,7 @@ def _build_daily_email_body(state: dict[str, Any], validation_report: dict[str, 
     calibration_preview_summary = _calibration_preview_summary(validation_report)
     strategy_bottleneck_summary = _strategy_bottleneck_summary(validation_report)
     strategy_structure_audit_summary = _strategy_structure_audit_summary(validation_report)
+    market_structure_audit_summary = _market_structure_audit_summary(validation_report)
     phase2_fine_tune_summary = _phase2_fine_tune_summary(validation_report)
     phase2_1_fine_tune_summary = _phase2_1_fine_tune_summary(validation_report)
     short_audit_summary = _short_audit_summary(state, validation_report)
@@ -505,6 +525,7 @@ def _build_daily_email_body(state: dict[str, Any], validation_report: dict[str, 
         calibration_preview_summary,
         strategy_bottleneck_summary,
         strategy_structure_audit_summary,
+        market_structure_audit_summary,
         phase2_fine_tune_summary,
         phase2_1_fine_tune_summary,
         f"Multi-timeframe summary: {multi_timeframe_summary}",

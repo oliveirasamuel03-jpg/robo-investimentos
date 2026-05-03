@@ -23,6 +23,7 @@ from core.config import (
 )
 from core.market_context import apply_context_filter, get_market_context
 from core.macro_alerts import apply_macro_risk_filter, default_macro_alert_state
+from core.market_structure_audit import build_market_structure_audit
 from core.market_data import (
     fallback_data as build_fallback_market_data,
     fetch_market_data_frame,
@@ -1345,7 +1346,13 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[s
 
     candidates.sort(key=lambda item: item["score"], reverse=True)
     strategy_structure_audit = build_strategy_structure_audit(signals)
+    market_structure_audit = build_market_structure_audit(
+        market_data=market_data,
+        signals=signals,
+        market_context=market_context,
+    )
     cycle_validation["strategy_structure_audit"] = strategy_structure_audit
+    cycle_validation["market_structure_audit"] = market_structure_audit
 
     if not config.allow_new_entries:
         for candidate in candidates:
@@ -1439,6 +1446,7 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[s
     state["phase2_fine_tune"] = phase2_fine_tune
     state["phase2_1_fine_tune"] = phase2_1_fine_tune
     state["strategy_structure_audit"] = strategy_structure_audit
+    state["market_structure_audit"] = market_structure_audit
 
     history = state.get("history", []) or []
     history.append(
@@ -1484,4 +1492,5 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[s
         "phase2_fine_tune": phase2_fine_tune,
         "phase2_1_fine_tune": phase2_1_fine_tune,
         "strategy_structure_audit": strategy_structure_audit,
+        "market_structure_audit": market_structure_audit,
     }

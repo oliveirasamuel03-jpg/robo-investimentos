@@ -396,6 +396,24 @@ DEFAULT_STATE = {
         "structural_audit_recent_candidates": [],
         "structural_audit_reason": "No structural audit data yet.",
     },
+    "market_structure_audit": {
+        "market_structure_audit_enabled": True,
+        "market_structure_audit_mode": "SHADOW_ONLY",
+        "market_structure_audit_last_run_at": "",
+        "market_structure_top_symbol": "",
+        "market_structure_top_score": None,
+        "market_structure_top_zone": "",
+        "market_structure_top_recommendation": "sem dados suficientes",
+        "market_structure_candidates_count": 0,
+        "market_structure_best_candidates": [],
+        "market_structure_setup_confluence": {},
+        "market_structure_fib_summary": {},
+        "market_structure_blockers_summary": {},
+        "market_structure_regime_summary": {},
+        "market_structure_data_sufficiency": "NO_DATA",
+        "market_structure_minimum_sample_met": False,
+        "market_structure_why_no_candidate": "No market structure audit data yet.",
+    },
     "phase2_fine_tune": {
         "fine_tune_enabled": True,
         "fine_tune_reason": "Relaxamento conservador de confirmacao secundaria marginal em PAPER.",
@@ -777,6 +795,47 @@ def load_bot_state() -> dict:
         if isinstance(item, dict)
     ][:15]
     state["strategy_structure_audit"] = strategy_structure_state
+    market_structure_state = state.get("market_structure_audit", {}) or {}
+    market_structure_state["market_structure_audit_enabled"] = bool(
+        market_structure_state.get("market_structure_audit_enabled", True)
+    )
+    market_structure_state["market_structure_audit_mode"] = str(
+        market_structure_state.get("market_structure_audit_mode") or "SHADOW_ONLY"
+    )
+    for key, fallback in (
+        ("market_structure_audit_last_run_at", ""),
+        ("market_structure_top_symbol", ""),
+        ("market_structure_top_zone", ""),
+        ("market_structure_top_recommendation", "sem dados suficientes"),
+        ("market_structure_data_sufficiency", "NO_DATA"),
+        ("market_structure_why_no_candidate", "No market structure audit data yet."),
+    ):
+        market_structure_state[key] = str(market_structure_state.get(key) or fallback)
+    market_structure_state["market_structure_candidates_count"] = int(
+        market_structure_state.get("market_structure_candidates_count", 0) or 0
+    )
+    market_structure_state["market_structure_minimum_sample_met"] = bool(
+        market_structure_state.get("market_structure_minimum_sample_met", False)
+    )
+    top_score = market_structure_state.get("market_structure_top_score")
+    try:
+        market_structure_state["market_structure_top_score"] = None if top_score in (None, "") else float(top_score or 0.0)
+    except (TypeError, ValueError):
+        market_structure_state["market_structure_top_score"] = None
+    market_structure_state["market_structure_best_candidates"] = [
+        item
+        for item in list(market_structure_state.get("market_structure_best_candidates", []) or [])
+        if isinstance(item, dict)
+    ][:10]
+    for key in (
+        "market_structure_setup_confluence",
+        "market_structure_fib_summary",
+        "market_structure_blockers_summary",
+        "market_structure_regime_summary",
+    ):
+        value = market_structure_state.get(key, {}) or {}
+        market_structure_state[key] = dict(value) if isinstance(value, dict) else {}
+    state["market_structure_audit"] = market_structure_state
     phase2_fine_tune_state = state.get("phase2_fine_tune", {}) or {}
     phase2_fine_tune_state["fine_tune_enabled"] = bool(phase2_fine_tune_state.get("fine_tune_enabled", True))
     for key, fallback in (

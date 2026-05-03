@@ -1285,6 +1285,12 @@ strategy_structure_audit = dict(
     or state.get("strategy_structure_audit", {})
     or {}
 )
+market_structure_audit = dict(
+    validation_last_report.get("market_structure_audit")
+    or current_audit_state.get("market_structure_audit", {})
+    or state.get("market_structure_audit", {})
+    or {}
+)
 phase2_fine_tune = dict(
     validation_last_report.get("phase2_fine_tune")
     or current_audit_state.get("phase2_fine_tune", {})
@@ -1989,6 +1995,62 @@ if strategy_structure_audit:
                 "recomendacao": row.get("recommendation"),
             }
             for row in setup_rows
+            if isinstance(row, dict)
+        ]
+        if display_rows:
+            st.dataframe(pd.DataFrame(display_rows), hide_index=True, use_container_width=True)
+if market_structure_audit:
+    st.markdown("#### AUDITORIA FIBONACCI + ESTRUTURA DE MERCADO")
+    st.caption(
+        "SHADOW ONLY: Fibonacci, price action, pivos e BOS sao apenas auditoria estrutural. "
+        "Nao aprovam trade, nao alteram score real, nao mudam broker e preservam PAPER TRADING."
+    )
+    top_score = market_structure_audit.get("market_structure_top_score")
+    score_label = "-" if top_score is None else f"{float(top_score):.2f}"
+    best_candidates = list(market_structure_audit.get("market_structure_best_candidates", []) or [])
+    top_candidate = dict(best_candidates[0] or {}) if best_candidates else {}
+    ms_c1, ms_c2, ms_c3, ms_c4, ms_c5 = st.columns(5)
+    ms_c1.metric("Melhor ativo", market_structure_audit.get("market_structure_top_symbol") or "-")
+    ms_c2.metric("Direcao", top_candidate.get("structure_direction") or "-")
+    ms_c3.metric("Zona Fibonacci", market_structure_audit.get("market_structure_top_zone") or "-")
+    ms_c4.metric("Score estrutural", score_label)
+    ms_c5.metric("Candidato shadow", "Sim" if bool(top_candidate.get("market_structure_shadow_candidate", False)) else "Nao")
+    ms_d1, ms_d2, ms_d3, ms_d4 = st.columns(4)
+    ms_d1.metric("Pivo", "Sim" if bool(top_candidate.get("pivot_detected", False)) else "Nao")
+    ms_d2.metric("BOS", "Sim" if bool(top_candidate.get("bos_detected", False)) else "Nao")
+    ms_d3.metric("Falso rompimento", "Sim" if bool(top_candidate.get("false_breakout_risk", False)) else "Nao")
+    ms_d4.metric("Regime", top_candidate.get("market_regime") or "INCONCLUSIVE")
+    st.caption(
+        f"Confluencia trend_pullback_breakout: "
+        f"{'Sim' if bool(top_candidate.get('structure_confirms_trend_pullback', False)) else 'Nao'} | "
+        f"Recomendacao: {market_structure_audit.get('market_structure_top_recommendation') or 'sem dados suficientes'}"
+    )
+    confluence = dict(market_structure_audit.get("market_structure_setup_confluence", {}) or {})
+    st.caption(
+        "Confluencia por setup: "
+        f"trend_pullback={int(confluence.get('trend_pullback', 0) or 0)} | "
+        f"breakout={int(confluence.get('breakout', 0) or 0)} | "
+        f"reversal={int(confluence.get('reversal', 0) or 0)} | "
+        f"melhoraria qualidade={int(confluence.get('would_improve_quality', 0) or 0)}"
+    )
+    st.caption(
+        f"Suficiencia: {market_structure_audit.get('market_structure_data_sufficiency') or 'NO_DATA'} | "
+        f"Amostra minima: {'Sim' if bool(market_structure_audit.get('market_structure_minimum_sample_met', False)) else 'Nao'} | "
+        f"Por que nao houve candidato: {market_structure_audit.get('market_structure_why_no_candidate') or '-'}"
+    )
+    if best_candidates:
+        display_rows = [
+            {
+                "asset": row.get("symbol"),
+                "structure_score": row.get("market_structure_score"),
+                "fib_zone": row.get("current_fib_zone"),
+                "bos": row.get("bos_detected"),
+                "pivot": row.get("pivot_detected"),
+                "false_breakout_risk": row.get("false_breakout_risk"),
+                "confluence": ", ".join(list(row.get("confluence_notes", []) or [])[:2]),
+                "recommendation": row.get("structure_recommendation"),
+            }
+            for row in best_candidates[:5]
             if isinstance(row, dict)
         ]
         if display_rows:
