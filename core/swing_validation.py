@@ -21,6 +21,7 @@ from core.config import (
     VALIDATION_TRADING_MODE,
 )
 from core.calibration_preview import build_calibration_preview, default_calibration_preview_state
+from core.market_structure_audit import default_market_structure_audit_state
 from core.market_data import build_feed_quality_snapshot
 from core.state_store import load_bot_state, read_storage_table, save_bot_state
 from core.signal_rejection_analysis import (
@@ -907,6 +908,7 @@ def _build_operational_consistency(
     calibration_preview = dict(state.get("calibration_preview", {}) or default_calibration_preview_state())
     strategy_bottleneck = dict(state.get("strategy_bottleneck", {}) or default_strategy_bottleneck_state())
     strategy_structure_audit = dict(state.get("strategy_structure_audit", {}) or default_strategy_structure_audit_state())
+    market_structure_audit = dict(state.get("market_structure_audit", {}) or default_market_structure_audit_state())
     phase2_fine_tune = dict(state.get("phase2_fine_tune", {}) or {})
     phase2_1_fine_tune = dict(state.get("phase2_1_fine_tune", {}) or {})
     runtime_capital = float(state.get("wallet_value", 0.0) or 0.0)
@@ -966,6 +968,11 @@ def _build_operational_consistency(
         "structural_audit_top_symbol": str(strategy_structure_audit.get("structural_audit_top_symbol") or ""),
         "structural_audit_recommendation": str(
             strategy_structure_audit.get("structural_audit_recommendation") or "sem dados suficientes"
+        ),
+        "market_structure_audit_mode": market_structure_audit.get("market_structure_audit_mode", "SHADOW_ONLY"),
+        "market_structure_top_symbol": str(market_structure_audit.get("market_structure_top_symbol") or ""),
+        "market_structure_top_recommendation": str(
+            market_structure_audit.get("market_structure_top_recommendation") or "sem dados suficientes"
         ),
         "phase2_fine_tune_enabled": bool(phase2_fine_tune.get("fine_tune_enabled", False)),
         "phase2_fine_tune_target": str(phase2_fine_tune.get("fine_tune_target") or ""),
@@ -1112,6 +1119,7 @@ def build_swing_validation_report(state: dict | None = None, now: datetime | Non
         "strategy_structure_audit": dict(
             payload.get("strategy_structure_audit", {}) or default_strategy_structure_audit_state()
         ),
+        "market_structure_audit": dict(payload.get("market_structure_audit", {}) or default_market_structure_audit_state()),
         "phase2_fine_tune": dict(payload.get("phase2_fine_tune", {}) or {}),
         "phase2_1_fine_tune": dict(payload.get("phase2_1_fine_tune", {}) or {}),
         "most_used_assets": most_used_assets,
@@ -1187,6 +1195,12 @@ def refresh_swing_validation_cycle(
             cycle_result.get("strategy_structure_audit")
             or (cycle_result.get("validation_cycle", {}) or {}).get("strategy_structure_audit", {})
             or build_strategy_structure_audit(list(cycle_result.get("signals", []) or []))
+        )
+        state["market_structure_audit"] = dict(
+            cycle_result.get("market_structure_audit")
+            or (cycle_result.get("validation_cycle", {}) or {}).get("market_structure_audit", {})
+            or state.get("market_structure_audit", {})
+            or default_market_structure_audit_state()
         )
         state["phase2_fine_tune"] = dict(
             cycle_result.get("phase2_fine_tune")
@@ -1298,6 +1312,11 @@ def refresh_swing_validation_cycle(
         sanitized_report.get("strategy_structure_audit")
         or updated_state.get("strategy_structure_audit", {})
         or default_strategy_structure_audit_state()
+    )
+    updated_state["market_structure_audit"] = dict(
+        sanitized_report.get("market_structure_audit")
+        or updated_state.get("market_structure_audit", {})
+        or default_market_structure_audit_state()
     )
     updated_state["phase2_fine_tune"] = dict(
         sanitized_report.get("phase2_fine_tune")

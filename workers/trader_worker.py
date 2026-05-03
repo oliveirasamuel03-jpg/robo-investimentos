@@ -322,6 +322,66 @@ def _log_strategy_structure_audit_summary(validation_report: dict) -> None:
         )
 
 
+def _log_market_structure_audit_summary(validation_report: dict) -> None:
+    audit = dict(validation_report.get("market_structure_audit", {}) or {})
+    if not audit:
+        return
+    candidates = list(audit.get("market_structure_best_candidates", []) or [])
+    confluence = dict(audit.get("market_structure_setup_confluence", {}) or {})
+    log_event(
+        "INFO",
+        (
+            "[market_structure_audit_summary] "
+            f"mode={str(audit.get('market_structure_audit_mode') or 'SHADOW_ONLY').lower()};"
+            f"top_symbol={str(audit.get('market_structure_top_symbol') or 'none')};"
+            f"top_score={audit.get('market_structure_top_score') if audit.get('market_structure_top_score') is not None else 'none'};"
+            f"top_zone={str(audit.get('market_structure_top_zone') or 'none')};"
+            f"candidates={int(audit.get('market_structure_candidates_count', 0) or 0)};"
+            f"recommendation={str(audit.get('market_structure_top_recommendation') or 'sem_dados_suficientes').replace(' ', '_')};"
+            "shadow_only=true"
+        ),
+    )
+    if candidates:
+        top = dict(candidates[0] or {})
+        log_event(
+            "INFO",
+            (
+                "[market_structure_top_candidate] "
+                f"symbol={str(top.get('symbol') or 'none')};"
+                f"score={top.get('market_structure_score') if top.get('market_structure_score') is not None else 'none'};"
+                f"fib_zone={str(top.get('current_fib_zone') or 'none')};"
+                f"bos_detected={int(bool(top.get('bos_detected', False)))};"
+                f"pivot_detected={int(bool(top.get('pivot_detected', False)))};"
+                f"false_breakout_risk={int(bool(top.get('false_breakout_risk', False)))};"
+                f"recommendation={str(top.get('structure_recommendation') or 'none').replace(' ', '_')};"
+                "shadow_only=true"
+            ),
+        )
+        log_event(
+            "INFO",
+            (
+                "[market_structure_fib_confluence] "
+                f"symbol={str(top.get('symbol') or 'none')};"
+                f"fib_zone={str(top.get('current_fib_zone') or 'none')};"
+                f"trend_pullback={int(bool(top.get('structure_confirms_trend_pullback', False)))};"
+                f"breakout={int(bool(top.get('structure_confirms_breakout', False)))};"
+                f"reversal={int(bool(top.get('structure_confirms_reversal', False)))};"
+                "shadow_only=true"
+            ),
+        )
+    log_event(
+        "INFO",
+        (
+            "[market_structure_setup_comparison] "
+            f"trend_pullback={int(confluence.get('trend_pullback', 0) or 0)};"
+            f"breakout={int(confluence.get('breakout', 0) or 0)};"
+            f"reversal={int(confluence.get('reversal', 0) or 0)};"
+            f"would_improve_quality={int(confluence.get('would_improve_quality', 0) or 0)};"
+            "shadow_only=true"
+        ),
+    )
+
+
 def _log_phase2_fine_tune_summary(validation_report: dict) -> None:
     fine_tune = dict(validation_report.get("phase2_fine_tune", {}) or {})
     if not fine_tune:
@@ -645,6 +705,7 @@ def worker_loop() -> None:
             _log_calibration_preview_summary(validation_report)
             _log_strategy_bottleneck_summary(validation_report)
             _log_strategy_structure_audit_summary(validation_report)
+            _log_market_structure_audit_summary(validation_report)
             _log_phase2_fine_tune_summary(validation_report)
             _log_phase2_1_fine_tune_summary(validation_report)
             _log_macro_alert_summary(result.get("cycle_result", {}))
