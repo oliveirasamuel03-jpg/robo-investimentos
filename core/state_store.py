@@ -414,6 +414,26 @@ DEFAULT_STATE = {
         "market_structure_minimum_sample_met": False,
         "market_structure_why_no_candidate": "No market structure audit data yet.",
     },
+    "fib_alignment_audit": {
+        "fib_alignment_enabled": True,
+        "fib_alignment_mode": "SHADOW_ONLY",
+        "fib_alignment_source": "video_pdf_inspired_checklist_v1",
+        "fib_alignment_score": None,
+        "fib_alignment_status": "insufficient_data",
+        "fib_alignment_top_symbol": "",
+        "fib_alignment_anchor_low_status": "insufficient",
+        "fib_alignment_anchor_high_status": "insufficient",
+        "fib_alignment_zone_status": "insufficient",
+        "fib_alignment_pivot_status": "insufficient",
+        "fib_alignment_bos_status": "insufficient",
+        "fib_alignment_entry_confirmation_status": "insufficient",
+        "fib_alignment_confluence_status": "insufficient",
+        "fib_alignment_missing_evidence": ["no_data"],
+        "fib_alignment_why_differs": "No Fibonacci video/PDF alignment audit data yet.",
+        "fib_alignment_recommendation": "insufficient_data",
+        "fib_alignment_checklist": [],
+        "fib_alignment_last_run_at": "",
+    },
     "phase2_fine_tune": {
         "fine_tune_enabled": True,
         "fine_tune_reason": "Relaxamento conservador de confirmacao secundaria marginal em PAPER.",
@@ -836,6 +856,41 @@ def load_bot_state() -> dict:
         value = market_structure_state.get(key, {}) or {}
         market_structure_state[key] = dict(value) if isinstance(value, dict) else {}
     state["market_structure_audit"] = market_structure_state
+    fib_alignment_state = state.get("fib_alignment_audit", {}) or {}
+    fib_alignment_state["fib_alignment_enabled"] = bool(fib_alignment_state.get("fib_alignment_enabled", True))
+    for key, fallback in (
+        ("fib_alignment_mode", "SHADOW_ONLY"),
+        ("fib_alignment_source", "video_pdf_inspired_checklist_v1"),
+        ("fib_alignment_status", "insufficient_data"),
+        ("fib_alignment_top_symbol", ""),
+        ("fib_alignment_anchor_low_status", "insufficient"),
+        ("fib_alignment_anchor_high_status", "insufficient"),
+        ("fib_alignment_zone_status", "insufficient"),
+        ("fib_alignment_pivot_status", "insufficient"),
+        ("fib_alignment_bos_status", "insufficient"),
+        ("fib_alignment_entry_confirmation_status", "insufficient"),
+        ("fib_alignment_confluence_status", "insufficient"),
+        ("fib_alignment_why_differs", "No Fibonacci video/PDF alignment audit data yet."),
+        ("fib_alignment_recommendation", "insufficient_data"),
+        ("fib_alignment_last_run_at", ""),
+    ):
+        fib_alignment_state[key] = str(fib_alignment_state.get(key) or fallback)
+    alignment_score = fib_alignment_state.get("fib_alignment_score")
+    try:
+        fib_alignment_state["fib_alignment_score"] = None if alignment_score in (None, "") else float(alignment_score or 0.0)
+    except (TypeError, ValueError):
+        fib_alignment_state["fib_alignment_score"] = None
+    fib_alignment_state["fib_alignment_missing_evidence"] = [
+        str(item)
+        for item in list(fib_alignment_state.get("fib_alignment_missing_evidence", []) or [])
+        if str(item).strip()
+    ][:8]
+    fib_alignment_state["fib_alignment_checklist"] = [
+        item
+        for item in list(fib_alignment_state.get("fib_alignment_checklist", []) or [])
+        if isinstance(item, dict)
+    ][:12]
+    state["fib_alignment_audit"] = fib_alignment_state
     phase2_fine_tune_state = state.get("phase2_fine_tune", {}) or {}
     phase2_fine_tune_state["fine_tune_enabled"] = bool(phase2_fine_tune_state.get("fine_tune_enabled", True))
     for key, fallback in (

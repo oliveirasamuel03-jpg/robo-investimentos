@@ -22,6 +22,7 @@ from core.config import (
     ensure_app_directories,
 )
 from core.market_context import apply_context_filter, get_market_context
+from core.fibonacci_alignment_audit import build_fibonacci_alignment_audit
 from core.macro_alerts import apply_macro_risk_filter, default_macro_alert_state
 from core.market_structure_audit import build_market_structure_audit
 from core.market_data import (
@@ -1351,8 +1352,10 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[s
         signals=signals,
         market_context=market_context,
     )
+    fib_alignment_audit = build_fibonacci_alignment_audit(market_structure_audit)
     cycle_validation["strategy_structure_audit"] = strategy_structure_audit
     cycle_validation["market_structure_audit"] = market_structure_audit
+    cycle_validation["fib_alignment_audit"] = fib_alignment_audit
 
     if not config.allow_new_entries:
         for candidate in candidates:
@@ -1447,6 +1450,7 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[s
     state["phase2_1_fine_tune"] = phase2_1_fine_tune
     state["strategy_structure_audit"] = strategy_structure_audit
     state["market_structure_audit"] = market_structure_audit
+    state["fib_alignment_audit"] = fib_alignment_audit
 
     history = state.get("history", []) or []
     history.append(
@@ -1493,4 +1497,5 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[s
         "phase2_1_fine_tune": phase2_1_fine_tune,
         "strategy_structure_audit": strategy_structure_audit,
         "market_structure_audit": market_structure_audit,
+        "fib_alignment_audit": fib_alignment_audit,
     }

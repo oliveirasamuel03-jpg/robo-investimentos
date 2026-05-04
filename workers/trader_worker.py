@@ -382,6 +382,50 @@ def _log_market_structure_audit_summary(validation_report: dict) -> None:
     )
 
 
+def _log_fib_alignment_audit_summary(validation_report: dict) -> None:
+    audit = dict(validation_report.get("fib_alignment_audit", {}) or {})
+    if not audit:
+        return
+    score = audit.get("fib_alignment_score")
+    score_text = "none" if score is None else f"{float(score):.4f}"
+    log_event(
+        "INFO",
+        (
+            "[fib_alignment_audit_summary] "
+            f"mode={str(audit.get('fib_alignment_mode') or 'SHADOW_ONLY').lower()};"
+            f"symbol={str(audit.get('fib_alignment_top_symbol') or 'none')};"
+            f"score={score_text};"
+            f"status={str(audit.get('fib_alignment_status') or 'insufficient_data')};"
+            f"recommendation={str(audit.get('fib_alignment_recommendation') or 'insufficient_data')};"
+            "shadow_only=true"
+        ),
+    )
+    checklist = [item for item in list(audit.get("fib_alignment_checklist", []) or []) if isinstance(item, dict)]
+    for row in checklist[:3]:
+        log_event(
+            "INFO",
+            (
+                "[fib_alignment_rule_comparison] "
+                f"item={str(row.get('item') or 'unknown').replace(' ', '_')};"
+                f"expected={str(row.get('esperado_pelo_video_pdf') or 'none').replace(' ', '_')};"
+                f"detected={str(row.get('detectado_pelo_app') or 'none').replace(' ', '_')};"
+                f"status={str(row.get('status') or 'unknown')};"
+                "shadow_only=true"
+            ),
+        )
+    why_differs = str(audit.get("fib_alignment_why_differs") or "").strip()
+    if why_differs:
+        log_event(
+            "INFO",
+            (
+                "[fib_alignment_divergence] "
+                f"symbol={str(audit.get('fib_alignment_top_symbol') or 'none')};"
+                f"why={why_differs.replace(' ', '_')};"
+                "shadow_only=true"
+            ),
+        )
+
+
 def _log_phase2_fine_tune_summary(validation_report: dict) -> None:
     fine_tune = dict(validation_report.get("phase2_fine_tune", {}) or {})
     if not fine_tune:
@@ -706,6 +750,7 @@ def worker_loop() -> None:
             _log_strategy_bottleneck_summary(validation_report)
             _log_strategy_structure_audit_summary(validation_report)
             _log_market_structure_audit_summary(validation_report)
+            _log_fib_alignment_audit_summary(validation_report)
             _log_phase2_fine_tune_summary(validation_report)
             _log_phase2_1_fine_tune_summary(validation_report)
             _log_macro_alert_summary(result.get("cycle_result", {}))
