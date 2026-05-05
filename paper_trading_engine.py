@@ -25,6 +25,7 @@ from core.market_context import apply_context_filter, get_market_context
 from core.fibonacci_alignment_audit import build_fibonacci_alignment_audit
 from core.macro_alerts import apply_macro_risk_filter, default_macro_alert_state
 from core.market_structure_audit import build_market_structure_audit
+from core.shadow_decision_simulator import build_shadow_decision_simulator
 from core.market_data import (
     fallback_data as build_fallback_market_data,
     fetch_market_data_frame,
@@ -1353,9 +1354,17 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[s
         market_context=market_context,
     )
     fib_alignment_audit = build_fibonacci_alignment_audit(market_structure_audit)
+    shadow_decision_simulator = build_shadow_decision_simulator(
+        signals=signals,
+        state=state,
+        market_data=market_data,
+        market_structure_audit=market_structure_audit,
+        fib_alignment_audit=fib_alignment_audit,
+    )
     cycle_validation["strategy_structure_audit"] = strategy_structure_audit
     cycle_validation["market_structure_audit"] = market_structure_audit
     cycle_validation["fib_alignment_audit"] = fib_alignment_audit
+    cycle_validation["shadow_decision_simulator"] = shadow_decision_simulator
 
     if not config.allow_new_entries:
         for candidate in candidates:
@@ -1451,6 +1460,7 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[s
     state["strategy_structure_audit"] = strategy_structure_audit
     state["market_structure_audit"] = market_structure_audit
     state["fib_alignment_audit"] = fib_alignment_audit
+    state["shadow_decision_simulator"] = shadow_decision_simulator
 
     history = state.get("history", []) or []
     history.append(
@@ -1498,4 +1508,5 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[s
         "strategy_structure_audit": strategy_structure_audit,
         "market_structure_audit": market_structure_audit,
         "fib_alignment_audit": fib_alignment_audit,
+        "shadow_decision_simulator": shadow_decision_simulator,
     }

@@ -421,6 +421,26 @@ def _fib_alignment_audit_summary(validation_report: dict[str, Any]) -> str:
     )
 
 
+def _shadow_decision_simulator_summary(validation_report: dict[str, Any]) -> str:
+    simulator = dict(validation_report.get("shadow_decision_simulator", {}) or {})
+    if not simulator:
+        return "Shadow decision simulator: no diagnostic sample yet. Shadow only."
+    if not bool(simulator.get("shadow_decision_simulator_enabled", True)):
+        return "Shadow decision simulator: disabled. Shadow only."
+    near_count = int(simulator.get("shadow_near_approved_count", 0) or 0)
+    would_enter = int(simulator.get("shadow_would_enter_count", 0) or 0)
+    pending = int(simulator.get("shadow_pending_count", 0) or 0)
+    wins = int(simulator.get("shadow_would_win_count", 0) or 0)
+    losses = int(simulator.get("shadow_would_lose_count", 0) or 0)
+    best_symbol = _safe_text(simulator.get("shadow_best_symbol"), fallback="none")
+    recommendation = _safe_text(simulator.get("shadow_policy_recommendation"), fallback="observe_more")
+    return (
+        f"Shadow decision simulator: near-approved analyzed={near_count}; would_enter={would_enter}; "
+        f"pending={pending}; theoretical_wins={wins}; theoretical_losses={losses}; best_symbol={best_symbol}; "
+        f"recommendation={recommendation}. Shadow only; official trades, PnL, score, broker, and thresholds were unchanged."
+    )
+
+
 def _phase2_fine_tune_summary(validation_report: dict[str, Any]) -> str:
     fine_tune = dict(validation_report.get("phase2_fine_tune", {}) or {})
     if not fine_tune:
@@ -522,6 +542,7 @@ def _build_daily_email_body(state: dict[str, Any], validation_report: dict[str, 
     strategy_structure_audit_summary = _strategy_structure_audit_summary(validation_report)
     market_structure_audit_summary = _market_structure_audit_summary(validation_report)
     fib_alignment_audit_summary = _fib_alignment_audit_summary(validation_report)
+    shadow_decision_simulator_summary = _shadow_decision_simulator_summary(validation_report)
     phase2_fine_tune_summary = _phase2_fine_tune_summary(validation_report)
     phase2_1_fine_tune_summary = _phase2_1_fine_tune_summary(validation_report)
     short_audit_summary = _short_audit_summary(state, validation_report)
@@ -547,6 +568,7 @@ def _build_daily_email_body(state: dict[str, Any], validation_report: dict[str, 
         strategy_structure_audit_summary,
         market_structure_audit_summary,
         fib_alignment_audit_summary,
+        shadow_decision_simulator_summary,
         phase2_fine_tune_summary,
         phase2_1_fine_tune_summary,
         f"Multi-timeframe summary: {multi_timeframe_summary}",
