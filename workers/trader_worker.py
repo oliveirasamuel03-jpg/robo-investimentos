@@ -426,6 +426,63 @@ def _log_fib_alignment_audit_summary(validation_report: dict) -> None:
         )
 
 
+def _log_shadow_decision_simulator_summary(validation_report: dict) -> None:
+    simulator = dict(validation_report.get("shadow_decision_simulator", {}) or {})
+    if not simulator:
+        return
+    log_event(
+        "INFO",
+        (
+            "[shadow_decision_simulator_summary] "
+            f"mode={str(simulator.get('shadow_decision_mode') or 'SHADOW_ONLY').lower()};"
+            f"near={int(simulator.get('shadow_near_approved_count', 0) or 0)};"
+            f"safe={int(simulator.get('shadow_safe_near_approved_count', 0) or 0)};"
+            f"marginal={int(simulator.get('shadow_marginal_count', 0) or 0)};"
+            f"would_enter={int(simulator.get('shadow_would_enter_count', 0) or 0)};"
+            f"pending={int(simulator.get('shadow_pending_count', 0) or 0)};"
+            f"recommendation={str(simulator.get('shadow_policy_recommendation') or 'observe_more')};"
+            "shadow_only=true"
+        ),
+    )
+    candidates = [item for item in list(simulator.get("shadow_recent_candidates", []) or []) if isinstance(item, dict)]
+    for item in candidates[:3]:
+        log_event(
+            "INFO",
+            (
+                "[shadow_decision_candidate] "
+                f"symbol={str(item.get('symbol') or 'none')};"
+                f"strategy={str(item.get('strategy') or 'none')};"
+                f"score={item.get('current_score') if item.get('current_score') is not None else 'none'};"
+                f"gap={item.get('score_gap') if item.get('score_gap') is not None else 'none'};"
+                f"class={str(item.get('candidate_class') or 'unknown')};"
+                f"would_enter={int(bool(item.get('shadow_would_enter', False)))};"
+                f"outcome={str(item.get('outcome_label') or 'UNKNOWN')};"
+                "shadow_only=true"
+            ),
+        )
+    outcome = dict(simulator.get("shadow_outcome_summary", {}) or {})
+    log_event(
+        "INFO",
+        (
+            "[shadow_decision_outcome_update] "
+            f"pending={int(outcome.get('pending', 0) or 0)};"
+            f"would_win={int(outcome.get('would_win', 0) or 0)};"
+            f"would_lose={int(outcome.get('would_lose', 0) or 0)};"
+            f"invalidated={int(outcome.get('invalidated', 0) or 0)};"
+            "shadow_only=true"
+        ),
+    )
+    log_event(
+        "INFO",
+        (
+            "[shadow_decision_policy_recommendation] "
+            f"recommendation={str(simulator.get('shadow_policy_recommendation') or 'observe_more')};"
+            f"dominant_block={str(simulator.get('shadow_dominant_block_reason') or 'none')};"
+            "shadow_only=true"
+        ),
+    )
+
+
 def _log_phase2_fine_tune_summary(validation_report: dict) -> None:
     fine_tune = dict(validation_report.get("phase2_fine_tune", {}) or {})
     if not fine_tune:
@@ -751,6 +808,7 @@ def worker_loop() -> None:
             _log_strategy_structure_audit_summary(validation_report)
             _log_market_structure_audit_summary(validation_report)
             _log_fib_alignment_audit_summary(validation_report)
+            _log_shadow_decision_simulator_summary(validation_report)
             _log_phase2_fine_tune_summary(validation_report)
             _log_phase2_1_fine_tune_summary(validation_report)
             _log_macro_alert_summary(result.get("cycle_result", {}))

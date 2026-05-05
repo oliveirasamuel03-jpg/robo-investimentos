@@ -604,6 +604,11 @@ fib_alignment_audit = dict(
     or state.get("fib_alignment_audit", {})
     or {}
 )
+shadow_decision_simulator = dict(
+    validation_report.get("shadow_decision_simulator")
+    or state.get("shadow_decision_simulator", {})
+    or {}
+)
 phase2_fine_tune = dict(
     validation_report.get("phase2_fine_tune")
     or state.get("phase2_fine_tune", {})
@@ -878,6 +883,47 @@ if fib_alignment_audit:
     ]
     if checklist_rows:
         st.dataframe(pd.DataFrame(checklist_rows[:8]), hide_index=True, use_container_width=True)
+if shadow_decision_simulator:
+    st.subheader("SIMULADOR SHADOW DE DECISAO - FASE 2.4")
+    st.caption(
+        "SHADOW ONLY: quase-aprovados sao simulados separadamente. "
+        "Nao abre trade, nao cria posicao paper oficial, nao altera PnL, score, broker ou thresholds."
+    )
+    sd_c1, sd_c2, sd_c3, sd_c4, sd_c5 = st.columns(5)
+    sd_c1.metric("Quase-aprovados", int(shadow_decision_simulator.get("shadow_near_approved_count", 0) or 0))
+    sd_c2.metric("Safe", int(shadow_decision_simulator.get("shadow_safe_near_approved_count", 0) or 0))
+    sd_c3.metric("Marginal", int(shadow_decision_simulator.get("shadow_marginal_count", 0) or 0))
+    sd_c4.metric("Teria entrado", int(shadow_decision_simulator.get("shadow_would_enter_count", 0) or 0))
+    sd_c5.metric("Pendentes", int(shadow_decision_simulator.get("shadow_pending_count", 0) or 0))
+    sd_d1, sd_d2, sd_d3, sd_d4 = st.columns(4)
+    sd_d1.metric("Teria ganho", int(shadow_decision_simulator.get("shadow_would_win_count", 0) or 0))
+    sd_d2.metric("Teria perdido", int(shadow_decision_simulator.get("shadow_would_lose_count", 0) or 0))
+    sd_d3.metric("Melhor ativo", shadow_decision_simulator.get("shadow_best_symbol") or "-")
+    sd_d4.metric("Melhor setup", shadow_decision_simulator.get("shadow_best_strategy") or "-")
+    st.caption(
+        f"Bloqueio dominante: {shadow_decision_simulator.get('shadow_dominant_block_reason') or '-'} | "
+        f"Recomendacao: {shadow_decision_simulator.get('shadow_policy_recommendation') or 'observe_more'} | "
+        f"Politica: {shadow_decision_simulator.get('shadow_entry_policy') or 'conservative_v1'}"
+    )
+    shadow_rows = [
+        {
+            "symbol": row.get("symbol"),
+            "setup": row.get("strategy"),
+            "score": row.get("current_score"),
+            "score_gap": row.get("score_gap"),
+            "class": row.get("candidate_class"),
+            "would_enter": row.get("shadow_would_enter"),
+            "reason": row.get("shadow_entry_reason") or row.get("shadow_block_reason"),
+            "fib_alignment": row.get("fib_alignment_status"),
+            "pivot": row.get("pivot_detected"),
+            "bos": row.get("bos_detected"),
+            "outcome": row.get("outcome_label"),
+        }
+        for row in list(shadow_decision_simulator.get("shadow_recent_candidates", []) or [])
+        if isinstance(row, dict)
+    ]
+    if shadow_rows:
+        st.dataframe(pd.DataFrame(shadow_rows[:8]), hide_index=True, use_container_width=True)
 if phase2_fine_tune:
     st.subheader("Ajuste Fino FASE 2")
     st.caption(

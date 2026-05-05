@@ -434,6 +434,31 @@ DEFAULT_STATE = {
         "fib_alignment_checklist": [],
         "fib_alignment_last_run_at": "",
     },
+    "shadow_decision_simulator": {
+        "shadow_decision_simulator_enabled": True,
+        "shadow_decision_mode": "SHADOW_ONLY",
+        "shadow_entry_policy": "conservative_v1",
+        "shadow_decision_last_run_at": "",
+        "shadow_near_approved_count": 0,
+        "shadow_safe_near_approved_count": 0,
+        "shadow_marginal_count": 0,
+        "shadow_unsafe_count": 0,
+        "shadow_would_enter_count": 0,
+        "shadow_pending_count": 0,
+        "shadow_would_win_count": 0,
+        "shadow_would_lose_count": 0,
+        "shadow_best_symbol": "",
+        "shadow_best_strategy": "",
+        "shadow_best_candidate_score": None,
+        "shadow_dominant_block_reason": "",
+        "shadow_policy_recommendation": "observe_more",
+        "shadow_recent_candidates": [],
+        "shadow_outcome_summary": {},
+        "shadow_reason": "No shadow decision simulator data yet.",
+        "shadow_stop_pct": 0.025,
+        "shadow_take_profit_pct": 0.04,
+        "shadow_max_hold_cycles": 24,
+    },
     "phase2_fine_tune": {
         "fine_tune_enabled": True,
         "fine_tune_reason": "Relaxamento conservador de confirmacao secundaria marginal em PAPER.",
@@ -891,6 +916,50 @@ def load_bot_state() -> dict:
         if isinstance(item, dict)
     ][:12]
     state["fib_alignment_audit"] = fib_alignment_state
+    shadow_state = state.get("shadow_decision_simulator", {}) or {}
+    shadow_state["shadow_decision_simulator_enabled"] = bool(
+        shadow_state.get("shadow_decision_simulator_enabled", True)
+    )
+    for key, fallback in (
+        ("shadow_decision_mode", "SHADOW_ONLY"),
+        ("shadow_entry_policy", "conservative_v1"),
+        ("shadow_decision_last_run_at", ""),
+        ("shadow_best_symbol", ""),
+        ("shadow_best_strategy", ""),
+        ("shadow_dominant_block_reason", ""),
+        ("shadow_policy_recommendation", "observe_more"),
+        ("shadow_reason", "No shadow decision simulator data yet."),
+    ):
+        shadow_state[key] = str(shadow_state.get(key) or fallback)
+    for key in (
+        "shadow_near_approved_count",
+        "shadow_safe_near_approved_count",
+        "shadow_marginal_count",
+        "shadow_unsafe_count",
+        "shadow_would_enter_count",
+        "shadow_pending_count",
+        "shadow_would_win_count",
+        "shadow_would_lose_count",
+        "shadow_max_hold_cycles",
+    ):
+        try:
+            shadow_state[key] = int(shadow_state.get(key, 0) or 0)
+        except (TypeError, ValueError):
+            shadow_state[key] = 0
+    for key in ("shadow_best_candidate_score", "shadow_stop_pct", "shadow_take_profit_pct"):
+        value = shadow_state.get(key)
+        try:
+            shadow_state[key] = None if value in (None, "") else float(value or 0.0)
+        except (TypeError, ValueError):
+            shadow_state[key] = None
+    shadow_state["shadow_recent_candidates"] = [
+        item
+        for item in list(shadow_state.get("shadow_recent_candidates", []) or [])
+        if isinstance(item, dict)
+    ][:30]
+    outcome_summary = shadow_state.get("shadow_outcome_summary", {}) or {}
+    shadow_state["shadow_outcome_summary"] = dict(outcome_summary) if isinstance(outcome_summary, dict) else {}
+    state["shadow_decision_simulator"] = shadow_state
     phase2_fine_tune_state = state.get("phase2_fine_tune", {}) or {}
     phase2_fine_tune_state["fine_tune_enabled"] = bool(phase2_fine_tune_state.get("fine_tune_enabled", True))
     for key, fallback in (
