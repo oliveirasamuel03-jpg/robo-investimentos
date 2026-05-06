@@ -60,6 +60,13 @@ def test_state_store_bootstraps_files_and_defaults(isolated_storage):
     assert state["shadow_decision_simulator"]["shadow_recent_candidates"] == []
     assert state["shadow_decision_simulator"]["shadow_would_enter_count"] == 0
     assert state["shadow_decision_simulator"]["preview_near_approved_count"] == 0
+    assert state["shadow_decision_simulator"]["shadow_candidates_unique_count"] == 0
+    assert state["shadow_decision_simulator"]["shadow_current_cycle_analyzed_count"] == 0
+    assert state["shadow_decision_simulator"]["shadow_current_cycle_classified_count"] == 0
+    assert state["shadow_decision_simulator"]["shadow_current_cycle_unsafe_count"] == 0
+    assert state["shadow_decision_simulator"]["shadow_accumulated_analyzed_count"] == 0
+    assert state["shadow_decision_simulator"]["shadow_counts_scope"] == "current_cycle_and_accumulated"
+    assert state["shadow_decision_simulator"]["shadow_counter_warning"] is False
     assert state["shadow_decision_simulator"]["shadow_raw_near_approved_count"] == 0
     assert state["shadow_decision_simulator"]["shadow_unsafe_rejection_count"] == 0
     assert state["phase2_fine_tune"]["fine_tune_enabled"] is True
@@ -131,6 +138,8 @@ def test_state_store_backfills_strategy_structure_audit_for_old_state(isolated_s
     assert state["shadow_decision_simulator"]["shadow_decision_mode"] == "SHADOW_ONLY"
     assert state["shadow_decision_simulator"]["shadow_recent_candidates"] == []
     assert state["shadow_decision_simulator"]["shadow_candidates_analyzed_count"] == 0
+    assert state["shadow_decision_simulator"]["shadow_current_cycle_analyzed_count"] == 0
+    assert state["shadow_decision_simulator"]["shadow_counts_scope"] == "current_cycle_and_accumulated"
 
 
 def test_update_market_data_status_tracks_last_success_and_error(isolated_storage):

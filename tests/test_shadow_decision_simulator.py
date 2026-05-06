@@ -231,3 +231,93 @@ def test_small_secondary_gap_can_be_marginal_without_becoming_safe():
     assert candidate["candidate_class"] == "MARGINAL_NEAR_APPROVED"
     assert candidate["safe_candidate"] is False
     assert candidate["shadow_would_enter"] is False
+
+
+def test_unsafe_rejection_counts_as_analyzed_and_classified():
+    module = load_module("core.shadow_decision_simulator")
+
+    result = module.build_shadow_decision_simulator(
+        signals=[_signal(data_source="fallback", rejection_reasons=["fallback_blocked"])],
+        state=_state(),
+        market_data=_market_data(),
+        market_structure_audit=_structure(),
+        fib_alignment_audit=_fib(),
+    )
+
+    candidate = result["shadow_recent_candidates"][0]
+    assert candidate["candidate_class"] == "UNSAFE_REJECTION"
+    assert candidate["analyzed_by_shadow"] is True
+    assert candidate["classified_by_shadow"] is True
+    assert result["shadow_current_cycle_analyzed_count"] == 1
+    assert result["shadow_current_cycle_classified_count"] == 1
+    assert result["shadow_current_cycle_unsafe_count"] == 1
+    assert result["shadow_candidates_analyzed_count"] == 1
+    assert result["shadow_counter_warning"] is False
+
+
+def test_duplicate_candidates_are_ignored_without_zeroing_accumulated_analysis():
+    module = load_module("core.shadow_decision_simulator")
+    signal = _signal(data_source="fallback", rejection_reasons=["fallback_blocked"])
+
+    first = module.build_shadow_decision_simulator(
+        signals=[signal],
+        state=_state(),
+        market_data=_market_data(),
+        market_structure_audit=_structure(),
+        fib_alignment_audit=_fib(),
+    )
+    second = module.build_shadow_decision_simulator(
+        signals=[signal],
+        state=_state(shadow_decision_simulator=first),
+        market_data=_market_data(),
+        market_structure_audit=_structure(),
+        fib_alignment_audit=_fib(),
+    )
+
+    candidate = second["shadow_recent_candidates"][0]
+    assert second["shadow_current_cycle_received_count"] == 1
+    assert second["shadow_candidates_unique_count"] == 0
+    assert second["shadow_current_cycle_ignored_count"] == 1
+    assert second["shadow_current_cycle_analyzed_count"] == 0
+    assert second["shadow_accumulated_analyzed_count"] == 1
+    assert second["shadow_candidates_analyzed_count"] == 1
+    assert candidate["duplicate_candidate"] is True
+    assert candidate["shadow_trace_status"] == "duplicate_existing_shadow_candidate"
+
+
+def test_counter_subsets_stay_inside_classified_current_cycle():
+    module = load_module("core.shadow_decision_simulator")
+
+    result = module.build_shadow_decision_simulator(
+        signals=[
+            _signal(signal_key="BNB-USD|safe", signal_timestamp="2026-05-05T10:00:00+00:00"),
+            _signal(
+                signal_key="BNB-USD|marginal",
+                signal_timestamp="2026-05-05T10:01:00+00:00",
+                score=0.715,
+                rejection_reasons=["confidence_too_low"],
+            ),
+            _signal(
+                signal_key="BNB-USD|unsafe",
+                signal_timestamp="2026-05-05T10:02:00+00:00",
+                data_source="fallback",
+                rejection_reasons=["fallback_blocked"],
+            ),
+        ],
+        state=_state(),
+        market_data=_market_data(),
+        market_structure_audit=_structure(),
+        fib_alignment_audit=_fib(),
+    )
+
+    classified = result["shadow_current_cycle_classified_count"]
+    subset_total = (
+        result["shadow_current_cycle_safe_near_approved_count"]
+        + result["shadow_current_cycle_marginal_near_approved_count"]
+        + result["shadow_current_cycle_unsafe_count"]
+    )
+    assert result["shadow_current_cycle_received_count"] >= result["shadow_candidates_unique_count"]
+    assert result["shadow_current_cycle_ignored_count"] <= result["shadow_current_cycle_received_count"]
+    assert result["shadow_current_cycle_analyzed_count"] == classified
+    assert subset_total <= classified
+    assert result["shadow_counter_warning"] is False

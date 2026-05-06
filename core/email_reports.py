@@ -428,12 +428,30 @@ def _shadow_decision_simulator_summary(validation_report: dict[str, Any]) -> str
     if not bool(simulator.get("shadow_decision_simulator_enabled", True)):
         return "Shadow decision simulator: disabled. Shadow only."
     preview_count = int(simulator.get("preview_near_approved_count", simulator.get("shadow_near_approved_count", 0)) or 0)
-    analyzed_count = int(simulator.get("shadow_candidates_analyzed_count", 0) or 0)
-    safe_count = int(simulator.get("shadow_safe_near_approved_count", 0) or 0)
-    marginal_count = int(
-        simulator.get("shadow_marginal_near_approved_count", simulator.get("shadow_marginal_count", 0)) or 0
+    received_count = int(
+        simulator.get("shadow_current_cycle_received_count", simulator.get("shadow_candidates_received_count", 0)) or 0
     )
-    unsafe_count = int(simulator.get("shadow_unsafe_count", simulator.get("shadow_unsafe_rejection_count", 0)) or 0)
+    unique_count = int(simulator.get("shadow_candidates_unique_count", 0) or 0)
+    analyzed_count = int(
+        simulator.get("shadow_current_cycle_analyzed_count", simulator.get("shadow_candidates_analyzed_count", 0)) or 0
+    )
+    classified_count = int(
+        simulator.get("shadow_current_cycle_classified_count", simulator.get("shadow_candidates_classified_count", 0)) or 0
+    )
+    safe_count = int(
+        simulator.get("shadow_current_cycle_safe_near_approved_count", simulator.get("shadow_safe_near_approved_count", 0))
+        or 0
+    )
+    marginal_count = int(
+        simulator.get(
+            "shadow_current_cycle_marginal_near_approved_count",
+            simulator.get("shadow_marginal_near_approved_count", simulator.get("shadow_marginal_count", 0)),
+        )
+        or 0
+    )
+    unsafe_count = int(
+        simulator.get("shadow_current_cycle_unsafe_count", simulator.get("shadow_unsafe_rejection_count", 0)) or 0
+    )
     would_enter = int(simulator.get("shadow_would_enter_count", 0) or 0)
     pending = int(simulator.get("shadow_pending_count", 0) or 0)
     wins = int(simulator.get("shadow_would_win_count", 0) or 0)
@@ -442,11 +460,12 @@ def _shadow_decision_simulator_summary(validation_report: dict[str, Any]) -> str
     dominant = _safe_text(simulator.get("shadow_dominant_block_reason"), fallback="none")
     recommendation = _safe_text(simulator.get("shadow_policy_recommendation"), fallback="observe_more")
     return (
-        f"Shadow decision simulator: preview_near_approved={preview_count}; analyzed={analyzed_count}; "
+        f"Shadow decision simulator: preview_near_approved={preview_count}; received={received_count}; "
+        f"unique={unique_count}; analyzed_unique={analyzed_count}; classified={classified_count}; "
         f"safe={safe_count}; marginal={marginal_count}; unsafe={unsafe_count}; would_enter={would_enter}; "
         f"pending={pending}; theoretical_wins={wins}; theoretical_losses={losses}; best_symbol={best_symbol}; "
         f"dominant_exclusion={dominant}; recommendation={recommendation}. "
-        "Shadow only; official trades, PnL, score, broker, and thresholds were unchanged."
+        "Analyzed includes candidates classified as unsafe. Shadow only; official trades, PnL, score, broker, and thresholds were unchanged."
     )
 
 
