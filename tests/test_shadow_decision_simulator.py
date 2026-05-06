@@ -78,7 +78,11 @@ def test_small_secondary_rejection_can_be_shadow_would_enter_without_real_trade_
 
     candidate = result["shadow_recent_candidates"][0]
     assert result["shadow_would_enter_count"] == 1
+    assert result["preview_near_approved_count"] == 1
+    assert result["shadow_raw_near_approved_count"] == 1
     assert candidate["shadow_would_enter"] is True
+    assert candidate["raw_near_approved"] is True
+    assert candidate["safe_candidate"] is True
     assert candidate["outcome_label"] == "STILL_PENDING"
     assert "trade_approved" not in result
     assert "positions" not in result
@@ -98,7 +102,12 @@ def test_no_setup_eligible_blocks_shadow_entry():
 
     candidate = result["shadow_recent_candidates"][0]
     assert candidate["candidate_class"] == "STRUCTURE_MISSING"
+    assert candidate["raw_near_approved"] is True
+    assert candidate["why_not_safe"] == "blocked_by_no_setup_eligible"
     assert candidate["shadow_would_enter"] is False
+    assert result["preview_near_approved_count"] == 1
+    assert result["shadow_raw_near_approved_count"] == 1
+    assert result["shadow_structure_missing_count"] == 1
 
 
 def test_trend_not_confirmed_blocks_shadow_entry():
@@ -112,7 +121,9 @@ def test_trend_not_confirmed_blocks_shadow_entry():
         fib_alignment_audit=_fib(),
     )
 
-    assert result["shadow_recent_candidates"][0]["shadow_would_enter"] is False
+    candidate = result["shadow_recent_candidates"][0]
+    assert candidate["shadow_would_enter"] is False
+    assert candidate["why_not_safe"] == "blocked_by_trend_not_confirmed"
 
 
 def test_fallback_blocks_shadow_entry():
@@ -141,7 +152,9 @@ def test_critical_context_blocks_shadow_entry():
         fib_alignment_audit=_fib(),
     )
 
-    assert result["shadow_recent_candidates"][0]["shadow_would_enter"] is False
+    candidate = result["shadow_recent_candidates"][0]
+    assert candidate["shadow_would_enter"] is False
+    assert candidate["why_not_safe"] == "blocked_by_context"
 
 
 def test_partial_alignment_without_pivot_or_bos_does_not_release_alone():
@@ -157,6 +170,7 @@ def test_partial_alignment_without_pivot_or_bos_does_not_release_alone():
 
     candidate = result["shadow_recent_candidates"][0]
     assert candidate["candidate_class"] == "CONFIRMATION_MISSING"
+    assert candidate["why_not_safe"] == "blocked_by_missing_pivot_bos"
     assert candidate["shadow_would_enter"] is False
 
 
@@ -182,3 +196,38 @@ def test_shadow_outcome_is_updated_separately_from_official_state():
     assert second["shadow_would_win_count"] == 1
     assert next_state["wallet_value"] == 1000.0
     assert next_state["history"] == []
+
+
+def test_reversal_not_eligible_is_traceable_and_blocks_shadow_entry():
+    module = load_module("core.shadow_decision_simulator")
+
+    result = module.build_shadow_decision_simulator(
+        signals=[_signal(rejection_reasons=["reversal_not_eligible"], score=0.735)],
+        state=_state(),
+        market_data=_market_data(),
+        market_structure_audit=_structure(),
+        fib_alignment_audit=_fib(),
+    )
+
+    candidate = result["shadow_recent_candidates"][0]
+    assert candidate["raw_near_approved"] is True
+    assert candidate["shadow_would_enter"] is False
+    assert candidate["why_not_safe"] == "blocked_by_reversal_not_eligible"
+
+
+def test_small_secondary_gap_can_be_marginal_without_becoming_safe():
+    module = load_module("core.shadow_decision_simulator")
+
+    result = module.build_shadow_decision_simulator(
+        signals=[_signal(score=0.715, rejection_reasons=["confidence_too_low"])],
+        state=_state(),
+        market_data=_market_data(),
+        market_structure_audit=_structure(),
+        fib_alignment_audit=_fib(),
+    )
+
+    candidate = result["shadow_recent_candidates"][0]
+    assert candidate["raw_near_approved"] is True
+    assert candidate["candidate_class"] == "MARGINAL_NEAR_APPROVED"
+    assert candidate["safe_candidate"] is False
+    assert candidate["shadow_would_enter"] is False

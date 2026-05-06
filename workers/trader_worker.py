@@ -435,9 +435,11 @@ def _log_shadow_decision_simulator_summary(validation_report: dict) -> None:
         (
             "[shadow_decision_simulator_summary] "
             f"mode={str(simulator.get('shadow_decision_mode') or 'SHADOW_ONLY').lower()};"
-            f"near={int(simulator.get('shadow_near_approved_count', 0) or 0)};"
+            f"preview_near={int(simulator.get('preview_near_approved_count', simulator.get('shadow_near_approved_count', 0)) or 0)};"
+            f"raw_near={int(simulator.get('shadow_raw_near_approved_count', simulator.get('shadow_near_approved_count', 0)) or 0)};"
             f"safe={int(simulator.get('shadow_safe_near_approved_count', 0) or 0)};"
-            f"marginal={int(simulator.get('shadow_marginal_count', 0) or 0)};"
+            f"marginal={int(simulator.get('shadow_marginal_near_approved_count', simulator.get('shadow_marginal_count', 0)) or 0)};"
+            f"unsafe={int(simulator.get('shadow_unsafe_count', simulator.get('shadow_unsafe_rejection_count', 0)) or 0)};"
             f"would_enter={int(simulator.get('shadow_would_enter_count', 0) or 0)};"
             f"pending={int(simulator.get('shadow_pending_count', 0) or 0)};"
             f"recommendation={str(simulator.get('shadow_policy_recommendation') or 'observe_more')};"
@@ -455,7 +457,9 @@ def _log_shadow_decision_simulator_summary(validation_report: dict) -> None:
                 f"score={item.get('current_score') if item.get('current_score') is not None else 'none'};"
                 f"gap={item.get('score_gap') if item.get('score_gap') is not None else 'none'};"
                 f"class={str(item.get('candidate_class') or 'unknown')};"
+                f"raw_near={int(bool(item.get('raw_near_approved', False)))};"
                 f"would_enter={int(bool(item.get('shadow_would_enter', False)))};"
+                f"why_not_safe={str(item.get('why_not_safe') or 'none')};"
                 f"outcome={str(item.get('outcome_label') or 'UNKNOWN')};"
                 "shadow_only=true"
             ),
@@ -478,6 +482,55 @@ def _log_shadow_decision_simulator_summary(validation_report: dict) -> None:
             "[shadow_decision_policy_recommendation] "
             f"recommendation={str(simulator.get('shadow_policy_recommendation') or 'observe_more')};"
             f"dominant_block={str(simulator.get('shadow_dominant_block_reason') or 'none')};"
+            "shadow_only=true"
+        ),
+    )
+    log_event(
+        "INFO",
+        (
+            "[shadow_traceability_summary] "
+            f"preview_count={int(simulator.get('preview_near_approved_count', 0) or 0)};"
+            f"simulator_received_count={int(simulator.get('shadow_candidates_received_count', 0) or 0)};"
+            f"analyzed_count={int(simulator.get('shadow_candidates_analyzed_count', 0) or 0)};"
+            f"unsafe_count={int(simulator.get('shadow_unsafe_count', 0) or 0)};"
+            f"ignored_count={int(simulator.get('shadow_ignored_count', 0) or 0)};"
+            f"dominant_exclusion_reason={str(simulator.get('shadow_dominant_block_reason') or 'none')};"
+            "shadow_only=true"
+        ),
+    )
+    for item in candidates[:3]:
+        log_event(
+            "INFO",
+            (
+                "[shadow_traceability_candidate] "
+                f"symbol={str(item.get('symbol') or 'none')};"
+                f"raw_near={int(bool(item.get('raw_near_approved', False)))};"
+                f"class={str(item.get('candidate_class') or 'unknown')};"
+                f"safe={int(bool(item.get('safe_candidate', False)))};"
+                f"why_not_safe={str(item.get('why_not_safe') or 'none')};"
+                f"why_would_not_enter={str(item.get('why_would_not_enter') or 'none')};"
+                "shadow_only=true"
+            ),
+        )
+    log_event(
+        "INFO",
+        (
+            "[shadow_traceability_exclusion_reason] "
+            f"dominant={str(simulator.get('shadow_dominant_block_reason') or 'none')};"
+            f"primary_blocked={int(simulator.get('shadow_primary_blocked_count', 0) or 0)};"
+            f"secondary_blocked={int(simulator.get('shadow_secondary_blocked_count', 0) or 0)};"
+            "shadow_only=true"
+        ),
+    )
+    log_event(
+        "INFO",
+        (
+            "[shadow_traceability_preview_vs_simulator] "
+            f"preview_count={int(simulator.get('preview_near_approved_count', 0) or 0)};"
+            f"raw_near={int(simulator.get('shadow_raw_near_approved_count', 0) or 0)};"
+            f"safe={int(simulator.get('shadow_safe_near_approved_count', 0) or 0)};"
+            f"marginal={int(simulator.get('shadow_marginal_near_approved_count', 0) or 0)};"
+            f"unsafe={int(simulator.get('shadow_unsafe_count', 0) or 0)};"
             "shadow_only=true"
         ),
     )

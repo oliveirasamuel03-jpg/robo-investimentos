@@ -427,17 +427,26 @@ def _shadow_decision_simulator_summary(validation_report: dict[str, Any]) -> str
         return "Shadow decision simulator: no diagnostic sample yet. Shadow only."
     if not bool(simulator.get("shadow_decision_simulator_enabled", True)):
         return "Shadow decision simulator: disabled. Shadow only."
-    near_count = int(simulator.get("shadow_near_approved_count", 0) or 0)
+    preview_count = int(simulator.get("preview_near_approved_count", simulator.get("shadow_near_approved_count", 0)) or 0)
+    analyzed_count = int(simulator.get("shadow_candidates_analyzed_count", 0) or 0)
+    safe_count = int(simulator.get("shadow_safe_near_approved_count", 0) or 0)
+    marginal_count = int(
+        simulator.get("shadow_marginal_near_approved_count", simulator.get("shadow_marginal_count", 0)) or 0
+    )
+    unsafe_count = int(simulator.get("shadow_unsafe_count", simulator.get("shadow_unsafe_rejection_count", 0)) or 0)
     would_enter = int(simulator.get("shadow_would_enter_count", 0) or 0)
     pending = int(simulator.get("shadow_pending_count", 0) or 0)
     wins = int(simulator.get("shadow_would_win_count", 0) or 0)
     losses = int(simulator.get("shadow_would_lose_count", 0) or 0)
     best_symbol = _safe_text(simulator.get("shadow_best_symbol"), fallback="none")
+    dominant = _safe_text(simulator.get("shadow_dominant_block_reason"), fallback="none")
     recommendation = _safe_text(simulator.get("shadow_policy_recommendation"), fallback="observe_more")
     return (
-        f"Shadow decision simulator: near-approved analyzed={near_count}; would_enter={would_enter}; "
+        f"Shadow decision simulator: preview_near_approved={preview_count}; analyzed={analyzed_count}; "
+        f"safe={safe_count}; marginal={marginal_count}; unsafe={unsafe_count}; would_enter={would_enter}; "
         f"pending={pending}; theoretical_wins={wins}; theoretical_losses={losses}; best_symbol={best_symbol}; "
-        f"recommendation={recommendation}. Shadow only; official trades, PnL, score, broker, and thresholds were unchanged."
+        f"dominant_exclusion={dominant}; recommendation={recommendation}. "
+        "Shadow only; official trades, PnL, score, broker, and thresholds were unchanged."
     )
 
 
