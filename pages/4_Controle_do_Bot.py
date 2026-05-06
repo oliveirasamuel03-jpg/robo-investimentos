@@ -890,9 +890,9 @@ if shadow_decision_simulator:
         "Nao abre trade, nao cria posicao paper oficial, nao altera PnL, score, broker ou thresholds."
     )
     sd_c1, sd_c2, sd_c3, sd_c4, sd_c5 = st.columns(5)
-    sd_c1.metric("Quase-aprovados", int(shadow_decision_simulator.get("shadow_near_approved_count", 0) or 0))
+    sd_c1.metric("Quase-aprovados preview", int(shadow_decision_simulator.get("preview_near_approved_count", shadow_decision_simulator.get("shadow_near_approved_count", 0)) or 0))
     sd_c2.metric("Safe", int(shadow_decision_simulator.get("shadow_safe_near_approved_count", 0) or 0))
-    sd_c3.metric("Marginal", int(shadow_decision_simulator.get("shadow_marginal_count", 0) or 0))
+    sd_c3.metric("Marginal", int(shadow_decision_simulator.get("shadow_marginal_near_approved_count", shadow_decision_simulator.get("shadow_marginal_count", 0)) or 0))
     sd_c4.metric("Teria entrado", int(shadow_decision_simulator.get("shadow_would_enter_count", 0) or 0))
     sd_c5.metric("Pendentes", int(shadow_decision_simulator.get("shadow_pending_count", 0) or 0))
     sd_d1, sd_d2, sd_d3, sd_d4 = st.columns(4)
@@ -905,15 +905,36 @@ if shadow_decision_simulator:
         f"Recomendacao: {shadow_decision_simulator.get('shadow_policy_recommendation') or 'observe_more'} | "
         f"Politica: {shadow_decision_simulator.get('shadow_entry_policy') or 'conservative_v1'}"
     )
+    st.markdown("##### RASTREABILIDADE FASE 2.4B")
+    tr_c1, tr_c2, tr_c3, tr_c4, tr_c5 = st.columns(5)
+    tr_c1.metric("Recebidos", int(shadow_decision_simulator.get("shadow_candidates_received_count", 0) or 0))
+    tr_c2.metric("Analisados", int(shadow_decision_simulator.get("shadow_candidates_analyzed_count", 0) or 0))
+    tr_c3.metric("Unsafe", int(shadow_decision_simulator.get("shadow_unsafe_count", shadow_decision_simulator.get("shadow_unsafe_rejection_count", 0)) or 0))
+    tr_c4.metric("Primario bloqueado", int(shadow_decision_simulator.get("shadow_primary_blocked_count", 0) or 0))
+    tr_c5.metric("Ignorados", int(shadow_decision_simulator.get("shadow_ignored_count", 0) or 0))
+    tr_d1, tr_d2, tr_d3, tr_d4 = st.columns(4)
+    tr_d1.metric("Raw near", int(shadow_decision_simulator.get("shadow_raw_near_approved_count", 0) or 0))
+    tr_d2.metric("Secundario bloqueado", int(shadow_decision_simulator.get("shadow_secondary_blocked_count", 0) or 0))
+    tr_d3.metric("Estrutura ausente", int(shadow_decision_simulator.get("shadow_structure_missing_count", 0) or 0))
+    tr_d4.metric("Confirmacao ausente", int(shadow_decision_simulator.get("shadow_confirmation_missing_count", 0) or 0))
+    st.caption(
+        f"Motivo principal de exclusao: {shadow_decision_simulator.get('shadow_dominant_block_reason') or '-'} | "
+        f"Ignorados: {shadow_decision_simulator.get('shadow_ignored_reason') or '-'}"
+    )
     shadow_rows = [
         {
             "symbol": row.get("symbol"),
             "setup": row.get("strategy"),
             "score": row.get("current_score"),
             "score_gap": row.get("score_gap"),
+            "raw_near_approved": row.get("raw_near_approved"),
             "class": row.get("candidate_class"),
+            "safe_candidate": row.get("safe_candidate"),
             "would_enter": row.get("shadow_would_enter"),
-            "reason": row.get("shadow_entry_reason") or row.get("shadow_block_reason"),
+            "primary_blockers": ", ".join(list(row.get("primary_blocker_codes", row.get("primary_blockers", [])) or [])),
+            "secondary_blockers": ", ".join(list(row.get("secondary_blocker_codes", row.get("secondary_blockers", [])) or [])),
+            "why_not_safe": row.get("why_not_safe"),
+            "why_would_not_enter": row.get("why_would_not_enter") or row.get("shadow_block_reason"),
             "fib_alignment": row.get("fib_alignment_status"),
             "pivot": row.get("pivot_detected"),
             "bos": row.get("bos_detected"),

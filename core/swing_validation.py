@@ -986,6 +986,15 @@ def _build_operational_consistency(
             fib_alignment_audit.get("fib_alignment_recommendation") or "insufficient_data"
         ),
         "shadow_decision_mode": shadow_decision_simulator.get("shadow_decision_mode", "SHADOW_ONLY"),
+        "preview_near_approved_count": int(
+            shadow_decision_simulator.get("preview_near_approved_count", 0) or 0
+        ),
+        "shadow_candidates_analyzed_count": int(
+            shadow_decision_simulator.get("shadow_candidates_analyzed_count", 0) or 0
+        ),
+        "shadow_unsafe_rejection_count": int(
+            shadow_decision_simulator.get("shadow_unsafe_rejection_count", 0) or 0
+        ),
         "shadow_would_enter_count": int(shadow_decision_simulator.get("shadow_would_enter_count", 0) or 0),
         "shadow_pending_count": int(shadow_decision_simulator.get("shadow_pending_count", 0) or 0),
         "shadow_policy_recommendation": str(

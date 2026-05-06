@@ -59,6 +59,9 @@ def test_state_store_bootstraps_files_and_defaults(isolated_storage):
     assert state["shadow_decision_simulator"]["shadow_decision_mode"] == "SHADOW_ONLY"
     assert state["shadow_decision_simulator"]["shadow_recent_candidates"] == []
     assert state["shadow_decision_simulator"]["shadow_would_enter_count"] == 0
+    assert state["shadow_decision_simulator"]["preview_near_approved_count"] == 0
+    assert state["shadow_decision_simulator"]["shadow_raw_near_approved_count"] == 0
+    assert state["shadow_decision_simulator"]["shadow_unsafe_rejection_count"] == 0
     assert state["phase2_fine_tune"]["fine_tune_enabled"] is True
     assert state["phase2_fine_tune"]["fine_tune_target"] == "trend_pullback_breakout_secondary_breakout_confirmation"
     assert state["phase2_fine_tune"]["fine_tune_applied_count"] == 0
@@ -127,6 +130,7 @@ def test_state_store_backfills_strategy_structure_audit_for_old_state(isolated_s
     assert state["shadow_decision_simulator"]["shadow_decision_simulator_enabled"] is True
     assert state["shadow_decision_simulator"]["shadow_decision_mode"] == "SHADOW_ONLY"
     assert state["shadow_decision_simulator"]["shadow_recent_candidates"] == []
+    assert state["shadow_decision_simulator"]["shadow_candidates_analyzed_count"] == 0
 
 
 def test_update_market_data_status_tracks_last_success_and_error(isolated_storage):

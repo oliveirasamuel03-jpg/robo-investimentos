@@ -138,10 +138,22 @@ def default_shadow_decision_state(reason: str = "No shadow decision simulator da
         "shadow_decision_mode": MODE,
         "shadow_entry_policy": POLICY,
         "shadow_decision_last_run_at": "",
+        "preview_near_approved_count": 0,
+        "shadow_candidates_received_count": 0,
+        "shadow_candidates_analyzed_count": 0,
+        "shadow_raw_near_approved_count": 0,
         "shadow_near_approved_count": 0,
         "shadow_safe_near_approved_count": 0,
+        "shadow_marginal_near_approved_count": 0,
         "shadow_marginal_count": 0,
         "shadow_unsafe_count": 0,
+        "shadow_unsafe_rejection_count": 0,
+        "shadow_primary_blocked_count": 0,
+        "shadow_secondary_blocked_count": 0,
+        "shadow_structure_missing_count": 0,
+        "shadow_confirmation_missing_count": 0,
+        "shadow_ignored_count": 0,
+        "shadow_ignored_reason": "",
         "shadow_would_enter_count": 0,
         "shadow_pending_count": 0,
         "shadow_would_win_count": 0,
@@ -158,6 +170,47 @@ def default_shadow_decision_state(reason: str = "No shadow decision simulator da
         "shadow_take_profit_pct": TAKE_PROFIT_SHADOW_PCT,
         "shadow_max_hold_cycles": MAX_HOLD_CYCLES_SHADOW,
     }
+
+
+def _first_exclusion_reason(
+    *,
+    reasons: set[str],
+    operational_blocks: list[str],
+    primary: list[str],
+    score_gap: float | None,
+    fib_status: str,
+    pivot: bool,
+    bos: bool,
+) -> tuple[str, str]:
+    if "fallback" in operational_blocks:
+        return "blocked_by_fallback", "feed"
+    if "provider_unknown" in operational_blocks:
+        return "blocked_by_provider_unknown", "feed"
+    if "context_critical" in operational_blocks:
+        return "blocked_by_context", "context"
+    if "daily_loss_guard" in operational_blocks or "daily_loss_guard" in reasons:
+        return "blocked_by_daily_loss_guard", "guard"
+    if "position_limit_reached" in operational_blocks or "position_limit_reached" in reasons:
+        return "blocked_by_position_limit", "guard"
+    if "cooldown_active" in reasons:
+        return "blocked_by_cooldown", "guard"
+    if "duplicate_signal_blocked" in reasons:
+        return "blocked_by_duplicate_signal", "guard"
+    if len(primary) > 1:
+        return "blocked_by_multiple_primary_rejections", "strategy"
+    if "no_setup_eligible" in reasons:
+        return "blocked_by_no_setup_eligible", "structure"
+    if "trend_not_confirmed" in reasons:
+        return "blocked_by_trend_not_confirmed", "strategy"
+    if "reversal_not_eligible" in reasons:
+        return "blocked_by_reversal_not_eligible", "strategy"
+    if score_gap is None or score_gap > MARGINAL_GAP_MAX:
+        return "blocked_by_score_gap", "score"
+    if fib_status in {"weak_alignment", "no_sufficient_alignment"}:
+        return "blocked_by_fib_weak_alignment", "structure"
+    if fib_status == "partial_alignment" and not (pivot or bos):
+        return "blocked_by_missing_pivot_bos", "confirmation"
+    return "blocked_by_policy_conservative_v1", "policy"
 
 
 def _classify_candidate(
@@ -202,6 +255,7 @@ def _classify_candidate(
         operational_blocks.append("position_limit_reached")
     if score is None or min_score is None:
         operational_blocks.append("missing_score")
+    raw_near_approved = bool(score_gap is not None and 0.0 <= score_gap <= MARGINAL_GAP_MAX)
 
     if operational_blocks:
         candidate_class = "UNSAFE_REJECTION"
@@ -223,9 +277,32 @@ def _classify_candidate(
         candidate_class = "MARGINAL_NEAR_APPROVED"
     else:
         candidate_class = "UNSAFE_REJECTION"
+    exclusion_reason, exclusion_layer = _first_exclusion_reason(
+        reasons=reasons,
+        operational_blocks=operational_blocks,
+        primary=primary,
+        score_gap=score_gap,
+        fib_status=fib_status,
+        pivot=pivot,
+        bos=bos,
+    )
+    safe_candidate = candidate_class == "SAFE_NEAR_APPROVED"
+    marginal_candidate = candidate_class == "MARGINAL_NEAR_APPROVED"
+    why_not_safe = "" if safe_candidate else exclusion_reason
+    if marginal_candidate:
+        why_not_marginal = ""
+    elif not raw_near_approved:
+        why_not_marginal = "not_raw_near_approved"
+    elif candidate_class == "SAFE_NEAR_APPROVED":
+        why_not_marginal = "candidate_is_safe"
+    else:
+        why_not_marginal = exclusion_reason
 
     return {
         "candidate_class": candidate_class,
+        "raw_near_approved": raw_near_approved,
+        "analyzed_by_shadow": True,
+        "safe_candidate": safe_candidate,
         "score": score,
         "min_score": min_score,
         "score_gap": score_gap,
@@ -233,6 +310,12 @@ def _classify_candidate(
         "primary_blockers": primary,
         "secondary_blockers": secondary,
         "risk_blockers": sorted(set(risk + operational_blocks)),
+        "unsafe_reason_codes": sorted(set(risk + operational_blocks + primary)),
+        "primary_blocker_codes": primary,
+        "secondary_blocker_codes": secondary,
+        "exclusion_layer": exclusion_layer if not safe_candidate else "none",
+        "why_not_safe": why_not_safe,
+        "why_not_marginal": why_not_marginal,
         "context_status": context_status,
         "feed_status": feed_status,
         "provider_effective": provider,
@@ -296,6 +379,7 @@ def _shadow_decision(classification: dict[str, Any], signal: dict[str, Any], fib
         "shadow_entry_policy": POLICY,
         "shadow_entry_reason": entry_reason,
         "shadow_block_reason": block_reason,
+        "why_would_not_enter": "" if would_enter else block_reason,
         "shadow_expected_risk": ",".join(risk_notes) if risk_notes else "secondary_confirmation_risk",
         "shadow_confidence": round(max(0.0, min(1.0, confidence)), 4),
     }
@@ -334,6 +418,15 @@ def _build_candidate(
         "primary_blockers": classification.get("primary_blockers", []),
         "secondary_blockers": classification.get("secondary_blockers", []),
         "risk_blockers": classification.get("risk_blockers", []),
+        "raw_near_approved": bool(classification.get("raw_near_approved", False)),
+        "analyzed_by_shadow": bool(classification.get("analyzed_by_shadow", True)),
+        "safe_candidate": bool(classification.get("safe_candidate", False)),
+        "unsafe_reason_codes": list(classification.get("unsafe_reason_codes", []) or []),
+        "primary_blocker_codes": list(classification.get("primary_blocker_codes", []) or []),
+        "secondary_blocker_codes": list(classification.get("secondary_blocker_codes", []) or []),
+        "exclusion_layer": classification.get("exclusion_layer"),
+        "why_not_safe": classification.get("why_not_safe"),
+        "why_not_marginal": classification.get("why_not_marginal"),
         "context_status": classification.get("context_status"),
         "feed_status": classification.get("feed_status"),
         "provider_effective": classification.get("provider_effective"),
@@ -344,6 +437,7 @@ def _build_candidate(
         "pivot_detected": classification.get("pivot_detected"),
         "bos_detected": classification.get("bos_detected"),
         "candidate_class": classification.get("candidate_class"),
+        "shadow_trace_status": "analyzed_by_shadow",
         "price_at_signal": price,
         "observed_cycles": 0,
         "shadow_result_pending": bool(decision.get("shadow_would_enter")),
@@ -425,10 +519,27 @@ def build_shadow_decision_simulator(
     ]
     seen_keys = {str(item.get("shadow_candidate_key") or "") for item in previous_candidates if item.get("shadow_candidate_key")}
 
+    rejected_signals = [
+        dict(item or {})
+        for item in list(signals or [])
+        if isinstance(item, dict) and not bool(item.get("buy", False))
+    ]
+    preview_near_count = 0
+    for signal in rejected_signals:
+        score = _as_float(signal.get("score"), None)
+        min_score = _as_float(signal.get("effective_min_signal_score"), _as_float(signal.get("base_min_signal_score"), None))
+        gap = None if score is None or min_score is None else max(0.0, float(min_score) - float(score))
+        if gap is not None and 0.0 <= gap <= MARGINAL_GAP_MAX:
+            preview_near_count += 1
+
     new_candidates: list[dict[str, Any]] = []
-    for signal in [dict(item or {}) for item in list(signals or []) if isinstance(item, dict) and not bool(item.get("buy", False))]:
+    ignored_count = 0
+    ignored_reason_counter: Counter[str] = Counter()
+    for signal in rejected_signals:
         key = _candidate_key(signal)
         if key in seen_keys:
+            ignored_count += 1
+            ignored_reason_counter["duplicate_existing_shadow_candidate"] += 1
             continue
         symbol = _norm_text(signal.get("asset") or signal.get("symbol")).upper()
         market_row = _market_structure_for_symbol(market_structure_audit, symbol)
@@ -439,15 +550,23 @@ def build_shadow_decision_simulator(
 
     combined = [*new_candidates, *previous_candidates]
     combined = combined[:MAX_RECENT_CANDIDATES]
-    near_classes = {"SAFE_NEAR_APPROVED", "MARGINAL_NEAR_APPROVED", "CONFIRMATION_MISSING"}
+    raw_near = [item for item in combined if bool(item.get("raw_near_approved", False))]
     safe = [item for item in combined if item.get("candidate_class") == "SAFE_NEAR_APPROVED"]
     marginal = [item for item in combined if item.get("candidate_class") == "MARGINAL_NEAR_APPROVED"]
     unsafe = [item for item in combined if item.get("candidate_class") in {"UNSAFE_REJECTION", "PRIMARY_BLOCKED", "STRUCTURE_MISSING"}]
+    primary_blocked = [item for item in combined if item.get("candidate_class") == "PRIMARY_BLOCKED" or item.get("primary_blocker_codes")]
+    secondary_blocked = [item for item in combined if item.get("secondary_blocker_codes")]
+    structure_missing = [item for item in combined if item.get("candidate_class") == "STRUCTURE_MISSING"]
+    confirmation_missing = [item for item in combined if item.get("candidate_class") == "CONFIRMATION_MISSING"]
     would_enter = [item for item in combined if bool(item.get("shadow_would_enter", False))]
     pending = [item for item in combined if bool(item.get("shadow_result_pending", False))]
     wins = [item for item in combined if item.get("outcome_label") == "WOULD_WIN"]
     losses = [item for item in combined if item.get("outcome_label") == "WOULD_LOSE"]
-    block_counter = Counter(str(item.get("shadow_block_reason") or "none") for item in combined if not bool(item.get("shadow_would_enter", False)))
+    block_counter = Counter(
+        str(item.get("why_not_safe") or item.get("shadow_block_reason") or "none")
+        for item in combined
+        if not bool(item.get("shadow_would_enter", False))
+    )
     best = sorted(combined, key=lambda item: float(item.get("current_score") or 0.0), reverse=True)[0] if combined else {}
 
     if wins and len(wins) >= len(losses) + 2:
@@ -464,10 +583,22 @@ def build_shadow_decision_simulator(
         "shadow_decision_mode": MODE,
         "shadow_entry_policy": POLICY,
         "shadow_decision_last_run_at": _utc_now_iso(),
-        "shadow_near_approved_count": len([item for item in combined if item.get("candidate_class") in near_classes]),
+        "preview_near_approved_count": preview_near_count,
+        "shadow_candidates_received_count": len(rejected_signals),
+        "shadow_candidates_analyzed_count": len(new_candidates),
+        "shadow_raw_near_approved_count": len(raw_near),
+        "shadow_near_approved_count": len(raw_near),
         "shadow_safe_near_approved_count": len(safe),
+        "shadow_marginal_near_approved_count": len(marginal),
         "shadow_marginal_count": len(marginal),
         "shadow_unsafe_count": len(unsafe),
+        "shadow_unsafe_rejection_count": len([item for item in combined if item.get("candidate_class") == "UNSAFE_REJECTION"]),
+        "shadow_primary_blocked_count": len(primary_blocked),
+        "shadow_secondary_blocked_count": len(secondary_blocked),
+        "shadow_structure_missing_count": len(structure_missing),
+        "shadow_confirmation_missing_count": len(confirmation_missing),
+        "shadow_ignored_count": ignored_count,
+        "shadow_ignored_reason": ignored_reason_counter.most_common(1)[0][0] if ignored_reason_counter else "",
         "shadow_would_enter_count": len(would_enter),
         "shadow_pending_count": len(pending),
         "shadow_would_win_count": len(wins),
