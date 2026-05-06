@@ -140,8 +140,30 @@ def default_shadow_decision_state(reason: str = "No shadow decision simulator da
         "shadow_decision_last_run_at": "",
         "preview_near_approved_count": 0,
         "shadow_candidates_received_count": 0,
+        "shadow_candidates_unique_count": 0,
+        "shadow_candidates_ignored_count": 0,
+        "shadow_candidates_classified_count": 0,
         "shadow_candidates_analyzed_count": 0,
         "shadow_raw_near_approved_count": 0,
+        "shadow_counts_scope": "current_cycle_and_accumulated",
+        "shadow_current_cycle_candidates_count": 0,
+        "shadow_accumulated_candidates_count": 0,
+        "shadow_current_cycle_received_count": 0,
+        "shadow_current_cycle_analyzed_count": 0,
+        "shadow_current_cycle_classified_count": 0,
+        "shadow_current_cycle_raw_near_approved_count": 0,
+        "shadow_current_cycle_safe_near_approved_count": 0,
+        "shadow_current_cycle_marginal_near_approved_count": 0,
+        "shadow_current_cycle_unsafe_count": 0,
+        "shadow_current_cycle_ignored_count": 0,
+        "shadow_current_cycle_primary_blocked_count": 0,
+        "shadow_current_cycle_secondary_blocked_count": 0,
+        "shadow_accumulated_received_count": 0,
+        "shadow_accumulated_analyzed_count": 0,
+        "shadow_accumulated_raw_near_approved_count": 0,
+        "shadow_accumulated_unsafe_count": 0,
+        "shadow_accumulated_primary_blocked_count": 0,
+        "shadow_accumulated_secondary_blocked_count": 0,
         "shadow_near_approved_count": 0,
         "shadow_safe_near_approved_count": 0,
         "shadow_marginal_near_approved_count": 0,
@@ -154,6 +176,8 @@ def default_shadow_decision_state(reason: str = "No shadow decision simulator da
         "shadow_confirmation_missing_count": 0,
         "shadow_ignored_count": 0,
         "shadow_ignored_reason": "",
+        "shadow_counter_warning": False,
+        "shadow_counter_warning_reason": "",
         "shadow_would_enter_count": 0,
         "shadow_pending_count": 0,
         "shadow_would_win_count": 0,
@@ -411,6 +435,7 @@ def _build_candidate(
         "symbol": symbol,
         "strategy": _norm_text(signal.get("strategy_name") or "trend_pullback_breakout"),
         "timestamp": _norm_text(signal.get("signal_timestamp") or signal.get("timestamp") or _utc_now_iso()),
+        "duplicate_candidate": False,
         "current_score": classification.get("score"),
         "min_score": classification.get("min_score"),
         "score_gap": classification.get("score_gap"),
@@ -438,6 +463,8 @@ def _build_candidate(
         "bos_detected": classification.get("bos_detected"),
         "candidate_class": classification.get("candidate_class"),
         "shadow_trace_status": "analyzed_by_shadow",
+        "classified_by_shadow": bool(classification.get("candidate_class")),
+        "count_scope": "current_cycle",
         "price_at_signal": price,
         "observed_cycles": 0,
         "shadow_result_pending": bool(decision.get("shadow_would_enter")),
@@ -458,7 +485,11 @@ def _build_candidate(
 
 def _update_outcome(candidate: dict[str, Any], market_data: dict[str, Any] | None) -> dict[str, Any]:
     payload = dict(candidate or {})
+    payload["duplicate_candidate"] = bool(payload.get("duplicate_candidate", False))
+    payload["classified_by_shadow"] = bool(payload.get("classified_by_shadow", bool(payload.get("candidate_class"))))
+    payload["analyzed_by_shadow"] = bool(payload.get("analyzed_by_shadow", payload["classified_by_shadow"]))
     if not bool(payload.get("shadow_would_enter", False)) or str(payload.get("outcome_label") or "") not in {"STILL_PENDING", ""}:
+        payload["count_scope"] = "accumulated"
         return payload
     symbol = _norm_text(payload.get("symbol")).upper()
     current_price = _latest_price(market_data, symbol)
@@ -466,9 +497,11 @@ def _update_outcome(candidate: dict[str, Any], market_data: dict[str, Any] | Non
     if current_price is None or entry_price is None or entry_price <= 0:
         payload["shadow_result_pending"] = True
         payload["outcome_label"] = "STILL_PENDING"
+        payload["count_scope"] = "accumulated"
         return payload
 
     cycles = _as_int(payload.get("observed_cycles"), 0) + 1
+    payload["count_scope"] = "accumulated"
     pnl_pct = round((float(current_price) - float(entry_price)) / float(entry_price), 6)
     payload["observed_cycles"] = cycles
     payload["price_after_window"] = round(float(current_price), 6)
@@ -496,6 +529,35 @@ def _update_outcome(candidate: dict[str, Any], market_data: dict[str, Any] | Non
         payload["shadow_result_pending"] = True
         payload["outcome_label"] = "STILL_PENDING"
     return payload
+
+
+def _classified(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [item for item in items if str(item.get("candidate_class") or "").strip()]
+
+
+def _unsafe_items(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [item for item in items if item.get("candidate_class") == "UNSAFE_REJECTION"]
+
+
+def _counter_invariant_warning(
+    *,
+    received: int,
+    ignored: int,
+    analyzed: int,
+    classified: int,
+    safe: int,
+    marginal: int,
+    unsafe: int,
+) -> tuple[bool, str]:
+    if ignored > received:
+        return True, "ignored_count_greater_than_received"
+    if classified > 0 and analyzed <= 0:
+        return True, "classified_candidates_without_analyzed_count"
+    if analyzed < safe + marginal + unsafe:
+        return True, "analyzed_lower_than_classified_subsets"
+    if classified < safe + marginal + unsafe:
+        return True, "classified_lower_than_classified_subsets"
+    return False, ""
 
 
 def build_shadow_decision_simulator(
@@ -540,6 +602,11 @@ def build_shadow_decision_simulator(
         if key in seen_keys:
             ignored_count += 1
             ignored_reason_counter["duplicate_existing_shadow_candidate"] += 1
+            for item in previous_candidates:
+                if str(item.get("shadow_candidate_key") or "") == key:
+                    item["duplicate_candidate"] = True
+                    item["shadow_trace_status"] = "duplicate_existing_shadow_candidate"
+                    break
             continue
         symbol = _norm_text(signal.get("asset") or signal.get("symbol")).upper()
         market_row = _market_structure_for_symbol(market_structure_audit, symbol)
@@ -550,10 +617,21 @@ def build_shadow_decision_simulator(
 
     combined = [*new_candidates, *previous_candidates]
     combined = combined[:MAX_RECENT_CANDIDATES]
+    current_classified = _classified(new_candidates)
+    accumulated_classified = _classified(combined)
+    current_unsafe = _unsafe_items(new_candidates)
+    accumulated_unsafe = _unsafe_items(combined)
+    current_raw_near = [item for item in new_candidates if bool(item.get("raw_near_approved", False))]
     raw_near = [item for item in combined if bool(item.get("raw_near_approved", False))]
     safe = [item for item in combined if item.get("candidate_class") == "SAFE_NEAR_APPROVED"]
     marginal = [item for item in combined if item.get("candidate_class") == "MARGINAL_NEAR_APPROVED"]
-    unsafe = [item for item in combined if item.get("candidate_class") in {"UNSAFE_REJECTION", "PRIMARY_BLOCKED", "STRUCTURE_MISSING"}]
+    unsafe = accumulated_unsafe
+    current_primary_blocked = [
+        item
+        for item in new_candidates
+        if item.get("candidate_class") == "PRIMARY_BLOCKED" or item.get("primary_blocker_codes")
+    ]
+    current_secondary_blocked = [item for item in new_candidates if item.get("secondary_blocker_codes")]
     primary_blocked = [item for item in combined if item.get("candidate_class") == "PRIMARY_BLOCKED" or item.get("primary_blocker_codes")]
     secondary_blocked = [item for item in combined if item.get("secondary_blocker_codes")]
     structure_missing = [item for item in combined if item.get("candidate_class") == "STRUCTURE_MISSING"]
@@ -568,6 +646,17 @@ def build_shadow_decision_simulator(
         if not bool(item.get("shadow_would_enter", False))
     )
     best = sorted(combined, key=lambda item: float(item.get("current_score") or 0.0), reverse=True)[0] if combined else {}
+    current_safe = [item for item in new_candidates if item.get("candidate_class") == "SAFE_NEAR_APPROVED"]
+    current_marginal = [item for item in new_candidates if item.get("candidate_class") == "MARGINAL_NEAR_APPROVED"]
+    warning, warning_reason = _counter_invariant_warning(
+        received=len(rejected_signals),
+        ignored=ignored_count,
+        analyzed=len(current_classified),
+        classified=len(current_classified),
+        safe=len(current_safe),
+        marginal=len(current_marginal),
+        unsafe=len(current_unsafe),
+    )
 
     if wins and len(wins) >= len(losses) + 2:
         recommendation = "study_future_relaxation"
@@ -583,9 +672,32 @@ def build_shadow_decision_simulator(
         "shadow_decision_mode": MODE,
         "shadow_entry_policy": POLICY,
         "shadow_decision_last_run_at": _utc_now_iso(),
+        "shadow_counts_scope": "current_cycle_and_accumulated",
         "preview_near_approved_count": preview_near_count,
         "shadow_candidates_received_count": len(rejected_signals),
-        "shadow_candidates_analyzed_count": len(new_candidates),
+        "shadow_candidates_unique_count": len(new_candidates),
+        "shadow_candidates_ignored_count": ignored_count,
+        "shadow_candidates_classified_count": len(accumulated_classified),
+        "shadow_candidates_analyzed_count": len(accumulated_classified),
+        "shadow_current_cycle_candidates_count": len(new_candidates),
+        "shadow_accumulated_candidates_count": len(combined),
+        "shadow_current_cycle_received_count": len(rejected_signals),
+        "shadow_current_cycle_analyzed_count": len(current_classified),
+        "shadow_current_cycle_classified_count": len(current_classified),
+        "shadow_current_cycle_raw_near_approved_count": len(current_raw_near),
+        "shadow_current_cycle_safe_near_approved_count": len(current_safe),
+        "shadow_current_cycle_marginal_near_approved_count": len(current_marginal),
+        "shadow_current_cycle_unsafe_count": len(current_unsafe),
+        "shadow_current_cycle_ignored_count": ignored_count,
+        "shadow_current_cycle_primary_blocked_count": len(current_primary_blocked),
+        "shadow_current_cycle_secondary_blocked_count": len(current_secondary_blocked),
+        "shadow_accumulated_received_count": int(previous_state.get("shadow_accumulated_received_count", 0) or 0)
+        + len(rejected_signals),
+        "shadow_accumulated_analyzed_count": len(accumulated_classified),
+        "shadow_accumulated_raw_near_approved_count": len(raw_near),
+        "shadow_accumulated_unsafe_count": len(accumulated_unsafe),
+        "shadow_accumulated_primary_blocked_count": len(primary_blocked),
+        "shadow_accumulated_secondary_blocked_count": len(secondary_blocked),
         "shadow_raw_near_approved_count": len(raw_near),
         "shadow_near_approved_count": len(raw_near),
         "shadow_safe_near_approved_count": len(safe),
@@ -599,6 +711,8 @@ def build_shadow_decision_simulator(
         "shadow_confirmation_missing_count": len(confirmation_missing),
         "shadow_ignored_count": ignored_count,
         "shadow_ignored_reason": ignored_reason_counter.most_common(1)[0][0] if ignored_reason_counter else "",
+        "shadow_counter_warning": warning,
+        "shadow_counter_warning_reason": warning_reason,
         "shadow_would_enter_count": len(would_enter),
         "shadow_pending_count": len(pending),
         "shadow_would_win_count": len(wins),

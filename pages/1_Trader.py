@@ -2127,22 +2127,89 @@ if shadow_decision_simulator:
         f"Recomendacao: {shadow_decision_simulator.get('shadow_policy_recommendation') or 'observe_more'} | "
         f"Politica: {shadow_decision_simulator.get('shadow_entry_policy') or 'conservative_v1'}"
     )
-    st.markdown("##### RASTREABILIDADE FASE 2.4B")
+    st.markdown("##### RASTREABILIDADE FASE 2.4C")
+    trace_preview_count = int(shadow_decision_simulator.get("preview_near_approved_count", 0) or 0)
+    trace_received_current = int(
+        shadow_decision_simulator.get(
+            "shadow_current_cycle_received_count",
+            shadow_decision_simulator.get("shadow_candidates_received_count", 0),
+        )
+        or 0
+    )
+    trace_unique_current = int(shadow_decision_simulator.get("shadow_candidates_unique_count", 0) or 0)
+    trace_analyzed_current = int(
+        shadow_decision_simulator.get(
+            "shadow_current_cycle_analyzed_count",
+            shadow_decision_simulator.get("shadow_candidates_analyzed_count", 0),
+        )
+        or 0
+    )
+    trace_classified_current = int(
+        shadow_decision_simulator.get(
+            "shadow_current_cycle_classified_count",
+            shadow_decision_simulator.get("shadow_candidates_classified_count", 0),
+        )
+        or 0
+    )
+    trace_unsafe_current = int(
+        shadow_decision_simulator.get(
+            "shadow_current_cycle_unsafe_count",
+            shadow_decision_simulator.get("shadow_unsafe_count", 0),
+        )
+        or 0
+    )
+    trace_primary_current = int(
+        shadow_decision_simulator.get(
+            "shadow_current_cycle_primary_blocked_count",
+            shadow_decision_simulator.get("shadow_primary_blocked_count", 0),
+        )
+        or 0
+    )
+    trace_secondary_current = int(
+        shadow_decision_simulator.get(
+            "shadow_current_cycle_secondary_blocked_count",
+            shadow_decision_simulator.get("shadow_secondary_blocked_count", 0),
+        )
+        or 0
+    )
+    trace_ignored_current = int(
+        shadow_decision_simulator.get(
+            "shadow_current_cycle_ignored_count",
+            shadow_decision_simulator.get("shadow_ignored_count", 0),
+        )
+        or 0
+    )
     tr_c1, tr_c2, tr_c3, tr_c4, tr_c5 = st.columns(5)
-    tr_c1.metric("Recebidos", int(shadow_decision_simulator.get("shadow_candidates_received_count", 0) or 0))
-    tr_c2.metric("Analisados", int(shadow_decision_simulator.get("shadow_candidates_analyzed_count", 0) or 0))
-    tr_c3.metric("Unsafe", int(shadow_decision_simulator.get("shadow_unsafe_count", shadow_decision_simulator.get("shadow_unsafe_rejection_count", 0)) or 0))
-    tr_c4.metric("Primario bloqueado", int(shadow_decision_simulator.get("shadow_primary_blocked_count", 0) or 0))
-    tr_c5.metric("Ignorados", int(shadow_decision_simulator.get("shadow_ignored_count", 0) or 0))
-    tr_d1, tr_d2, tr_d3, tr_d4 = st.columns(4)
-    tr_d1.metric("Raw near", int(shadow_decision_simulator.get("shadow_raw_near_approved_count", 0) or 0))
-    tr_d2.metric("Secundario bloqueado", int(shadow_decision_simulator.get("shadow_secondary_blocked_count", 0) or 0))
-    tr_d3.metric("Estrutura ausente", int(shadow_decision_simulator.get("shadow_structure_missing_count", 0) or 0))
-    tr_d4.metric("Confirmacao ausente", int(shadow_decision_simulator.get("shadow_confirmation_missing_count", 0) or 0))
+    tr_c1.metric("Preview near-approved", trace_preview_count)
+    tr_c2.metric("Recebidos no ciclo", trace_received_current)
+    tr_c3.metric("Unicos no ciclo", trace_unique_current)
+    tr_c4.metric("Analisados no ciclo", trace_analyzed_current)
+    tr_c5.metric("Classificados no ciclo", trace_classified_current)
+    tr_d1, tr_d2, tr_d3, tr_d4, tr_d5 = st.columns(5)
+    tr_d1.metric("Unsafe no ciclo", trace_unsafe_current)
+    tr_d2.metric("Primario bloqueado", trace_primary_current)
+    tr_d3.metric("Secundario bloqueado", trace_secondary_current)
+    tr_d4.metric("Ignorados duplicidade", trace_ignored_current)
+    tr_d5.metric("Escopo", shadow_decision_simulator.get("shadow_counts_scope") or "current_cycle_and_accumulated")
     st.caption(
         f"Motivo principal de exclusao: {shadow_decision_simulator.get('shadow_dominant_block_reason') or '-'} | "
         f"Ignorados: {shadow_decision_simulator.get('shadow_ignored_reason') or '-'}"
     )
+    st.caption(
+        "Analisados inclui candidatos classificados como unsafe. "
+        "Safe/marginal sao subconjuntos, nao o total analisado. "
+        "A tabela pode incluir candidatos acumulados; veja count_scope."
+    )
+    st.caption(
+        f"Acumulado: recebidos={int(shadow_decision_simulator.get('shadow_accumulated_received_count', trace_received_current) or 0)} | "
+        f"analisados={int(shadow_decision_simulator.get('shadow_accumulated_analyzed_count', shadow_decision_simulator.get('shadow_candidates_analyzed_count', 0)) or 0)} | "
+        f"unsafe={int(shadow_decision_simulator.get('shadow_accumulated_unsafe_count', shadow_decision_simulator.get('shadow_unsafe_count', 0)) or 0)}."
+    )
+    if bool(shadow_decision_simulator.get("shadow_counter_warning", False)):
+        st.warning(
+            "Aviso de consistencia dos contadores shadow: "
+            f"{shadow_decision_simulator.get('shadow_counter_warning_reason') or 'verificar contadores'}"
+        )
     shadow_rows = [
         {
             "symbol": row.get("symbol"),
@@ -2150,6 +2217,9 @@ if shadow_decision_simulator:
             "score": row.get("current_score"),
             "score_gap": row.get("score_gap"),
             "raw_near_approved": row.get("raw_near_approved"),
+            "duplicate_candidate": row.get("duplicate_candidate"),
+            "analyzed_by_shadow": row.get("analyzed_by_shadow"),
+            "classified_by_shadow": row.get("classified_by_shadow"),
             "class": row.get("candidate_class"),
             "safe_candidate": row.get("safe_candidate"),
             "would_enter": row.get("shadow_would_enter"),
@@ -2157,9 +2227,7 @@ if shadow_decision_simulator:
             "secondary_blockers": ", ".join(list(row.get("secondary_blocker_codes", row.get("secondary_blockers", [])) or [])),
             "why_not_safe": row.get("why_not_safe"),
             "why_would_not_enter": row.get("why_would_not_enter") or row.get("shadow_block_reason"),
-            "fib_alignment": row.get("fib_alignment_status"),
-            "pivot": row.get("pivot_detected"),
-            "bos": row.get("bos_detected"),
+            "count_scope": row.get("count_scope"),
             "outcome": row.get("outcome_label"),
         }
         for row in list(shadow_decision_simulator.get("shadow_recent_candidates", []) or [])
