@@ -446,25 +446,41 @@ DEFAULT_STATE = {
         "shadow_candidates_classified_count": 0,
         "shadow_candidates_analyzed_count": 0,
         "shadow_raw_near_approved_count": 0,
-        "shadow_counts_scope": "current_cycle_and_accumulated",
+        "shadow_counts_scope": "current_cycle_and_accumulated_recent",
         "shadow_current_cycle_candidates_count": 0,
         "shadow_accumulated_candidates_count": 0,
         "shadow_current_cycle_received_count": 0,
+        "shadow_current_cycle_new_unique_count": 0,
+        "shadow_current_cycle_duplicate_count": 0,
+        "shadow_current_cycle_already_analyzed_count": 0,
         "shadow_current_cycle_analyzed_count": 0,
+        "shadow_current_cycle_analyzed_new_count": 0,
         "shadow_current_cycle_classified_count": 0,
+        "shadow_current_cycle_classified_new_count": 0,
         "shadow_current_cycle_raw_near_approved_count": 0,
         "shadow_current_cycle_safe_near_approved_count": 0,
         "shadow_current_cycle_marginal_near_approved_count": 0,
         "shadow_current_cycle_unsafe_count": 0,
+        "shadow_current_cycle_unsafe_new_count": 0,
         "shadow_current_cycle_ignored_count": 0,
         "shadow_current_cycle_primary_blocked_count": 0,
+        "shadow_current_cycle_primary_blocked_new_count": 0,
         "shadow_current_cycle_secondary_blocked_count": 0,
+        "shadow_current_cycle_secondary_blocked_new_count": 0,
         "shadow_accumulated_received_count": 0,
+        "shadow_accumulated_raw_received_count": 0,
+        "shadow_accumulated_unique_candidates_count": 0,
         "shadow_accumulated_analyzed_count": 0,
+        "shadow_accumulated_analyzed_unique_count": 0,
+        "shadow_accumulated_classified_unique_count": 0,
         "shadow_accumulated_raw_near_approved_count": 0,
         "shadow_accumulated_unsafe_count": 0,
+        "shadow_accumulated_unsafe_unique_count": 0,
         "shadow_accumulated_primary_blocked_count": 0,
         "shadow_accumulated_secondary_blocked_count": 0,
+        "shadow_raw_to_unique_ratio": 0.0,
+        "shadow_duplicate_ratio": 0.0,
+        "shadow_counter_health_status": "healthy",
         "shadow_near_approved_count": 0,
         "shadow_safe_near_approved_count": 0,
         "shadow_marginal_near_approved_count": 0,
@@ -479,6 +495,8 @@ DEFAULT_STATE = {
         "shadow_ignored_reason": "",
         "shadow_counter_warning": False,
         "shadow_counter_warning_reason": "",
+        "shadow_scope_warning": False,
+        "shadow_scope_warning_reason": "",
         "shadow_would_enter_count": 0,
         "shadow_pending_count": 0,
         "shadow_would_win_count": 0,
@@ -488,6 +506,8 @@ DEFAULT_STATE = {
         "shadow_best_candidate_score": None,
         "shadow_dominant_block_reason": "",
         "shadow_policy_recommendation": "observe_more",
+        "shadow_current_cycle_candidates": [],
+        "shadow_accumulated_recent_candidates": [],
         "shadow_recent_candidates": [],
         "shadow_outcome_summary": {},
         "shadow_reason": "No shadow decision simulator data yet.",
@@ -965,12 +985,15 @@ def load_bot_state() -> dict:
         ("shadow_dominant_block_reason", ""),
         ("shadow_policy_recommendation", "observe_more"),
         ("shadow_ignored_reason", ""),
-        ("shadow_counts_scope", "current_cycle_and_accumulated"),
+        ("shadow_counts_scope", "current_cycle_and_accumulated_recent"),
+        ("shadow_counter_health_status", "healthy"),
         ("shadow_counter_warning_reason", ""),
+        ("shadow_scope_warning_reason", ""),
         ("shadow_reason", "No shadow decision simulator data yet."),
     ):
         shadow_state[key] = str(shadow_state.get(key) or fallback)
     shadow_state["shadow_counter_warning"] = bool(shadow_state.get("shadow_counter_warning", False))
+    shadow_state["shadow_scope_warning"] = bool(shadow_state.get("shadow_scope_warning", False))
     for key in (
         "preview_near_approved_count",
         "shadow_candidates_received_count",
@@ -982,19 +1005,32 @@ def load_bot_state() -> dict:
         "shadow_current_cycle_candidates_count",
         "shadow_accumulated_candidates_count",
         "shadow_current_cycle_received_count",
+        "shadow_current_cycle_new_unique_count",
+        "shadow_current_cycle_duplicate_count",
+        "shadow_current_cycle_already_analyzed_count",
         "shadow_current_cycle_analyzed_count",
+        "shadow_current_cycle_analyzed_new_count",
         "shadow_current_cycle_classified_count",
+        "shadow_current_cycle_classified_new_count",
         "shadow_current_cycle_raw_near_approved_count",
         "shadow_current_cycle_safe_near_approved_count",
         "shadow_current_cycle_marginal_near_approved_count",
         "shadow_current_cycle_unsafe_count",
+        "shadow_current_cycle_unsafe_new_count",
         "shadow_current_cycle_ignored_count",
         "shadow_current_cycle_primary_blocked_count",
+        "shadow_current_cycle_primary_blocked_new_count",
         "shadow_current_cycle_secondary_blocked_count",
+        "shadow_current_cycle_secondary_blocked_new_count",
         "shadow_accumulated_received_count",
+        "shadow_accumulated_raw_received_count",
+        "shadow_accumulated_unique_candidates_count",
         "shadow_accumulated_analyzed_count",
+        "shadow_accumulated_analyzed_unique_count",
+        "shadow_accumulated_classified_unique_count",
         "shadow_accumulated_raw_near_approved_count",
         "shadow_accumulated_unsafe_count",
+        "shadow_accumulated_unsafe_unique_count",
         "shadow_accumulated_primary_blocked_count",
         "shadow_accumulated_secondary_blocked_count",
         "shadow_near_approved_count",
@@ -1018,17 +1054,43 @@ def load_bot_state() -> dict:
             shadow_state[key] = int(shadow_state.get(key, 0) or 0)
         except (TypeError, ValueError):
             shadow_state[key] = 0
-    for key in ("shadow_best_candidate_score", "shadow_stop_pct", "shadow_take_profit_pct"):
+    if shadow_state["shadow_accumulated_raw_received_count"] <= 0 and shadow_state["shadow_accumulated_received_count"] > 0:
+        shadow_state["shadow_accumulated_raw_received_count"] = shadow_state["shadow_accumulated_received_count"]
+    if shadow_state["shadow_accumulated_unique_candidates_count"] <= 0 and shadow_state["shadow_accumulated_candidates_count"] > 0:
+        shadow_state["shadow_accumulated_unique_candidates_count"] = shadow_state["shadow_accumulated_candidates_count"]
+    if shadow_state["shadow_accumulated_analyzed_unique_count"] <= 0 and shadow_state["shadow_accumulated_analyzed_count"] > 0:
+        shadow_state["shadow_accumulated_analyzed_unique_count"] = shadow_state["shadow_accumulated_analyzed_count"]
+    if shadow_state["shadow_accumulated_unsafe_unique_count"] <= 0 and shadow_state["shadow_accumulated_unsafe_count"] > 0:
+        shadow_state["shadow_accumulated_unsafe_unique_count"] = shadow_state["shadow_accumulated_unsafe_count"]
+    for key in (
+        "shadow_best_candidate_score",
+        "shadow_stop_pct",
+        "shadow_take_profit_pct",
+        "shadow_raw_to_unique_ratio",
+        "shadow_duplicate_ratio",
+    ):
         value = shadow_state.get(key)
         try:
             shadow_state[key] = None if value in (None, "") else float(value or 0.0)
         except (TypeError, ValueError):
-            shadow_state[key] = None
+            shadow_state[key] = 0.0 if key in {"shadow_raw_to_unique_ratio", "shadow_duplicate_ratio"} else None
+    shadow_state["shadow_current_cycle_candidates"] = [
+        item
+        for item in list(shadow_state.get("shadow_current_cycle_candidates", []) or [])
+        if isinstance(item, dict)
+    ][:30]
+    shadow_state["shadow_accumulated_recent_candidates"] = [
+        item
+        for item in list(shadow_state.get("shadow_accumulated_recent_candidates", []) or [])
+        if isinstance(item, dict)
+    ][:30]
     shadow_state["shadow_recent_candidates"] = [
         item
         for item in list(shadow_state.get("shadow_recent_candidates", []) or [])
         if isinstance(item, dict)
     ][:30]
+    if not shadow_state["shadow_accumulated_recent_candidates"]:
+        shadow_state["shadow_accumulated_recent_candidates"] = list(shadow_state["shadow_recent_candidates"])
     outcome_summary = shadow_state.get("shadow_outcome_summary", {}) or {}
     shadow_state["shadow_outcome_summary"] = dict(outcome_summary) if isinstance(outcome_summary, dict) else {}
     state["shadow_decision_simulator"] = shadow_state

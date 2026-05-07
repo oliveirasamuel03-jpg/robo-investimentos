@@ -277,11 +277,22 @@ def test_duplicate_candidates_are_ignored_without_zeroing_accumulated_analysis()
     candidate = second["shadow_recent_candidates"][0]
     assert second["shadow_current_cycle_received_count"] == 1
     assert second["shadow_candidates_unique_count"] == 0
+    assert second["shadow_current_cycle_new_unique_count"] == 0
+    assert second["shadow_current_cycle_duplicate_count"] == 1
+    assert second["shadow_current_cycle_already_analyzed_count"] == 1
     assert second["shadow_current_cycle_ignored_count"] == 1
     assert second["shadow_current_cycle_analyzed_count"] == 0
+    assert second["shadow_current_cycle_analyzed_new_count"] == 0
     assert second["shadow_accumulated_analyzed_count"] == 1
+    assert second["shadow_accumulated_analyzed_unique_count"] == 1
     assert second["shadow_candidates_analyzed_count"] == 1
+    assert second["shadow_duplicate_ratio"] == 1.0
+    assert second["shadow_current_cycle_candidates"] == []
     assert candidate["duplicate_candidate"] is True
+    assert candidate["count_scope"] == "accumulated_recent"
+    assert candidate["already_seen"] is True
+    assert candidate["analyzed_this_cycle"] is False
+    assert candidate["analyzed_previously"] is True
     assert candidate["shadow_trace_status"] == "duplicate_existing_shadow_candidate"
 
 
@@ -317,7 +328,61 @@ def test_counter_subsets_stay_inside_classified_current_cycle():
         + result["shadow_current_cycle_unsafe_count"]
     )
     assert result["shadow_current_cycle_received_count"] >= result["shadow_candidates_unique_count"]
+    assert result["shadow_current_cycle_received_count"] == (
+        result["shadow_current_cycle_new_unique_count"] + result["shadow_current_cycle_duplicate_count"]
+    )
     assert result["shadow_current_cycle_ignored_count"] <= result["shadow_current_cycle_received_count"]
     assert result["shadow_current_cycle_analyzed_count"] == classified
+    assert result["shadow_current_cycle_analyzed_new_count"] == classified
     assert subset_total <= classified
     assert result["shadow_counter_warning"] is False
+    assert result["shadow_scope_warning"] is False
+
+
+def test_all_duplicate_cycle_has_zero_new_analysis_with_accumulated_recent_table():
+    module = load_module("core.shadow_decision_simulator")
+    signals = [
+        _signal(
+            signal_key=f"BNB-USD|duplicate-{idx}",
+            signal_timestamp=f"2026-05-05T10:0{idx}:00+00:00",
+            data_source="fallback",
+            rejection_reasons=["fallback_blocked"],
+        )
+        for idx in range(5)
+    ]
+
+    first = module.build_shadow_decision_simulator(
+        signals=signals,
+        state=_state(),
+        market_data=_market_data(),
+        market_structure_audit=_structure(),
+        fib_alignment_audit=_fib(),
+    )
+    second = module.build_shadow_decision_simulator(
+        signals=signals,
+        state=_state(shadow_decision_simulator=first),
+        market_data=_market_data(),
+        market_structure_audit=_structure(),
+        fib_alignment_audit=_fib(),
+    )
+
+    assert second["shadow_current_cycle_received_count"] == 5
+    assert second["shadow_current_cycle_new_unique_count"] == 0
+    assert second["shadow_current_cycle_duplicate_count"] == 5
+    assert second["shadow_current_cycle_analyzed_new_count"] == 0
+    assert second["shadow_current_cycle_classified_new_count"] == 0
+    assert second["shadow_current_cycle_unsafe_new_count"] == 0
+    assert second["shadow_current_cycle_already_analyzed_count"] == 5
+    assert second["shadow_accumulated_unique_candidates_count"] == 5
+    assert second["shadow_accumulated_analyzed_unique_count"] == 5
+    assert second["shadow_accumulated_unsafe_unique_count"] == 5
+    assert second["shadow_accumulated_raw_received_count"] == 10
+    assert second["shadow_duplicate_ratio"] == 1.0
+    assert second["shadow_raw_to_unique_ratio"] == 2.0
+    assert second["shadow_counter_health_status"] == "all_duplicates_current_cycle"
+    assert second["shadow_current_cycle_candidates"] == []
+    assert len(second["shadow_accumulated_recent_candidates"]) == 5
+    assert all(row["count_scope"] == "accumulated_recent" for row in second["shadow_accumulated_recent_candidates"])
+    assert all(row["duplicate_candidate"] is True for row in second["shadow_accumulated_recent_candidates"])
+    assert "positions" not in second
+    assert "wallet_value" not in second

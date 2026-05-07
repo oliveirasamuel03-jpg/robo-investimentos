@@ -431,12 +431,18 @@ def _shadow_decision_simulator_summary(validation_report: dict[str, Any]) -> str
     received_count = int(
         simulator.get("shadow_current_cycle_received_count", simulator.get("shadow_candidates_received_count", 0)) or 0
     )
-    unique_count = int(simulator.get("shadow_candidates_unique_count", 0) or 0)
+    new_unique_count = int(
+        simulator.get("shadow_current_cycle_new_unique_count", simulator.get("shadow_candidates_unique_count", 0)) or 0
+    )
+    duplicate_count = int(
+        simulator.get("shadow_current_cycle_duplicate_count", simulator.get("shadow_current_cycle_ignored_count", 0)) or 0
+    )
     analyzed_count = int(
-        simulator.get("shadow_current_cycle_analyzed_count", simulator.get("shadow_candidates_analyzed_count", 0)) or 0
+        simulator.get("shadow_current_cycle_analyzed_new_count", simulator.get("shadow_current_cycle_analyzed_count", 0)) or 0
     )
     classified_count = int(
-        simulator.get("shadow_current_cycle_classified_count", simulator.get("shadow_candidates_classified_count", 0)) or 0
+        simulator.get("shadow_current_cycle_classified_new_count", simulator.get("shadow_current_cycle_classified_count", 0))
+        or 0
     )
     safe_count = int(
         simulator.get("shadow_current_cycle_safe_near_approved_count", simulator.get("shadow_safe_near_approved_count", 0))
@@ -450,7 +456,17 @@ def _shadow_decision_simulator_summary(validation_report: dict[str, Any]) -> str
         or 0
     )
     unsafe_count = int(
-        simulator.get("shadow_current_cycle_unsafe_count", simulator.get("shadow_unsafe_rejection_count", 0)) or 0
+        simulator.get("shadow_current_cycle_unsafe_new_count", simulator.get("shadow_current_cycle_unsafe_count", 0)) or 0
+    )
+    accumulated_unique = int(
+        simulator.get("shadow_accumulated_unique_candidates_count", simulator.get("shadow_accumulated_candidates_count", 0))
+        or 0
+    )
+    accumulated_unsafe = int(
+        simulator.get("shadow_accumulated_unsafe_unique_count", simulator.get("shadow_accumulated_unsafe_count", 0)) or 0
+    )
+    accumulated_raw = int(
+        simulator.get("shadow_accumulated_raw_received_count", simulator.get("shadow_accumulated_received_count", 0)) or 0
     )
     would_enter = int(simulator.get("shadow_would_enter_count", 0) or 0)
     pending = int(simulator.get("shadow_pending_count", 0) or 0)
@@ -460,12 +476,15 @@ def _shadow_decision_simulator_summary(validation_report: dict[str, Any]) -> str
     dominant = _safe_text(simulator.get("shadow_dominant_block_reason"), fallback="none")
     recommendation = _safe_text(simulator.get("shadow_policy_recommendation"), fallback="observe_more")
     return (
-        f"Shadow decision simulator: preview_near_approved={preview_count}; received={received_count}; "
-        f"unique={unique_count}; analyzed_unique={analyzed_count}; classified={classified_count}; "
-        f"safe={safe_count}; marginal={marginal_count}; unsafe={unsafe_count}; would_enter={would_enter}; "
+        f"Shadow decision simulator: preview_near_approved={preview_count}; received_current={received_count}; "
+        f"new_unique_current={new_unique_count}; duplicates_current={duplicate_count}; "
+        f"analyzed_new_current={analyzed_count}; classified_new_current={classified_count}; "
+        f"safe_new={safe_count}; marginal_new={marginal_count}; unsafe_new={unsafe_count}; would_enter={would_enter}; "
+        f"accumulated_unique={accumulated_unique}; accumulated_unsafe_unique={accumulated_unsafe}; "
+        f"accumulated_raw_received={accumulated_raw}; "
         f"pending={pending}; theoretical_wins={wins}; theoretical_losses={losses}; best_symbol={best_symbol}; "
         f"dominant_exclusion={dominant}; recommendation={recommendation}. "
-        "Analyzed includes candidates classified as unsafe. Shadow only; official trades, PnL, score, broker, and thresholds were unchanged."
+        "Duplicates are not reanalyzed as new. Shadow only; official trades, PnL, score, broker, and thresholds were unchanged."
     )
 
 
