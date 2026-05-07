@@ -2127,7 +2127,7 @@ if shadow_decision_simulator:
         f"Recomendacao: {shadow_decision_simulator.get('shadow_policy_recommendation') or 'observe_more'} | "
         f"Politica: {shadow_decision_simulator.get('shadow_entry_policy') or 'conservative_v1'}"
     )
-    st.markdown("##### RASTREABILIDADE FASE 2.4C")
+    st.markdown("##### RASTREABILIDADE FASE 2.4D - ESCOPO NORMALIZADO")
     trace_preview_count = int(shadow_decision_simulator.get("preview_near_approved_count", 0) or 0)
     trace_received_current = int(
         shadow_decision_simulator.get(
@@ -2136,89 +2136,131 @@ if shadow_decision_simulator:
         )
         or 0
     )
-    trace_unique_current = int(shadow_decision_simulator.get("shadow_candidates_unique_count", 0) or 0)
+    trace_new_unique_current = int(
+        shadow_decision_simulator.get(
+            "shadow_current_cycle_new_unique_count",
+            shadow_decision_simulator.get("shadow_candidates_unique_count", 0),
+        )
+        or 0
+    )
+    trace_duplicate_current = int(
+        shadow_decision_simulator.get(
+            "shadow_current_cycle_duplicate_count",
+            shadow_decision_simulator.get("shadow_current_cycle_ignored_count", 0),
+        )
+        or 0
+    )
+    trace_already_analyzed = int(
+        shadow_decision_simulator.get("shadow_current_cycle_already_analyzed_count", trace_duplicate_current) or 0
+    )
     trace_analyzed_current = int(
         shadow_decision_simulator.get(
-            "shadow_current_cycle_analyzed_count",
-            shadow_decision_simulator.get("shadow_candidates_analyzed_count", 0),
+            "shadow_current_cycle_analyzed_new_count",
+            shadow_decision_simulator.get("shadow_current_cycle_analyzed_count", 0),
         )
         or 0
     )
     trace_classified_current = int(
         shadow_decision_simulator.get(
-            "shadow_current_cycle_classified_count",
-            shadow_decision_simulator.get("shadow_candidates_classified_count", 0),
+            "shadow_current_cycle_classified_new_count",
+            shadow_decision_simulator.get("shadow_current_cycle_classified_count", 0),
         )
         or 0
     )
     trace_unsafe_current = int(
         shadow_decision_simulator.get(
-            "shadow_current_cycle_unsafe_count",
-            shadow_decision_simulator.get("shadow_unsafe_count", 0),
+            "shadow_current_cycle_unsafe_new_count",
+            shadow_decision_simulator.get("shadow_current_cycle_unsafe_count", 0),
         )
         or 0
     )
     trace_primary_current = int(
         shadow_decision_simulator.get(
-            "shadow_current_cycle_primary_blocked_count",
+            "shadow_current_cycle_primary_blocked_new_count",
             shadow_decision_simulator.get("shadow_primary_blocked_count", 0),
         )
         or 0
     )
     trace_secondary_current = int(
         shadow_decision_simulator.get(
-            "shadow_current_cycle_secondary_blocked_count",
+            "shadow_current_cycle_secondary_blocked_new_count",
             shadow_decision_simulator.get("shadow_secondary_blocked_count", 0),
         )
         or 0
     )
-    trace_ignored_current = int(
+    trace_accumulated_unique = int(
         shadow_decision_simulator.get(
-            "shadow_current_cycle_ignored_count",
-            shadow_decision_simulator.get("shadow_ignored_count", 0),
+            "shadow_accumulated_unique_candidates_count",
+            shadow_decision_simulator.get("shadow_accumulated_candidates_count", 0),
         )
         or 0
     )
-    tr_c1, tr_c2, tr_c3, tr_c4, tr_c5 = st.columns(5)
+    trace_accumulated_unsafe = int(
+        shadow_decision_simulator.get(
+            "shadow_accumulated_unsafe_unique_count",
+            shadow_decision_simulator.get("shadow_accumulated_unsafe_count", 0),
+        )
+        or 0
+    )
+    trace_accumulated_raw = int(
+        shadow_decision_simulator.get(
+            "shadow_accumulated_raw_received_count",
+            shadow_decision_simulator.get("shadow_accumulated_received_count", trace_received_current),
+        )
+        or 0
+    )
+    trace_duplicate_ratio = float(shadow_decision_simulator.get("shadow_duplicate_ratio", 0.0) or 0.0)
+    trace_raw_to_unique_ratio = float(shadow_decision_simulator.get("shadow_raw_to_unique_ratio", 0.0) or 0.0)
+    trace_table_scope = shadow_decision_simulator.get("shadow_counts_scope") or "current_cycle_and_accumulated_recent"
+    tr_c1, tr_c2, tr_c3, tr_c4 = st.columns(4)
     tr_c1.metric("Preview near-approved", trace_preview_count)
     tr_c2.metric("Recebidos no ciclo", trace_received_current)
-    tr_c3.metric("Unicos no ciclo", trace_unique_current)
-    tr_c4.metric("Analisados no ciclo", trace_analyzed_current)
-    tr_c5.metric("Classificados no ciclo", trace_classified_current)
-    tr_d1, tr_d2, tr_d3, tr_d4, tr_d5 = st.columns(5)
-    tr_d1.metric("Unsafe no ciclo", trace_unsafe_current)
-    tr_d2.metric("Primario bloqueado", trace_primary_current)
-    tr_d3.metric("Secundario bloqueado", trace_secondary_current)
-    tr_d4.metric("Ignorados duplicidade", trace_ignored_current)
-    tr_d5.metric("Escopo", shadow_decision_simulator.get("shadow_counts_scope") or "current_cycle_and_accumulated")
+    tr_c3.metric("Novos unicos no ciclo", trace_new_unique_current)
+    tr_c4.metric("Duplicados no ciclo", trace_duplicate_current)
+    tr_d1, tr_d2, tr_d3, tr_d4 = st.columns(4)
+    tr_d1.metric("Analisados novos no ciclo", trace_analyzed_current)
+    tr_d2.metric("Unsafe novos no ciclo", trace_unsafe_current)
+    tr_d3.metric("Ja analisados anteriormente", trace_already_analyzed)
+    tr_d4.metric("Candidatos unicos acumulados", trace_accumulated_unique)
+    tr_e1, tr_e2, tr_e3, tr_e4 = st.columns(4)
+    tr_e1.metric("Unsafe acumulados unicos", trace_accumulated_unsafe)
+    tr_e2.metric("Recebidos brutos acumulados", trace_accumulated_raw)
+    tr_e3.metric("Taxa de duplicidade", f"{trace_duplicate_ratio:.0%}")
+    tr_e4.metric("Escopo da tabela", trace_table_scope)
     st.caption(
         f"Motivo principal de exclusao: {shadow_decision_simulator.get('shadow_dominant_block_reason') or '-'} | "
+        f"Primario novo: {trace_primary_current} | Secundario novo: {trace_secondary_current} | "
         f"Ignorados: {shadow_decision_simulator.get('shadow_ignored_reason') or '-'}"
     )
     st.caption(
-        "Analisados inclui candidatos classificados como unsafe. "
-        "Safe/marginal sao subconjuntos, nao o total analisado. "
-        "A tabela pode incluir candidatos acumulados; veja count_scope."
+        "Candidatos duplicados nao sao reanalisados como novos, mas continuam aparecendo no acumulado recente para auditoria."
     )
-    st.caption(
-        f"Acumulado: recebidos={int(shadow_decision_simulator.get('shadow_accumulated_received_count', trace_received_current) or 0)} | "
-        f"analisados={int(shadow_decision_simulator.get('shadow_accumulated_analyzed_count', shadow_decision_simulator.get('shadow_candidates_analyzed_count', 0)) or 0)} | "
-        f"unsafe={int(shadow_decision_simulator.get('shadow_accumulated_unsafe_count', shadow_decision_simulator.get('shadow_unsafe_count', 0)) or 0)}."
-    )
-    if bool(shadow_decision_simulator.get("shadow_counter_warning", False)):
-        st.warning(
-            "Aviso de consistencia dos contadores shadow: "
-            f"{shadow_decision_simulator.get('shadow_counter_warning_reason') or 'verificar contadores'}"
+    if trace_received_current > 0 and trace_new_unique_current == 0 and trace_duplicate_current == trace_received_current:
+        st.info(
+            f"Este ciclo nao gerou novos candidatos unicos; os {trace_received_current} recebidos ja haviam sido analisados antes. "
+            "A tabela de acumulados abaixo mostra candidatos recentes ja classificados."
         )
-    shadow_rows = [
-        {
+    if trace_raw_to_unique_ratio >= 10.0:
+        st.info(
+            "Alto volume bruto recebido por repeticao de ciclos; leitura estrategica deve usar candidatos unicos, "
+            "nao recebimentos brutos."
+        )
+    if bool(shadow_decision_simulator.get("shadow_scope_warning", shadow_decision_simulator.get("shadow_counter_warning", False))):
+        st.warning(
+            "Aviso de consistencia de escopo shadow: "
+            f"{shadow_decision_simulator.get('shadow_scope_warning_reason') or shadow_decision_simulator.get('shadow_counter_warning_reason') or 'verificar contadores'}"
+        )
+    def _shadow_trace_row(row, default_scope):
+        return {
             "symbol": row.get("symbol"),
             "setup": row.get("strategy"),
             "score": row.get("current_score"),
             "score_gap": row.get("score_gap"),
             "raw_near_approved": row.get("raw_near_approved"),
             "duplicate_candidate": row.get("duplicate_candidate"),
-            "analyzed_by_shadow": row.get("analyzed_by_shadow"),
+            "already_seen": row.get("already_seen"),
+            "analyzed_this_cycle": row.get("analyzed_this_cycle"),
+            "analyzed_previously": row.get("analyzed_previously"),
             "classified_by_shadow": row.get("classified_by_shadow"),
             "class": row.get("candidate_class"),
             "safe_candidate": row.get("safe_candidate"),
@@ -2227,14 +2269,35 @@ if shadow_decision_simulator:
             "secondary_blockers": ", ".join(list(row.get("secondary_blocker_codes", row.get("secondary_blockers", [])) or [])),
             "why_not_safe": row.get("why_not_safe"),
             "why_would_not_enter": row.get("why_would_not_enter") or row.get("shadow_block_reason"),
-            "count_scope": row.get("count_scope"),
-            "outcome": row.get("outcome_label"),
+            "count_scope": row.get("count_scope") or default_scope,
         }
-        for row in list(shadow_decision_simulator.get("shadow_recent_candidates", []) or [])
+
+    current_shadow_rows = [
+        _shadow_trace_row(row, "current_cycle")
+        for row in list(shadow_decision_simulator.get("shadow_current_cycle_candidates", []) or [])
         if isinstance(row, dict)
     ]
-    if shadow_rows:
-        st.dataframe(pd.DataFrame(shadow_rows[:8]), hide_index=True, use_container_width=True)
+    accumulated_shadow_rows = [
+        _shadow_trace_row(row, "accumulated_recent")
+        for row in list(
+            shadow_decision_simulator.get(
+                "shadow_accumulated_recent_candidates",
+                shadow_decision_simulator.get("shadow_recent_candidates", []),
+            )
+            or []
+        )
+        if isinstance(row, dict)
+    ]
+    st.markdown("###### CANDIDATOS NOVOS DO CICLO")
+    if current_shadow_rows:
+        st.dataframe(pd.DataFrame(current_shadow_rows[:8]), hide_index=True, use_container_width=True)
+    else:
+        st.info("Nenhum candidato novo unico neste ciclo.")
+    st.markdown("###### CANDIDATOS ACUMULADOS RECENTES")
+    if accumulated_shadow_rows:
+        st.dataframe(pd.DataFrame(accumulated_shadow_rows[:8]), hide_index=True, use_container_width=True)
+    else:
+        st.info("Nenhum candidato acumulado recente para auditoria.")
 if phase2_fine_tune:
     st.markdown("#### Ajuste Fino FASE 2")
     st.caption(

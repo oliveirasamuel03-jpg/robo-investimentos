@@ -992,8 +992,17 @@ def _build_operational_consistency(
         "shadow_candidates_analyzed_count": int(
             shadow_decision_simulator.get("shadow_candidates_analyzed_count", 0) or 0
         ),
+        "shadow_current_cycle_new_unique_count": int(
+            shadow_decision_simulator.get("shadow_current_cycle_new_unique_count", 0) or 0
+        ),
+        "shadow_current_cycle_duplicate_count": int(
+            shadow_decision_simulator.get("shadow_current_cycle_duplicate_count", 0) or 0
+        ),
         "shadow_current_cycle_analyzed_count": int(
             shadow_decision_simulator.get("shadow_current_cycle_analyzed_count", 0) or 0
+        ),
+        "shadow_current_cycle_analyzed_new_count": int(
+            shadow_decision_simulator.get("shadow_current_cycle_analyzed_new_count", 0) or 0
         ),
         "shadow_candidates_classified_count": int(
             shadow_decision_simulator.get("shadow_candidates_classified_count", 0) or 0
@@ -1004,10 +1013,18 @@ def _build_operational_consistency(
         "shadow_current_cycle_unsafe_count": int(
             shadow_decision_simulator.get("shadow_current_cycle_unsafe_count", 0) or 0
         ),
+        "shadow_accumulated_unique_candidates_count": int(
+            shadow_decision_simulator.get("shadow_accumulated_unique_candidates_count", 0) or 0
+        ),
+        "shadow_accumulated_raw_received_count": int(
+            shadow_decision_simulator.get("shadow_accumulated_raw_received_count", 0) or 0
+        ),
+        "shadow_duplicate_ratio": float(shadow_decision_simulator.get("shadow_duplicate_ratio", 0.0) or 0.0),
         "shadow_unsafe_rejection_count": int(
             shadow_decision_simulator.get("shadow_unsafe_rejection_count", 0) or 0
         ),
         "shadow_counter_warning": bool(shadow_decision_simulator.get("shadow_counter_warning", False)),
+        "shadow_scope_warning": bool(shadow_decision_simulator.get("shadow_scope_warning", False)),
         "shadow_would_enter_count": int(shadow_decision_simulator.get("shadow_would_enter_count", 0) or 0),
         "shadow_pending_count": int(shadow_decision_simulator.get("shadow_pending_count", 0) or 0),
         "shadow_policy_recommendation": str(

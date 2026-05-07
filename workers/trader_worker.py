@@ -488,22 +488,37 @@ def _log_shadow_decision_simulator_summary(validation_report: dict) -> None:
     current_received = int(
         simulator.get("shadow_current_cycle_received_count", simulator.get("shadow_candidates_received_count", 0)) or 0
     )
-    current_unique = int(simulator.get("shadow_candidates_unique_count", 0) or 0)
-    current_ignored = int(
-        simulator.get("shadow_current_cycle_ignored_count", simulator.get("shadow_candidates_ignored_count", 0)) or 0
+    current_new_unique = int(
+        simulator.get("shadow_current_cycle_new_unique_count", simulator.get("shadow_candidates_unique_count", 0)) or 0
+    )
+    current_duplicate = int(
+        simulator.get("shadow_current_cycle_duplicate_count", simulator.get("shadow_candidates_ignored_count", 0)) or 0
     )
     current_analyzed = int(
-        simulator.get("shadow_current_cycle_analyzed_count", simulator.get("shadow_candidates_analyzed_count", 0)) or 0
+        simulator.get("shadow_current_cycle_analyzed_new_count", simulator.get("shadow_current_cycle_analyzed_count", 0)) or 0
     )
     current_classified = int(
-        simulator.get("shadow_current_cycle_classified_count", simulator.get("shadow_candidates_classified_count", 0)) or 0
+        simulator.get("shadow_current_cycle_classified_new_count", simulator.get("shadow_current_cycle_classified_count", 0))
+        or 0
     )
     current_unsafe = int(
-        simulator.get("shadow_current_cycle_unsafe_count", simulator.get("shadow_unsafe_rejection_count", 0)) or 0
+        simulator.get("shadow_current_cycle_unsafe_new_count", simulator.get("shadow_current_cycle_unsafe_count", 0)) or 0
     )
     current_safe = int(simulator.get("shadow_current_cycle_safe_near_approved_count", 0) or 0)
     current_marginal = int(simulator.get("shadow_current_cycle_marginal_near_approved_count", 0) or 0)
-    invariant_ok = not bool(simulator.get("shadow_counter_warning", False))
+    accumulated_unique = int(
+        simulator.get("shadow_accumulated_unique_candidates_count", simulator.get("shadow_accumulated_candidates_count", 0))
+        or 0
+    )
+    accumulated_raw = int(
+        simulator.get("shadow_accumulated_raw_received_count", simulator.get("shadow_accumulated_received_count", 0)) or 0
+    )
+    accumulated_unsafe = int(
+        simulator.get("shadow_accumulated_unsafe_unique_count", simulator.get("shadow_accumulated_unsafe_count", 0)) or 0
+    )
+    duplicate_ratio = float(simulator.get("shadow_duplicate_ratio", 0.0) or 0.0)
+    table_scope = str(simulator.get("shadow_counts_scope") or "current_cycle_and_accumulated_recent")
+    invariant_ok = not bool(simulator.get("shadow_scope_warning", simulator.get("shadow_counter_warning", False)))
     log_event(
         "INFO",
         (
@@ -512,7 +527,7 @@ def _log_shadow_decision_simulator_summary(validation_report: dict) -> None:
             f"simulator_received_count={current_received};"
             f"analyzed_count={current_analyzed};"
             f"unsafe_count={current_unsafe};"
-            f"ignored_count={current_ignored};"
+            f"ignored_count={current_duplicate};"
             f"dominant_exclusion_reason={str(simulator.get('shadow_dominant_block_reason') or 'none')};"
             "scope=current_cycle;"
             "shadow_only=true"
@@ -523,15 +538,15 @@ def _log_shadow_decision_simulator_summary(validation_report: dict) -> None:
         (
             "[shadow_counter_consistency_summary] "
             f"received={current_received};"
-            f"unique={current_unique};"
-            f"ignored={current_ignored};"
+            f"unique={current_new_unique};"
+            f"ignored={current_duplicate};"
             f"analyzed={current_analyzed};"
             f"classified={current_classified};"
             f"unsafe={current_unsafe};"
             f"safe={current_safe};"
             f"marginal={current_marginal};"
             f"invariant_ok={str(invariant_ok).lower()};"
-            f"warning={str(simulator.get('shadow_counter_warning_reason') or 'none')};"
+            f"warning={str(simulator.get('shadow_scope_warning_reason') or simulator.get('shadow_counter_warning_reason') or 'none')};"
             "scope=current_cycle;"
             "shadow_only=true"
         ),
@@ -542,11 +557,12 @@ def _log_shadow_decision_simulator_summary(validation_report: dict) -> None:
             "[shadow_counter_candidate_flow] "
             f"preview={int(simulator.get('preview_near_approved_count', 0) or 0)};"
             f"received={current_received};"
-            f"unique={current_unique};"
+            f"unique={current_new_unique};"
             f"classified={current_classified};"
-            f"ignored={current_ignored};"
-            f"accumulated_analyzed={int(simulator.get('shadow_accumulated_analyzed_count', simulator.get('shadow_candidates_analyzed_count', 0)) or 0)};"
-            f"accumulated_unsafe={int(simulator.get('shadow_accumulated_unsafe_count', simulator.get('shadow_unsafe_count', 0)) or 0)};"
+            f"ignored={current_duplicate};"
+            f"accumulated_unique={accumulated_unique};"
+            f"accumulated_raw={accumulated_raw};"
+            f"accumulated_unsafe={accumulated_unsafe};"
             "shadow_only=true"
         ),
     )
@@ -555,7 +571,67 @@ def _log_shadow_decision_simulator_summary(validation_report: dict) -> None:
         (
             "[shadow_counter_invariant_check] "
             f"invariant_ok={str(invariant_ok).lower()};"
-            f"warning_reason={str(simulator.get('shadow_counter_warning_reason') or 'none')};"
+            f"warning_reason={str(simulator.get('shadow_scope_warning_reason') or simulator.get('shadow_counter_warning_reason') or 'none')};"
+            "non_blocking=true;"
+            "shadow_only=true"
+        ),
+    )
+    log_event(
+        "INFO",
+        (
+            "[shadow_scope_normalization_summary] "
+            f"received_current={current_received};"
+            f"new_unique_current={current_new_unique};"
+            f"duplicate_current={current_duplicate};"
+            f"analyzed_new_current={current_analyzed};"
+            f"unsafe_new_current={current_unsafe};"
+            f"accumulated_unique={accumulated_unique};"
+            f"accumulated_raw={accumulated_raw};"
+            f"duplicate_ratio={duplicate_ratio:.4f};"
+            f"table_scope={table_scope};"
+            f"invariant_ok={str(invariant_ok).lower()};"
+            "shadow_only=true"
+        ),
+    )
+    log_event(
+        "INFO",
+        (
+            "[shadow_scope_candidate_flow] "
+            f"received_current={current_received};"
+            f"new_unique_current={current_new_unique};"
+            f"duplicate_current={current_duplicate};"
+            f"already_analyzed_current={int(simulator.get('shadow_current_cycle_already_analyzed_count', current_duplicate) or 0)};"
+            f"classified_new_current={current_classified};"
+            "shadow_only=true"
+        ),
+    )
+    log_event(
+        "INFO",
+        (
+            "[shadow_scope_duplicate_summary] "
+            f"duplicate_current={current_duplicate};"
+            f"duplicate_ratio={duplicate_ratio:.4f};"
+            f"ignored_reason={str(simulator.get('shadow_ignored_reason') or 'none')};"
+            f"health={str(simulator.get('shadow_counter_health_status') or 'healthy')};"
+            "shadow_only=true"
+        ),
+    )
+    log_event(
+        "INFO",
+        (
+            "[shadow_scope_table_scope] "
+            f"table_scope={table_scope};"
+            f"current_table_count={len(list(simulator.get('shadow_current_cycle_candidates', []) or []))};"
+            f"accumulated_recent_table_count={len(list(simulator.get('shadow_accumulated_recent_candidates', simulator.get('shadow_recent_candidates', [])) or []))};"
+            "shadow_only=true"
+        ),
+    )
+    log_event(
+        "INFO",
+        (
+            "[shadow_scope_invariant_check] "
+            f"invariant_ok={str(invariant_ok).lower()};"
+            f"warning_reason={str(simulator.get('shadow_scope_warning_reason') or 'none')};"
             "non_blocking=true;"
             "shadow_only=true"
         ),
