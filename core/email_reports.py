@@ -318,6 +318,26 @@ def _composite_summary(validation_report: dict[str, Any], reports_df: pd.DataFra
 
 
 def _multi_timeframe_summary(validation_report: dict[str, Any]) -> str:
+    audit = dict(validation_report.get("multi_timeframe_swing_audit", {}) or {})
+    if audit:
+        if not bool(audit.get("enabled", True)):
+            return "Multi-timeframe swing audit: disabled. Shadow only; no trade decision changed."
+        top_symbol = _safe_text(audit.get("top_symbol"), fallback="none")
+        status = _safe_text(audit.get("top_alignment_status"), fallback="INSUFFICIENT_DATA")
+        score = audit.get("top_alignment_score")
+        score_text = "-" if score is None else f"{float(score):.2f}"
+        candidates = list(audit.get("recent_candidates", []) or [])
+        top_candidate = dict(candidates[0] if candidates and isinstance(candidates[0], dict) else {})
+        daily = _safe_text(top_candidate.get("daily_bias"), fallback="INCONCLUSIVE")
+        h4 = _safe_text(top_candidate.get("h4_structure"), fallback="INCONCLUSIVE")
+        h1 = _safe_text(top_candidate.get("h1_confirmation"), fallback="INCONCLUSIVE")
+        recommendation = _safe_text(audit.get("top_recommendation"), fallback="observe_more")
+        missing = _safe_text(audit.get("top_missing_confirmation"), fallback="none")
+        return (
+            f"Multi-timeframe swing audit: top={top_symbol}; alignment={status}; score={score_text}; "
+            f"1D={daily}; 4H={h4}; 1H={h1}; missing={missing}; recommendation={recommendation}. "
+            "Shadow only; no trade decision, score, broker, or threshold was changed."
+        )
     timeframe_label = _safe_text(validation_report.get("timeframe_label"), fallback="Diario (1D)")
     return (
         f"A fase atual opera em {timeframe_label}. Nao ha camada multi-timeframe ativa nesta etapa, "

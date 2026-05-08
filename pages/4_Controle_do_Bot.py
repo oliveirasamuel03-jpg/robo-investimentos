@@ -604,6 +604,11 @@ fib_alignment_audit = dict(
     or state.get("fib_alignment_audit", {})
     or {}
 )
+multi_timeframe_swing_audit = dict(
+    validation_report.get("multi_timeframe_swing_audit")
+    or state.get("multi_timeframe_swing_audit", {})
+    or {}
+)
 shadow_decision_simulator = dict(
     validation_report.get("shadow_decision_simulator")
     or state.get("shadow_decision_simulator", {})
@@ -883,6 +888,64 @@ if fib_alignment_audit:
     ]
     if checklist_rows:
         st.dataframe(pd.DataFrame(checklist_rows[:8]), hide_index=True, use_container_width=True)
+if multi_timeframe_swing_audit:
+    st.subheader("FASE 2.5 - DIAGNOSTICO MULTI-TIMEFRAME SWING")
+    st.caption(
+        "SHADOW ONLY: 1D, 4H e 1H sao usados apenas para diagnosticar estrutura swing. "
+        "Nao aprova trade, nao altera score real, nao muda broker e preserva PAPER TRADING."
+    )
+    top_alignment_score = multi_timeframe_swing_audit.get("top_alignment_score")
+    top_alignment_score_label = "-" if top_alignment_score is None else f"{float(top_alignment_score):.2f}"
+    mtf_candidates = [
+        row for row in list(multi_timeframe_swing_audit.get("recent_candidates", []) or []) if isinstance(row, dict)
+    ]
+    top_mtf = dict(mtf_candidates[0] if mtf_candidates else {})
+    pivot_timeframes = ", ".join(list(top_mtf.get("pivot_confirmed_timeframes", top_mtf.get("pivot_timeframes", [])) or [])) or "-"
+    bos_timeframes = ", ".join(list(top_mtf.get("bos_confirmed_timeframes", top_mtf.get("bos_timeframes", [])) or [])) or "-"
+    mtf_c1, mtf_c2, mtf_c3, mtf_c4 = st.columns(4)
+    mtf_c1.metric("Status", multi_timeframe_swing_audit.get("mode") or "SHADOW_ONLY")
+    mtf_c2.metric("Top ativo", multi_timeframe_swing_audit.get("top_symbol") or "-")
+    mtf_c3.metric("Score alinhamento", top_alignment_score_label)
+    mtf_c4.metric("Status alinhamento", multi_timeframe_swing_audit.get("top_alignment_status") or "INSUFFICIENT_DATA")
+    mtf_d1, mtf_d2, mtf_d3, mtf_d4 = st.columns(4)
+    mtf_d1.metric("Direcao 1D", top_mtf.get("daily_bias") or "INCONCLUSIVE")
+    mtf_d2.metric("Estrutura 4H", top_mtf.get("h4_structure") or "INCONCLUSIVE")
+    mtf_d3.metric("Confirmacao 1H", top_mtf.get("h1_confirmation") or "INCONCLUSIVE")
+    mtf_d4.metric("Pivo detectado", pivot_timeframes)
+    mtf_e1, mtf_e2, mtf_e3, mtf_e4 = st.columns(4)
+    mtf_e1.metric("BOS detectado", bos_timeframes)
+    mtf_e2.metric("Conflito dominante", multi_timeframe_swing_audit.get("dominant_conflict_reason") or "-")
+    mtf_e3.metric("Recomendacao", multi_timeframe_swing_audit.get("top_recommendation") or "observe_more")
+    mtf_e4.metric("Feed usado", multi_timeframe_swing_audit.get("feed_status") or "UNKNOWN")
+    st.caption(
+        f"Provider: {multi_timeframe_swing_audit.get('provider_effective') or '-'} | "
+        f"Cache/TTL: {multi_timeframe_swing_audit.get('cache_status') or 'cycle_data_resample_only'} / "
+        f"{int(multi_timeframe_swing_audit.get('cache_ttl_seconds', 0) or 0)}s | "
+        f"Chamadas extras estimadas: {int(multi_timeframe_swing_audit.get('estimated_provider_calls', 0) or 0)} | "
+        f"Guard provider: {multi_timeframe_swing_audit.get('provider_guard') or '-'}"
+    )
+    mtf_rows = [
+        {
+            "symbol": row.get("symbol"),
+            "daily_bias": row.get("daily_bias"),
+            "h4_structure": row.get("h4_structure"),
+            "h1_confirmation": row.get("h1_confirmation"),
+            "alignment_score": row.get("alignment_score"),
+            "alignment_status": row.get("alignment_status"),
+            "pivot_timeframes": ", ".join(list(row.get("pivot_confirmed_timeframes", row.get("pivot_timeframes", [])) or [])),
+            "bos_timeframes": ", ".join(list(row.get("bos_confirmed_timeframes", row.get("bos_timeframes", [])) or [])),
+            "supports_trend_pullback_breakout": row.get("supports_trend_pullback_breakout"),
+            "missing_for_setup": ", ".join(list(row.get("missing_for_setup", []) or [])),
+            "would_improve_signal_quality": row.get("would_improve_signal_quality"),
+            "should_keep_blocked": row.get("should_keep_blocked"),
+            "recommendation": row.get("recommendation"),
+        }
+        for row in mtf_candidates[:8]
+    ]
+    if mtf_rows:
+        st.dataframe(pd.DataFrame(mtf_rows), hide_index=True, use_container_width=True)
+    else:
+        st.info("Sem candidatos multi-timeframe suficientes ainda.")
 if shadow_decision_simulator:
     st.subheader("SIMULADOR SHADOW DE DECISAO - FASE 2.4")
     st.caption(

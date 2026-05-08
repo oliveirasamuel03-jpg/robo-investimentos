@@ -27,6 +27,12 @@ from core.config import (
     MARKET_DATA_FALLBACK_PROVIDER,
     MARKET_DATA_BUILD_LABEL,
     MARKET_DATA_PROVIDER,
+    MULTITF_SWING_AUDIT_ENABLED,
+    MULTITF_SWING_CACHE_TTL_SECONDS,
+    MULTITF_SWING_MAX_SYMBOLS,
+    MULTITF_SWING_REQUIRE_LIVE_FEED,
+    MULTITF_SWING_SHADOW_ONLY,
+    MULTITF_SWING_TIMEFRAMES,
     PRODUCTION_MODE,
     RAILWAY_GIT_COMMIT_SHA,
     REPORT_EMAIL_10DAY_ENABLED,
@@ -433,6 +439,38 @@ DEFAULT_STATE = {
         "fib_alignment_recommendation": "insufficient_data",
         "fib_alignment_checklist": [],
         "fib_alignment_last_run_at": "",
+    },
+    "multi_timeframe_swing_audit": {
+        "enabled": MULTITF_SWING_AUDIT_ENABLED,
+        "mode": "SHADOW_ONLY",
+        "generated_at": "",
+        "provider_effective": "",
+        "feed_status": "UNKNOWN",
+        "timeframes_used": [item.strip().lower() for item in MULTITF_SWING_TIMEFRAMES.split(",") if item.strip()],
+        "timeframe_source": "operational_cycle_resample",
+        "timeframe_fallbacks": [],
+        "symbols_analyzed": 0,
+        "top_symbol": "",
+        "top_alignment_score": None,
+        "top_alignment_status": "INSUFFICIENT_DATA",
+        "top_missing_confirmation": "",
+        "top_recommendation": "insufficient_data",
+        "dominant_conflict_reason": "No multi-timeframe swing audit data yet.",
+        "candidates_count": 0,
+        "strong_alignment_count": 0,
+        "partial_alignment_count": 0,
+        "conflict_count": 0,
+        "insufficient_data_count": 0,
+        "setup_support_count": 0,
+        "recent_candidates": [],
+        "estimated_provider_calls": 0,
+        "cache_ttl_seconds": MULTITF_SWING_CACHE_TTL_SECONDS,
+        "cache_status": "cycle_data_resample_only",
+        "provider_guard": "not_evaluated",
+        "require_live_feed": MULTITF_SWING_REQUIRE_LIVE_FEED,
+        "shadow_only": MULTITF_SWING_SHADOW_ONLY,
+        "max_symbols": MULTITF_SWING_MAX_SYMBOLS,
+        "reason": "No multi-timeframe swing audit data yet.",
     },
     "shadow_decision_simulator": {
         "shadow_decision_simulator_enabled": True,
@@ -972,6 +1010,68 @@ def load_bot_state() -> dict:
         if isinstance(item, dict)
     ][:12]
     state["fib_alignment_audit"] = fib_alignment_state
+    multi_tf_state = state.get("multi_timeframe_swing_audit", {}) or {}
+    multi_tf_state["enabled"] = MULTITF_SWING_AUDIT_ENABLED
+    multi_tf_state["shadow_only"] = MULTITF_SWING_SHADOW_ONLY
+    multi_tf_state["require_live_feed"] = MULTITF_SWING_REQUIRE_LIVE_FEED
+    for key, fallback in (
+        ("mode", "SHADOW_ONLY"),
+        ("generated_at", ""),
+        ("provider_effective", ""),
+        ("feed_status", "UNKNOWN"),
+        ("timeframe_source", "operational_cycle_resample"),
+        ("top_symbol", ""),
+        ("top_alignment_status", "INSUFFICIENT_DATA"),
+        ("top_missing_confirmation", ""),
+        ("top_recommendation", "insufficient_data"),
+        ("dominant_conflict_reason", "No multi-timeframe swing audit data yet."),
+        ("cache_status", "cycle_data_resample_only"),
+        ("provider_guard", "not_evaluated"),
+        ("reason", "No multi-timeframe swing audit data yet."),
+    ):
+        multi_tf_state[key] = str(multi_tf_state.get(key) or fallback)
+    for key in (
+        "symbols_analyzed",
+        "candidates_count",
+        "strong_alignment_count",
+        "partial_alignment_count",
+        "conflict_count",
+        "insufficient_data_count",
+        "setup_support_count",
+        "estimated_provider_calls",
+        "cache_ttl_seconds",
+        "max_symbols",
+    ):
+        try:
+            default_value = MULTITF_SWING_CACHE_TTL_SECONDS if key == "cache_ttl_seconds" else 0
+            if key == "max_symbols":
+                default_value = MULTITF_SWING_MAX_SYMBOLS
+            multi_tf_state[key] = int(multi_tf_state.get(key, default_value) or default_value)
+        except (TypeError, ValueError):
+            multi_tf_state[key] = MULTITF_SWING_CACHE_TTL_SECONDS if key == "cache_ttl_seconds" else 0
+    top_score = multi_tf_state.get("top_alignment_score")
+    try:
+        multi_tf_state["top_alignment_score"] = None if top_score in (None, "") else float(top_score or 0.0)
+    except (TypeError, ValueError):
+        multi_tf_state["top_alignment_score"] = None
+    configured_timeframes = [item.strip().lower() for item in MULTITF_SWING_TIMEFRAMES.split(",") if item.strip()]
+    timeframes = [
+        str(item).strip().lower()
+        for item in list(multi_tf_state.get("timeframes_used", configured_timeframes) or configured_timeframes)
+        if str(item).strip()
+    ]
+    multi_tf_state["timeframes_used"] = timeframes or configured_timeframes or ["1d", "4h", "1h"]
+    multi_tf_state["timeframe_fallbacks"] = [
+        str(item)
+        for item in list(multi_tf_state.get("timeframe_fallbacks", []) or [])
+        if str(item).strip()
+    ][:12]
+    multi_tf_state["recent_candidates"] = [
+        item
+        for item in list(multi_tf_state.get("recent_candidates", []) or [])
+        if isinstance(item, dict)
+    ][:10]
+    state["multi_timeframe_swing_audit"] = multi_tf_state
     shadow_state = state.get("shadow_decision_simulator", {}) or {}
     shadow_state["shadow_decision_simulator_enabled"] = bool(
         shadow_state.get("shadow_decision_simulator_enabled", True)
