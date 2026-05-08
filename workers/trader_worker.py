@@ -426,6 +426,79 @@ def _log_fib_alignment_audit_summary(validation_report: dict) -> None:
         )
 
 
+def _log_multi_timeframe_swing_audit_summary(validation_report: dict) -> None:
+    audit = dict(validation_report.get("multi_timeframe_swing_audit", {}) or {})
+    if not audit:
+        return
+    score = audit.get("top_alignment_score")
+    score_text = "none" if score is None else f"{float(score):.4f}"
+    log_event(
+        "INFO",
+        (
+            "[multi_tf_swing_audit_summary] "
+            f"mode={str(audit.get('mode') or 'SHADOW_ONLY').lower()};"
+            f"feed_status={str(audit.get('feed_status') or 'UNKNOWN')};"
+            f"provider={str(audit.get('provider_effective') or 'unknown')};"
+            f"symbols={int(audit.get('symbols_analyzed', 0) or 0)};"
+            f"top_symbol={str(audit.get('top_symbol') or 'none')};"
+            f"score={score_text};"
+            f"status={str(audit.get('top_alignment_status') or 'INSUFFICIENT_DATA')};"
+            f"missing={str(audit.get('top_missing_confirmation') or 'none')};"
+            f"calls={int(audit.get('estimated_provider_calls', 0) or 0)};"
+            f"cache={str(audit.get('cache_status') or 'cycle_data_resample_only')};"
+            "shadow_only=true"
+        ),
+    )
+    candidates = [item for item in list(audit.get("recent_candidates", []) or []) if isinstance(item, dict)]
+    for item in candidates[:3]:
+        log_event(
+            "INFO",
+            (
+                "[multi_tf_swing_audit_candidate] "
+                f"symbol={str(item.get('symbol') or 'none')};"
+                f"daily={str(item.get('daily_bias') or 'INCONCLUSIVE')};"
+                f"h4={str(item.get('h4_structure') or 'INCONCLUSIVE')};"
+                f"h1={str(item.get('h1_confirmation') or 'INCONCLUSIVE')};"
+                f"alignment={item.get('alignment_score') if item.get('alignment_score') is not None else 'none'};"
+                f"status={str(item.get('alignment_status') or 'INSUFFICIENT_DATA')};"
+                f"support={int(bool(item.get('supports_trend_pullback_breakout', False)))};"
+                f"keep_blocked={int(bool(item.get('should_keep_blocked', True)))};"
+                "shadow_only=true"
+            ),
+        )
+    log_event(
+        "INFO",
+        (
+            "[multi_tf_swing_alignment] "
+            f"strong={int(audit.get('strong_alignment_count', 0) or 0)};"
+            f"partial={int(audit.get('partial_alignment_count', 0) or 0)};"
+            f"conflict={int(audit.get('conflict_count', 0) or 0)};"
+            f"insufficient={int(audit.get('insufficient_data_count', 0) or 0)};"
+            f"setup_support={int(audit.get('setup_support_count', 0) or 0)};"
+            "shadow_only=true"
+        ),
+    )
+    log_event(
+        "INFO",
+        (
+            "[multi_tf_swing_missing_confirmation] "
+            f"dominant={str(audit.get('dominant_conflict_reason') or audit.get('top_missing_confirmation') or 'none')};"
+            f"recommendation={str(audit.get('top_recommendation') or 'observe_more')};"
+            "shadow_only=true"
+        ),
+    )
+    log_event(
+        "INFO",
+        (
+            "[multi_tf_swing_provider_guard] "
+            f"guard={str(audit.get('provider_guard') or 'not_evaluated')};"
+            f"cache_ttl={int(audit.get('cache_ttl_seconds', 0) or 0)};"
+            f"estimated_provider_calls={int(audit.get('estimated_provider_calls', 0) or 0)};"
+            "shadow_only=true"
+        ),
+    )
+
+
 def _log_shadow_decision_simulator_summary(validation_report: dict) -> None:
     simulator = dict(validation_report.get("shadow_decision_simulator", {}) or {})
     if not simulator:
@@ -999,6 +1072,7 @@ def worker_loop() -> None:
             _log_strategy_structure_audit_summary(validation_report)
             _log_market_structure_audit_summary(validation_report)
             _log_fib_alignment_audit_summary(validation_report)
+            _log_multi_timeframe_swing_audit_summary(validation_report)
             _log_shadow_decision_simulator_summary(validation_report)
             _log_phase2_fine_tune_summary(validation_report)
             _log_phase2_1_fine_tune_summary(validation_report)

@@ -24,6 +24,7 @@ from core.calibration_preview import build_calibration_preview, default_calibrat
 from core.fibonacci_alignment_audit import default_fib_alignment_audit_state
 from core.market_structure_audit import default_market_structure_audit_state
 from core.market_data import build_feed_quality_snapshot
+from core.multi_timeframe_swing_audit import default_multi_timeframe_swing_audit_state
 from core.shadow_decision_simulator import default_shadow_decision_state
 from core.state_store import load_bot_state, read_storage_table, save_bot_state
 from core.signal_rejection_analysis import (
@@ -912,6 +913,9 @@ def _build_operational_consistency(
     strategy_structure_audit = dict(state.get("strategy_structure_audit", {}) or default_strategy_structure_audit_state())
     market_structure_audit = dict(state.get("market_structure_audit", {}) or default_market_structure_audit_state())
     fib_alignment_audit = dict(state.get("fib_alignment_audit", {}) or default_fib_alignment_audit_state())
+    multi_timeframe_swing_audit = dict(
+        state.get("multi_timeframe_swing_audit", {}) or default_multi_timeframe_swing_audit_state()
+    )
     shadow_decision_simulator = dict(
         state.get("shadow_decision_simulator", {}) or default_shadow_decision_state()
     )
@@ -984,6 +988,14 @@ def _build_operational_consistency(
         "fib_alignment_top_symbol": str(fib_alignment_audit.get("fib_alignment_top_symbol") or ""),
         "fib_alignment_recommendation": str(
             fib_alignment_audit.get("fib_alignment_recommendation") or "insufficient_data"
+        ),
+        "multi_tf_swing_mode": multi_timeframe_swing_audit.get("mode", "SHADOW_ONLY"),
+        "multi_tf_swing_top_symbol": str(multi_timeframe_swing_audit.get("top_symbol") or ""),
+        "multi_tf_swing_top_alignment_status": str(
+            multi_timeframe_swing_audit.get("top_alignment_status") or "INSUFFICIENT_DATA"
+        ),
+        "multi_tf_swing_top_recommendation": str(
+            multi_timeframe_swing_audit.get("top_recommendation") or "insufficient_data"
         ),
         "shadow_decision_mode": shadow_decision_simulator.get("shadow_decision_mode", "SHADOW_ONLY"),
         "preview_near_approved_count": int(
@@ -1177,6 +1189,9 @@ def build_swing_validation_report(state: dict | None = None, now: datetime | Non
         ),
         "market_structure_audit": dict(payload.get("market_structure_audit", {}) or default_market_structure_audit_state()),
         "fib_alignment_audit": dict(payload.get("fib_alignment_audit", {}) or default_fib_alignment_audit_state()),
+        "multi_timeframe_swing_audit": dict(
+            payload.get("multi_timeframe_swing_audit", {}) or default_multi_timeframe_swing_audit_state()
+        ),
         "shadow_decision_simulator": dict(
             payload.get("shadow_decision_simulator", {}) or default_shadow_decision_state()
         ),
@@ -1267,6 +1282,12 @@ def refresh_swing_validation_cycle(
             or (cycle_result.get("validation_cycle", {}) or {}).get("fib_alignment_audit", {})
             or state.get("fib_alignment_audit", {})
             or default_fib_alignment_audit_state()
+        )
+        state["multi_timeframe_swing_audit"] = dict(
+            cycle_result.get("multi_timeframe_swing_audit")
+            or (cycle_result.get("validation_cycle", {}) or {}).get("multi_timeframe_swing_audit", {})
+            or state.get("multi_timeframe_swing_audit", {})
+            or default_multi_timeframe_swing_audit_state()
         )
         state["shadow_decision_simulator"] = dict(
             cycle_result.get("shadow_decision_simulator")
@@ -1394,6 +1415,11 @@ def refresh_swing_validation_cycle(
         sanitized_report.get("fib_alignment_audit")
         or updated_state.get("fib_alignment_audit", {})
         or default_fib_alignment_audit_state()
+    )
+    updated_state["multi_timeframe_swing_audit"] = dict(
+        sanitized_report.get("multi_timeframe_swing_audit")
+        or updated_state.get("multi_timeframe_swing_audit", {})
+        or default_multi_timeframe_swing_audit_state()
     )
     updated_state["shadow_decision_simulator"] = dict(
         sanitized_report.get("shadow_decision_simulator")

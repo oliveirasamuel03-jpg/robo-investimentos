@@ -131,6 +131,12 @@ Variaveis suportadas:
 - `CALIBRATION_PREVIEW_ENABLED`
 - `CALIBRATION_PREVIEW_MARGIN`
 - `CALIBRATION_PREVIEW_MAX_EXAMPLES`
+- `MULTITF_SWING_AUDIT_ENABLED`
+- `MULTITF_SWING_TIMEFRAMES`
+- `MULTITF_SWING_CACHE_TTL_SECONDS`
+- `MULTITF_SWING_MAX_SYMBOLS`
+- `MULTITF_SWING_REQUIRE_LIVE_FEED`
+- `MULTITF_SWING_SHADOW_ONLY`
 - `DAILY_LOSS_LIMIT_BRL`
 - `ALERT_EMAIL_ENABLED`
 - `ALERT_EMAIL_PROVIDER`
@@ -575,6 +581,40 @@ CALIBRATION_PREVIEW_MAX_EXAMPLES=10
 Com `min_signal_score=0.74` e margem `0.04`, o preview observa sinais rejeitados entre `0.70` e `0.74`, desde que o feed esteja `LIVE`, sem fallback no ciclo, macro alert inativo, contexto `FAVORAVEL`/`NEUTRO`, broker `PAPER`, ativo na watchlist e sem trava diaria ativa.
 
 Use esta leitura apenas para decidir se ha base para estudar calibracao futura. Nenhuma calibracao e aplicada automaticamente.
+
+## Multi-Timeframe Swing Diagnostic - FASE 2.5
+
+A camada `FASE 2.5 - Diagnostico Multi-Timeframe Swing` compara 1D, 4H e 1H em modo `SHADOW_ONLY` para explicar estrutura swing sem virar gatilho de entrada.
+
+- `1D` representa direcao principal e filtro macro da estrategia.
+- `4H` representa estrutura intermediaria, pivo, BOS, pullback e continuacao.
+- `1H` representa confirmacao de retomada/timing estrutural.
+- `15m` permanece visual/refino de UI, sem autoridade operacional.
+
+Seguranca:
+
+- nao aprova trades
+- nao altera score real nem `min_signal_score`
+- nao muda thresholds, broker, PnL, historico ou posicoes oficiais
+- nao transforma Fibonacci, BOS, 4H ou 1H em gatilho
+- preserva `PAPER TRADING`
+
+Configuracao:
+
+```env
+MULTITF_SWING_AUDIT_ENABLED=true
+MULTITF_SWING_TIMEFRAMES=1d,4h,1h
+MULTITF_SWING_CACHE_TTL_SECONDS=900
+MULTITF_SWING_MAX_SYMBOLS=5
+MULTITF_SWING_REQUIRE_LIVE_FEED=true
+MULTITF_SWING_SHADOW_ONLY=true
+```
+
+Para proteger os limites da Twelve Data, a implementacao inicial reaproveita os candles ja carregados no ciclo operacional e deriva 4H/1D por resample local. O diagnostico registra `estimated_provider_calls=0`, `cache_status=cycle_data_resample_only` e degrada se o feed nao estiver `LIVE`.
+
+`MULTITF_SWING_SHADOW_ONLY` e documentado como reforco operacional, mas a seguranca no codigo forca esta fase a permanecer `SHADOW_ONLY`.
+
+Procure nos logs por `[multi_tf_swing_audit_summary]`, `[multi_tf_swing_audit_candidate]`, `[multi_tf_swing_alignment]`, `[multi_tf_swing_missing_confirmation]` e `[multi_tf_swing_provider_guard]`.
 
 ## Strategy Bottleneck - FASE 2.7
 
