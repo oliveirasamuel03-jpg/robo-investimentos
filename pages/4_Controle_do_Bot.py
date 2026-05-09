@@ -604,6 +604,11 @@ fib_alignment_audit = dict(
     or state.get("fib_alignment_audit", {})
     or {}
 )
+multi_timeframe_intraday_fetcher = dict(
+    validation_report.get("multi_timeframe_intraday_fetcher")
+    or state.get("multi_timeframe_intraday_fetcher", {})
+    or {}
+)
 multi_timeframe_swing_audit = dict(
     validation_report.get("multi_timeframe_swing_audit")
     or state.get("multi_timeframe_swing_audit", {})
@@ -924,6 +929,53 @@ if multi_timeframe_swing_audit:
         f"Chamadas extras estimadas: {int(multi_timeframe_swing_audit.get('estimated_provider_calls', 0) or 0)} | "
         f"Guard provider: {multi_timeframe_swing_audit.get('provider_guard') or '-'}"
     )
+    st.markdown("##### FASE 2.5A - DADOS INTRADAY 4H/1H")
+    st.caption(
+        "SHADOW ONLY: dados 4H/1H sao usados apenas para diagnosticar estrutura swing. "
+        "Nao aprovam trade, nao alteram score real, nao mudam broker e preservam PAPER TRADING."
+    )
+    intraday_diags = [
+        row for row in list(multi_timeframe_intraday_fetcher.get("diagnostics", []) or []) if isinstance(row, dict)
+    ]
+    fetch_c1, fetch_c2, fetch_c3, fetch_c4 = st.columns(4)
+    fetch_c1.metric("Intraday fetch status", multi_timeframe_intraday_fetcher.get("intraday_data_quality") or "NO_DATA")
+    fetch_c2.metric("Usa dados reais 4H/1H", "Sim" if bool(multi_timeframe_swing_audit.get("uses_real_intraday_data", False)) else "Nao")
+    fetch_c3.metric("Timeframes disponiveis", ", ".join(list(multi_timeframe_intraday_fetcher.get("timeframes_available", []) or [])) or "-")
+    fetch_c4.metric("Simbolos buscados", len(list(multi_timeframe_intraday_fetcher.get("symbols_requested", []) or [])))
+    fetch_d1, fetch_d2, fetch_d3, fetch_d4 = st.columns(4)
+    fetch_d1.metric("Cache hits", int(multi_timeframe_intraday_fetcher.get("cache_hits", 0) or 0))
+    fetch_d2.metric("Cache misses", int(multi_timeframe_intraday_fetcher.get("cache_misses", 0) or 0))
+    fetch_d3.metric("Chamadas provider", int(multi_timeframe_intraday_fetcher.get("provider_calls_attempted", 0) or 0))
+    fetch_d4.metric("Puladas por guard", int(multi_timeframe_intraday_fetcher.get("provider_calls_skipped", 0) or 0))
+    fetch_e1, fetch_e2, fetch_e3, fetch_e4 = st.columns(4)
+    fetch_e1.metric("Qualidade 4H", multi_timeframe_swing_audit.get("h4_data_quality") or "missing")
+    fetch_e2.metric("Qualidade 1H", multi_timeframe_swing_audit.get("h1_data_quality") or "missing")
+    fetch_e3.metric("Motivo insuficiente", multi_timeframe_swing_audit.get("intraday_missing_reason") or multi_timeframe_intraday_fetcher.get("provider_guard_reason") or "-")
+    fetch_e4.metric("Recomendacao", multi_timeframe_intraday_fetcher.get("intraday_fetch_recommendation") or "observe_more")
+    mtf_diag_by_symbol = {
+        row.get("symbol"): dict(row.get("timeframe_diagnostics", {}) or {})
+        for row in mtf_candidates
+        if isinstance(row, dict)
+    }
+    fetch_rows = [
+        {
+            "symbol": row.get("symbol"),
+            "timeframe": row.get("timeframe"),
+            "candles_available": row.get("candles_available"),
+            "data_quality": row.get("data_quality"),
+            "cache_status": row.get("cache_status"),
+            "provider_call_attempted": row.get("provider_call_attempted"),
+            "trend_direction": ((mtf_diag_by_symbol.get(row.get("symbol"), {}) or {}).get(row.get("timeframe"), {}) or {}).get("trend_direction"),
+            "pivot_confirmed": ((mtf_diag_by_symbol.get(row.get("symbol"), {}) or {}).get(row.get("timeframe"), {}) or {}).get("pivot_confirmed"),
+            "bos_confirmed": ((mtf_diag_by_symbol.get(row.get("symbol"), {}) or {}).get(row.get("timeframe"), {}) or {}).get("bos_confirmed"),
+            "why_not_confirmed": row.get("quality_reason"),
+        }
+        for row in intraday_diags[:10]
+    ]
+    if fetch_rows:
+        st.dataframe(pd.DataFrame(fetch_rows), hide_index=True, use_container_width=True)
+    else:
+        st.info("Sem diagnostico intraday 4H/1H registrado ainda.")
     mtf_rows = [
         {
             "symbol": row.get("symbol"),

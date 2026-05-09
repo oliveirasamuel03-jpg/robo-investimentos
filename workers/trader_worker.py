@@ -499,6 +499,85 @@ def _log_multi_timeframe_swing_audit_summary(validation_report: dict) -> None:
     )
 
 
+def _log_multi_timeframe_intraday_fetch_summary(validation_report: dict) -> None:
+    fetcher = dict(validation_report.get("multi_timeframe_intraday_fetcher", {}) or {})
+    audit = dict(validation_report.get("multi_timeframe_swing_audit", {}) or {})
+    if not fetcher:
+        return
+    log_event(
+        "INFO",
+        (
+            "[multi_tf_intraday_fetch_summary] "
+            f"enabled={int(bool(fetcher.get('enabled', True)))};"
+            f"mode={str(fetcher.get('mode') or 'SHADOW_ONLY').lower()};"
+            f"feed_status={str(fetcher.get('feed_status') or 'UNKNOWN')};"
+            f"provider={str(fetcher.get('provider_effective') or 'unknown')};"
+            f"symbols_requested={len(list(fetcher.get('symbols_requested', []) or []))};"
+            f"symbols_fetched={len(list(fetcher.get('symbols_fetched', []) or []))};"
+            f"timeframes={','.join(list(fetcher.get('timeframes_requested', []) or []))};"
+            f"quality={str(fetcher.get('intraday_data_quality') or 'NO_DATA')};"
+            "shadow_only=true"
+        ),
+    )
+    log_event(
+        "INFO",
+        (
+            "[multi_tf_intraday_fetch_cache] "
+            f"hits={int(fetcher.get('cache_hits', 0) or 0)};"
+            f"misses={int(fetcher.get('cache_misses', 0) or 0)};"
+            f"calls_attempted={int(fetcher.get('provider_calls_attempted', 0) or 0)};"
+            f"calls_skipped={int(fetcher.get('provider_calls_skipped', 0) or 0)};"
+            f"estimated_calls={int(fetcher.get('estimated_provider_calls', 0) or 0)};"
+            "shadow_only=true"
+        ),
+    )
+    log_event(
+        "INFO",
+        (
+            "[multi_tf_intraday_fetch_provider_guard] "
+            f"budget_guard={int(bool(fetcher.get('provider_budget_guard_active', False)))};"
+            f"reason={str(fetcher.get('provider_guard_reason') or 'none')};"
+            f"recommendation={str(fetcher.get('intraday_fetch_recommendation') or 'observe_more')};"
+            "shadow_only=true"
+        ),
+    )
+    diagnostics = [item for item in list(fetcher.get("diagnostics", []) or []) if isinstance(item, dict)]
+    for row in diagnostics[:5]:
+        log_event(
+            "INFO",
+            (
+                "[multi_tf_intraday_fetch_symbol] "
+                f"symbol={str(row.get('symbol') or 'none')};"
+                f"timeframe={str(row.get('timeframe') or 'none')};"
+                f"candles={int(row.get('candles_available', 0) or 0)};"
+                f"quality={str(row.get('data_quality') or 'missing')};"
+                f"cache={str(row.get('cache_status') or 'unknown')};"
+                f"call_attempted={int(bool(row.get('provider_call_attempted', False)))};"
+                "shadow_only=true"
+            ),
+        )
+    if str(fetcher.get("last_error") or "").strip():
+        log_event(
+            "WARNING",
+            (
+                "[multi_tf_intraday_fetch_error] "
+                f"error={str(fetcher.get('last_error') or '').replace(' ', '_')};"
+                "shadow_only=true"
+            ),
+        )
+    log_event(
+        "INFO",
+        (
+            "[multi_tf_swing_audit_with_intraday] "
+            f"uses_real_intraday={int(bool(audit.get('uses_real_intraday_data', False)))};"
+            f"available={','.join(list(audit.get('intraday_timeframes_available', []) or []))};"
+            f"top_symbol={str(audit.get('intraday_top_symbol') or audit.get('top_symbol') or 'none')};"
+            f"missing={str(audit.get('intraday_missing_reason') or 'none')};"
+            "shadow_only=true"
+        ),
+    )
+
+
 def _log_shadow_decision_simulator_summary(validation_report: dict) -> None:
     simulator = dict(validation_report.get("shadow_decision_simulator", {}) or {})
     if not simulator:
@@ -1072,6 +1151,7 @@ def worker_loop() -> None:
             _log_strategy_structure_audit_summary(validation_report)
             _log_market_structure_audit_summary(validation_report)
             _log_fib_alignment_audit_summary(validation_report)
+            _log_multi_timeframe_intraday_fetch_summary(validation_report)
             _log_multi_timeframe_swing_audit_summary(validation_report)
             _log_shadow_decision_simulator_summary(validation_report)
             _log_phase2_fine_tune_summary(validation_report)

@@ -137,6 +137,14 @@ Variaveis suportadas:
 - `MULTITF_SWING_MAX_SYMBOLS`
 - `MULTITF_SWING_REQUIRE_LIVE_FEED`
 - `MULTITF_SWING_SHADOW_ONLY`
+- `MULTITF_INTRADAY_FETCH_ENABLED`
+- `MULTITF_INTRADAY_TIMEFRAMES`
+- `MULTITF_INTRADAY_CACHE_TTL_SECONDS`
+- `MULTITF_INTRADAY_MAX_SYMBOLS`
+- `MULTITF_INTRADAY_MAX_CALLS_PER_CYCLE`
+- `MULTITF_INTRADAY_REQUIRE_LIVE_FEED`
+- `MULTITF_INTRADAY_SHADOW_ONLY`
+- `MULTITF_INTRADAY_PROVIDER_BUDGET_MODE`
 - `DAILY_LOSS_LIMIT_BRL`
 - `ALERT_EMAIL_ENABLED`
 - `ALERT_EMAIL_PROVIDER`
@@ -615,6 +623,35 @@ Para proteger os limites da Twelve Data, a implementacao inicial reaproveita os 
 `MULTITF_SWING_SHADOW_ONLY` e documentado como reforco operacional, mas a seguranca no codigo forca esta fase a permanecer `SHADOW_ONLY`.
 
 Procure nos logs por `[multi_tf_swing_audit_summary]`, `[multi_tf_swing_audit_candidate]`, `[multi_tf_swing_alignment]`, `[multi_tf_swing_missing_confirmation]` e `[multi_tf_swing_provider_guard]`.
+
+### FASE 2.5A - Intraday Multi-Timeframe Fetcher
+
+A camada `multi_timeframe_intraday_fetcher` busca candles reais 4H/1H para alimentar a auditoria 2.5. Ela tambem e `SHADOW_ONLY`:
+
+- nao aprova entrada
+- nao altera score real
+- nao altera broker, PnL, historico ou posicoes oficiais
+- nao transforma 4H, 1H, BOS, pivo ou Fibonacci em gatilho
+- preserva `PAPER TRADING`
+
+Configuracao:
+
+```env
+MULTITF_INTRADAY_FETCH_ENABLED=true
+MULTITF_INTRADAY_TIMEFRAMES=4h,1h
+MULTITF_INTRADAY_CACHE_TTL_SECONDS=1800
+MULTITF_INTRADAY_MAX_SYMBOLS=5
+MULTITF_INTRADAY_MAX_CALLS_PER_CYCLE=3
+MULTITF_INTRADAY_REQUIRE_LIVE_FEED=true
+MULTITF_INTRADAY_SHADOW_ONLY=true
+MULTITF_INTRADAY_PROVIDER_BUDGET_MODE=conservative
+```
+
+Para proteger a Twelve Data, a busca usa cache por `symbol+timeframe`, TTL minimo conservador, limite de chamadas por ciclo e prioridade por simbolos mais promissores: top da auditoria estrutural, top do preview/calibracao, top da auditoria Fibonacci, `BTC-USD` e depois a watchlist.
+
+Se o budget acabar ou o feed nao estiver `LIVE`, a camada registra `provider_budget_guard_active`, `provider_guard_reason` e mantem a auditoria como `INSUFFICIENT_DATA`/`PROVIDER_BLOCKED`. Dados fallback/sinteticos nao sao tratados como intraday real.
+
+Procure nos logs por `[multi_tf_intraday_fetch_summary]`, `[multi_tf_intraday_fetch_cache]`, `[multi_tf_intraday_fetch_provider_guard]`, `[multi_tf_intraday_fetch_symbol]`, `[multi_tf_intraday_fetch_error]` e `[multi_tf_swing_audit_with_intraday]`.
 
 ## Strategy Bottleneck - FASE 2.7
 

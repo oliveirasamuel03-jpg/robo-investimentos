@@ -89,6 +89,12 @@ def _empty_default(reason: str) -> dict[str, Any]:
         "cache_status": "cycle_data_resample_only",
         "provider_guard": "not_evaluated",
         "shadow_only": True,
+        "uses_real_intraday_data": False,
+        "intraday_timeframes_available": [],
+        "intraday_top_symbol": "",
+        "intraday_missing_reason": "",
+        "h4_data_quality": "missing",
+        "h1_data_quality": "missing",
         "reason": reason,
     }
 
@@ -203,6 +209,24 @@ def _resolve_timeframe_frames(payload: Any, timeframes: list[str], *, base_inter
         elif timeframe == "1h":
             fallbacks.append("1h=operational_cycle_frame")
     return frames, fallbacks
+
+
+def _merge_intraday_frames(
+    frames: dict[str, pd.DataFrame],
+    intraday_frames: dict[str, pd.DataFrame] | None,
+    timeframes: list[str],
+) -> tuple[dict[str, pd.DataFrame], list[str]]:
+    merged = dict(frames)
+    available: list[str] = []
+    for timeframe in timeframes:
+        if timeframe not in {"4h", "1h"}:
+            continue
+        frame = (intraday_frames or {}).get(timeframe)
+        cleaned = _clean_frame(frame if isinstance(frame, pd.DataFrame) else None)
+        if not cleaned.empty and _last_text(cleaned, "data_source", "").lower() == "market":
+            merged[timeframe] = _with_indicators(cleaned)
+            available.append(timeframe)
+    return merged, available
 
 
 def _prior_range(frame: pd.DataFrame, bars: int = 20) -> tuple[float | None, float | None]:
@@ -553,6 +577,8 @@ def build_multi_timeframe_swing_audit(
     market_data_status: dict[str, Any] | None = None,
     market_structure_audit: dict[str, Any] | None = None,
     fib_alignment_audit: dict[str, Any] | None = None,
+    intraday_market_data: dict[str, dict[str, pd.DataFrame]] | None = None,
+    intraday_fetch_summary: dict[str, Any] | None = None,
     enabled: bool = True,
     timeframes: list[str] | tuple[str, ...] | None = None,
     max_symbols: int = DEFAULT_MAX_SYMBOLS,
@@ -585,11 +611,20 @@ def build_multi_timeframe_swing_audit(
     candidates: list[dict[str, Any]] = []
     fallback_notes: list[str] = []
     provider_guards: Counter[str] = Counter()
+    intraday_available_by_symbol: dict[str, list[str]] = {}
     base_interval = str(status.get("effective_interval") or status.get("requested_interval") or "").strip().lower()
     for symbol, payload in list(data.items())[: max(1, int(max_symbols or DEFAULT_MAX_SYMBOLS))]:
         feed_blocked, provider, provider_guard = _feed_guard_for_symbol(payload, status, require_live_feed)
         provider_guards[provider_guard] += 1
         frames, notes = _resolve_timeframe_frames(payload, requested_timeframes, base_interval=base_interval)
+        frames, available_intraday = _merge_intraday_frames(
+            frames,
+            dict((intraday_market_data or {}).get(str(symbol).upper(), {}) or {}),
+            requested_timeframes,
+        )
+        if available_intraday:
+            intraday_available_by_symbol[str(symbol).upper()] = available_intraday
+            notes.extend([f"{tf}=real_intraday_fetcher" for tf in available_intraday])
         fallback_notes.extend(notes)
         diagnostics = {tf: build_timeframe_diagnostic(frames.get(tf), tf) for tf in requested_timeframes}
         for tf in DEFAULT_TIMEFRAMES:
@@ -613,10 +648,26 @@ def build_multi_timeframe_swing_audit(
     provider_guard = provider_guards.most_common(1)[0][0] if provider_guards else "not_evaluated"
     feed_status = _normalize_feed_status(status.get("feed_status") or status.get("status"))
     provider_effective = str(status.get("provider_effective") or status.get("provider") or top.get("provider_effective") or "")
+    intraday_summary = dict(intraday_fetch_summary or {})
+    uses_real_intraday = bool(intraday_available_by_symbol)
+    intraday_timeframes_available = sorted({tf for values in intraday_available_by_symbol.values() for tf in values})
+    intraday_top_symbol = next((symbol for symbol, values in intraday_available_by_symbol.items() if values), "")
+    diagnostics = [row for row in list(intraday_summary.get("diagnostics", []) or []) if isinstance(row, dict)]
+    h4_quality = next((str(row.get("data_quality") or "") for row in diagnostics if row.get("timeframe") == "4h"), "")
+    h1_quality = next((str(row.get("data_quality") or "") for row in diagnostics if row.get("timeframe") == "1h"), "")
+    intraday_missing_reason = ""
+    if not uses_real_intraday:
+        intraday_missing_reason = str(
+            intraday_summary.get("provider_guard_reason")
+            or intraday_summary.get("last_error")
+            or "insufficient_intraday_candles"
+        )
     reason = (
         "Multi-timeframe swing audit generated from operational cycle data. "
         "1D/4H are resampled locally; no extra provider call is required."
     )
+    if uses_real_intraday:
+        reason = "Multi-timeframe swing audit used real intraday 4H/1H data from the SHADOW_ONLY fetcher."
     if provider_guard != "feed_live_provider_known":
         reason = f"Multi-timeframe swing audit degraded by provider guard: {provider_guard}."
 
@@ -627,7 +678,7 @@ def build_multi_timeframe_swing_audit(
         "provider_effective": provider_effective,
         "feed_status": feed_status,
         "timeframes_used": requested_timeframes,
-        "timeframe_source": "operational_cycle_resample",
+        "timeframe_source": "real_intraday_fetcher_plus_operational_resample" if uses_real_intraday else "operational_cycle_resample",
         "timeframe_fallbacks": list(dict.fromkeys(fallback_notes))[:12],
         "symbols_analyzed": int(len(candidates)),
         "top_symbol": str(top.get("symbol") or ""),
@@ -643,11 +694,17 @@ def build_multi_timeframe_swing_audit(
         "insufficient_data_count": int(status_counts.get("INSUFFICIENT_DATA", 0)),
         "setup_support_count": int(sum(1 for item in candidates if bool(item.get("supports_trend_pullback_breakout")))),
         "recent_candidates": candidates[:MAX_RECENT_CANDIDATES],
-        "estimated_provider_calls": 0,
+        "estimated_provider_calls": int(intraday_summary.get("estimated_provider_calls", 0) or 0),
         "cache_ttl_seconds": int(cache_ttl_seconds),
-        "cache_status": "cycle_data_resample_only",
+        "cache_status": "intraday_fetcher_with_cache" if intraday_summary else "cycle_data_resample_only",
         "provider_guard": provider_guard,
         "shadow_only": True,
         "fib_alignment_status": str((fib_alignment_audit or {}).get("fib_alignment_status") or ""),
+        "uses_real_intraday_data": bool(uses_real_intraday),
+        "intraday_timeframes_available": intraday_timeframes_available,
+        "intraday_top_symbol": intraday_top_symbol,
+        "intraday_missing_reason": intraday_missing_reason,
+        "h4_data_quality": h4_quality or "missing",
+        "h1_data_quality": h1_quality or "missing",
         "reason": reason,
     }
