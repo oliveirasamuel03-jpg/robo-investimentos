@@ -14,6 +14,13 @@ from core.config import (
     BROKER_MODE,
     LEGACY_VALIDATION_INITIAL_CAPITAL_BRL,
     MARKET_DATA_HISTORY_LIMIT,
+    MULTITF_INTRADAY_CACHE_TTL_SECONDS,
+    MULTITF_INTRADAY_FETCH_ENABLED,
+    MULTITF_INTRADAY_MAX_CALLS_PER_CYCLE,
+    MULTITF_INTRADAY_MAX_SYMBOLS,
+    MULTITF_INTRADAY_PROVIDER_BUDGET_MODE,
+    MULTITF_INTRADAY_REQUIRE_LIVE_FEED,
+    MULTITF_INTRADAY_TIMEFRAMES,
     MULTITF_SWING_AUDIT_ENABLED,
     MULTITF_SWING_CACHE_TTL_SECONDS,
     MULTITF_SWING_MAX_SYMBOLS,
@@ -30,6 +37,7 @@ from core.market_context import apply_context_filter, get_market_context
 from core.fibonacci_alignment_audit import build_fibonacci_alignment_audit
 from core.macro_alerts import apply_macro_risk_filter, default_macro_alert_state
 from core.market_structure_audit import build_market_structure_audit
+from core.multi_timeframe_data_fetcher import build_intraday_symbol_priority, fetch_multi_timeframe_intraday_data
 from core.multi_timeframe_swing_audit import build_multi_timeframe_swing_audit
 from core.shadow_decision_simulator import build_shadow_decision_simulator
 from core.market_data import (
@@ -1360,11 +1368,31 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[s
         market_context=market_context,
     )
     fib_alignment_audit = build_fibonacci_alignment_audit(market_structure_audit)
+    intraday_priority_symbols = build_intraday_symbol_priority(
+        base_symbols=list(market_data.keys()),
+        strategy_structure_audit=strategy_structure_audit,
+        calibration_preview=dict(state.get("calibration_preview", {}) or {}),
+        market_structure_audit=market_structure_audit,
+        max_symbols=MULTITF_INTRADAY_MAX_SYMBOLS,
+    )
+    multi_timeframe_intraday_fetch = fetch_multi_timeframe_intraday_data(
+        symbols=intraday_priority_symbols,
+        market_data_status=market_data_status,
+        enabled=MULTITF_INTRADAY_FETCH_ENABLED,
+        timeframes=[item.strip() for item in str(MULTITF_INTRADAY_TIMEFRAMES or "").split(",") if item.strip()],
+        ttl_seconds=MULTITF_INTRADAY_CACHE_TTL_SECONDS,
+        max_symbols=MULTITF_INTRADAY_MAX_SYMBOLS,
+        max_calls_per_cycle=MULTITF_INTRADAY_MAX_CALLS_PER_CYCLE,
+        require_live_feed=MULTITF_INTRADAY_REQUIRE_LIVE_FEED,
+        provider_budget_mode=MULTITF_INTRADAY_PROVIDER_BUDGET_MODE,
+    )
     multi_timeframe_swing_audit = build_multi_timeframe_swing_audit(
         market_data=market_data,
         market_data_status=market_data_status,
         market_structure_audit=market_structure_audit,
         fib_alignment_audit=fib_alignment_audit,
+        intraday_market_data=multi_timeframe_intraday_fetch.frames,
+        intraday_fetch_summary=multi_timeframe_intraday_fetch.summary,
         enabled=MULTITF_SWING_AUDIT_ENABLED,
         timeframes=[item.strip() for item in str(MULTITF_SWING_TIMEFRAMES or "").split(",") if item.strip()],
         max_symbols=MULTITF_SWING_MAX_SYMBOLS,
@@ -1381,6 +1409,7 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[s
     cycle_validation["strategy_structure_audit"] = strategy_structure_audit
     cycle_validation["market_structure_audit"] = market_structure_audit
     cycle_validation["fib_alignment_audit"] = fib_alignment_audit
+    cycle_validation["multi_timeframe_intraday_fetcher"] = multi_timeframe_intraday_fetch.summary
     cycle_validation["multi_timeframe_swing_audit"] = multi_timeframe_swing_audit
     cycle_validation["shadow_decision_simulator"] = shadow_decision_simulator
 
@@ -1478,6 +1507,7 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[s
     state["strategy_structure_audit"] = strategy_structure_audit
     state["market_structure_audit"] = market_structure_audit
     state["fib_alignment_audit"] = fib_alignment_audit
+    state["multi_timeframe_intraday_fetcher"] = multi_timeframe_intraday_fetch.summary
     state["multi_timeframe_swing_audit"] = multi_timeframe_swing_audit
     state["shadow_decision_simulator"] = shadow_decision_simulator
 
@@ -1527,6 +1557,7 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[s
         "strategy_structure_audit": strategy_structure_audit,
         "market_structure_audit": market_structure_audit,
         "fib_alignment_audit": fib_alignment_audit,
+        "multi_timeframe_intraday_fetcher": multi_timeframe_intraday_fetch.summary,
         "multi_timeframe_swing_audit": multi_timeframe_swing_audit,
         "shadow_decision_simulator": shadow_decision_simulator,
     }

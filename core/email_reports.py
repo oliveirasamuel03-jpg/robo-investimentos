@@ -319,6 +319,7 @@ def _composite_summary(validation_report: dict[str, Any], reports_df: pd.DataFra
 
 def _multi_timeframe_summary(validation_report: dict[str, Any]) -> str:
     audit = dict(validation_report.get("multi_timeframe_swing_audit", {}) or {})
+    fetcher = dict(validation_report.get("multi_timeframe_intraday_fetcher", {}) or {})
     if audit:
         if not bool(audit.get("enabled", True)):
             return "Multi-timeframe swing audit: disabled. Shadow only; no trade decision changed."
@@ -336,6 +337,13 @@ def _multi_timeframe_summary(validation_report: dict[str, Any]) -> str:
         return (
             f"Multi-timeframe swing audit: top={top_symbol}; alignment={status}; score={score_text}; "
             f"1D={daily}; 4H={h4}; 1H={h1}; missing={missing}; recommendation={recommendation}. "
+            f"2.5A intraday fetch: enabled={str(fetcher.get('enabled', True)).lower()}; "
+            f"real_4h_1h={str(bool(audit.get('uses_real_intraday_data', False))).lower()}; "
+            f"calls={int(fetcher.get('provider_calls_attempted', audit.get('estimated_provider_calls', 0)) or 0)}; "
+            f"cache_hits={int(fetcher.get('cache_hits', 0) or 0)}; "
+            f"budget_guard={str(bool(fetcher.get('provider_budget_guard_active', False))).lower()}; "
+            f"h4_quality={_safe_text(audit.get('h4_data_quality'), fallback='missing')}; "
+            f"h1_quality={_safe_text(audit.get('h1_data_quality'), fallback='missing')}. "
             "Shadow only; no trade decision, score, broker, or threshold was changed."
         )
     timeframe_label = _safe_text(validation_report.get("timeframe_label"), fallback="Diario (1D)")

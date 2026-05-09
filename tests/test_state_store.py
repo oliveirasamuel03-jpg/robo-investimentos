@@ -55,6 +55,10 @@ def test_state_store_bootstraps_files_and_defaults(isolated_storage):
     assert state["fib_alignment_audit"]["fib_alignment_mode"] == "SHADOW_ONLY"
     assert state["fib_alignment_audit"]["fib_alignment_status"] == "insufficient_data"
     assert state["fib_alignment_audit"]["fib_alignment_checklist"] == []
+    assert state["multi_timeframe_intraday_fetcher"]["enabled"] == config.MULTITF_INTRADAY_FETCH_ENABLED
+    assert state["multi_timeframe_intraday_fetcher"]["mode"] == "SHADOW_ONLY"
+    assert state["multi_timeframe_intraday_fetcher"]["shadow_only"] is True
+    assert state["multi_timeframe_intraday_fetcher"]["diagnostics"] == []
     assert state["multi_timeframe_swing_audit"]["enabled"] == config.MULTITF_SWING_AUDIT_ENABLED
     assert state["multi_timeframe_swing_audit"]["mode"] == "SHADOW_ONLY"
     assert state["multi_timeframe_swing_audit"]["shadow_only"] is True

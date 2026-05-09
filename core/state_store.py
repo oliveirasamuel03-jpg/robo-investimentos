@@ -27,6 +27,14 @@ from core.config import (
     MARKET_DATA_FALLBACK_PROVIDER,
     MARKET_DATA_BUILD_LABEL,
     MARKET_DATA_PROVIDER,
+    MULTITF_INTRADAY_CACHE_TTL_SECONDS,
+    MULTITF_INTRADAY_FETCH_ENABLED,
+    MULTITF_INTRADAY_MAX_CALLS_PER_CYCLE,
+    MULTITF_INTRADAY_MAX_SYMBOLS,
+    MULTITF_INTRADAY_PROVIDER_BUDGET_MODE,
+    MULTITF_INTRADAY_REQUIRE_LIVE_FEED,
+    MULTITF_INTRADAY_SHADOW_ONLY,
+    MULTITF_INTRADAY_TIMEFRAMES,
     MULTITF_SWING_AUDIT_ENABLED,
     MULTITF_SWING_CACHE_TTL_SECONDS,
     MULTITF_SWING_MAX_SYMBOLS,
@@ -440,6 +448,35 @@ DEFAULT_STATE = {
         "fib_alignment_checklist": [],
         "fib_alignment_last_run_at": "",
     },
+    "multi_timeframe_intraday_fetcher": {
+        "enabled": MULTITF_INTRADAY_FETCH_ENABLED,
+        "mode": "SHADOW_ONLY",
+        "generated_at": "",
+        "provider_effective": "",
+        "feed_status": "UNKNOWN",
+        "timeframes_requested": [item.strip().lower() for item in MULTITF_INTRADAY_TIMEFRAMES.split(",") if item.strip()],
+        "timeframes_available": [],
+        "symbols_requested": [],
+        "symbols_fetched": [],
+        "cache_hits": 0,
+        "cache_misses": 0,
+        "provider_calls_attempted": 0,
+        "provider_calls_skipped": 0,
+        "provider_budget_guard_active": False,
+        "provider_guard_reason": "No multi-timeframe intraday fetch data yet.",
+        "estimated_provider_calls": 0,
+        "last_success_at": "",
+        "last_error": "",
+        "intraday_data_quality": "NO_DATA",
+        "intraday_fetch_recommendation": "observe_more",
+        "diagnostics": [],
+        "cache_ttl_seconds": MULTITF_INTRADAY_CACHE_TTL_SECONDS,
+        "max_symbols": MULTITF_INTRADAY_MAX_SYMBOLS,
+        "max_calls_per_cycle": MULTITF_INTRADAY_MAX_CALLS_PER_CYCLE,
+        "require_live_feed": MULTITF_INTRADAY_REQUIRE_LIVE_FEED,
+        "provider_budget_mode": MULTITF_INTRADAY_PROVIDER_BUDGET_MODE,
+        "shadow_only": MULTITF_INTRADAY_SHADOW_ONLY,
+    },
     "multi_timeframe_swing_audit": {
         "enabled": MULTITF_SWING_AUDIT_ENABLED,
         "mode": "SHADOW_ONLY",
@@ -470,6 +507,12 @@ DEFAULT_STATE = {
         "require_live_feed": MULTITF_SWING_REQUIRE_LIVE_FEED,
         "shadow_only": MULTITF_SWING_SHADOW_ONLY,
         "max_symbols": MULTITF_SWING_MAX_SYMBOLS,
+        "uses_real_intraday_data": False,
+        "intraday_timeframes_available": [],
+        "intraday_top_symbol": "",
+        "intraday_missing_reason": "",
+        "h4_data_quality": "missing",
+        "h1_data_quality": "missing",
         "reason": "No multi-timeframe swing audit data yet.",
     },
     "shadow_decision_simulator": {
@@ -1010,6 +1053,65 @@ def load_bot_state() -> dict:
         if isinstance(item, dict)
     ][:12]
     state["fib_alignment_audit"] = fib_alignment_state
+    intraday_fetch_state = state.get("multi_timeframe_intraday_fetcher", {}) or {}
+    intraday_fetch_state["enabled"] = MULTITF_INTRADAY_FETCH_ENABLED
+    intraday_fetch_state["shadow_only"] = MULTITF_INTRADAY_SHADOW_ONLY
+    intraday_fetch_state["require_live_feed"] = MULTITF_INTRADAY_REQUIRE_LIVE_FEED
+    for key, fallback in (
+        ("mode", "SHADOW_ONLY"),
+        ("generated_at", ""),
+        ("provider_effective", ""),
+        ("feed_status", "UNKNOWN"),
+        ("provider_guard_reason", "No multi-timeframe intraday fetch data yet."),
+        ("last_success_at", ""),
+        ("last_error", ""),
+        ("intraday_data_quality", "NO_DATA"),
+        ("intraday_fetch_recommendation", "observe_more"),
+        ("provider_budget_mode", MULTITF_INTRADAY_PROVIDER_BUDGET_MODE),
+    ):
+        intraday_fetch_state[key] = str(intraday_fetch_state.get(key) or fallback)
+    for key in (
+        "cache_hits",
+        "cache_misses",
+        "provider_calls_attempted",
+        "provider_calls_skipped",
+        "estimated_provider_calls",
+        "cache_ttl_seconds",
+        "max_symbols",
+        "max_calls_per_cycle",
+    ):
+        try:
+            default_value = 0
+            if key == "cache_ttl_seconds":
+                default_value = MULTITF_INTRADAY_CACHE_TTL_SECONDS
+            elif key == "max_symbols":
+                default_value = MULTITF_INTRADAY_MAX_SYMBOLS
+            elif key == "max_calls_per_cycle":
+                default_value = MULTITF_INTRADAY_MAX_CALLS_PER_CYCLE
+            intraday_fetch_state[key] = int(intraday_fetch_state.get(key, default_value) or default_value)
+        except (TypeError, ValueError):
+            intraday_fetch_state[key] = 0
+    intraday_fetch_state["provider_budget_guard_active"] = bool(
+        intraday_fetch_state.get("provider_budget_guard_active", False)
+    )
+    configured_intraday_tfs = [item.strip().lower() for item in MULTITF_INTRADAY_TIMEFRAMES.split(",") if item.strip()]
+    for key, fallback in (
+        ("timeframes_requested", configured_intraday_tfs),
+        ("timeframes_available", []),
+        ("symbols_requested", []),
+        ("symbols_fetched", []),
+    ):
+        intraday_fetch_state[key] = [
+            str(item).strip()
+            for item in list(intraday_fetch_state.get(key, fallback) or fallback)
+            if str(item).strip()
+        ][:10]
+    intraday_fetch_state["diagnostics"] = [
+        item
+        for item in list(intraday_fetch_state.get("diagnostics", []) or [])
+        if isinstance(item, dict)
+    ][:30]
+    state["multi_timeframe_intraday_fetcher"] = intraday_fetch_state
     multi_tf_state = state.get("multi_timeframe_swing_audit", {}) or {}
     multi_tf_state["enabled"] = MULTITF_SWING_AUDIT_ENABLED
     multi_tf_state["shadow_only"] = MULTITF_SWING_SHADOW_ONLY
@@ -1027,9 +1129,14 @@ def load_bot_state() -> dict:
         ("dominant_conflict_reason", "No multi-timeframe swing audit data yet."),
         ("cache_status", "cycle_data_resample_only"),
         ("provider_guard", "not_evaluated"),
+        ("intraday_top_symbol", ""),
+        ("intraday_missing_reason", ""),
+        ("h4_data_quality", "missing"),
+        ("h1_data_quality", "missing"),
         ("reason", "No multi-timeframe swing audit data yet."),
     ):
         multi_tf_state[key] = str(multi_tf_state.get(key) or fallback)
+    multi_tf_state["uses_real_intraday_data"] = bool(multi_tf_state.get("uses_real_intraday_data", False))
     for key in (
         "symbols_analyzed",
         "candidates_count",
@@ -1066,6 +1173,11 @@ def load_bot_state() -> dict:
         for item in list(multi_tf_state.get("timeframe_fallbacks", []) or [])
         if str(item).strip()
     ][:12]
+    multi_tf_state["intraday_timeframes_available"] = [
+        str(item)
+        for item in list(multi_tf_state.get("intraday_timeframes_available", []) or [])
+        if str(item).strip()
+    ][:5]
     multi_tf_state["recent_candidates"] = [
         item
         for item in list(multi_tf_state.get("recent_candidates", []) or [])
