@@ -117,6 +117,9 @@ MULTITF_INTRADAY_REQUIRE_LIVE_FEED = env_flag("MULTITF_INTRADAY_REQUIRE_LIVE_FEE
 MULTITF_INTRADAY_PROVIDER_BUDGET_MODE = _env_str("MULTITF_INTRADAY_PROVIDER_BUDGET_MODE", "conservative") or "conservative"
 # Non-negotiable safety: intraday data can feed diagnostics, never trade authority.
 MULTITF_INTRADAY_SHADOW_ONLY = True
+BOS_PIVOT_TRACE_AUDIT_ENABLED = env_flag("BOS_PIVOT_TRACE_AUDIT_ENABLED", True)
+# Non-negotiable safety: FASE 2.5B is traceability only, never approval authority.
+BOS_PIVOT_TRACE_SHADOW_ONLY = True
 BROKER_PROVIDER = _env_str("BROKER_PROVIDER", "paper") or "paper"
 BROKER_MODE = _env_str("BROKER_MODE", "paper") or "paper"
 BROKER_ACCOUNT_ID = _env_str("BROKER_ACCOUNT_ID", "")

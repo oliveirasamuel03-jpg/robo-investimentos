@@ -353,6 +353,28 @@ def _multi_timeframe_summary(validation_report: dict[str, Any]) -> str:
     )
 
 
+def _bos_pivot_trace_audit_summary(validation_report: dict[str, Any]) -> str:
+    audit = dict(validation_report.get("bos_pivot_trace_audit", {}) or {})
+    if not audit:
+        return "BOS/Pivot trace audit: no 4H/1H trace sample yet. Shadow only; no trade decision changed."
+    if not bool(audit.get("enabled", True)):
+        return "BOS/Pivot trace audit: disabled. Shadow only; no trade decision changed."
+    top_symbol = _safe_text(audit.get("top_symbol"), fallback="none")
+    h4_bos = _safe_text(audit.get("top_h4_bos_state"), fallback="INSUFFICIENT_DATA")
+    h1_bos = _safe_text(audit.get("top_h1_bos_state"), fallback="INSUFFICIENT_DATA")
+    pivot = _safe_text(audit.get("top_pivot_state"), fallback="INSUFFICIENT_DATA")
+    missing = _safe_text(
+        audit.get("dominant_missing_piece") or audit.get("top_primary_missing_piece"),
+        fallback="none",
+    )
+    recommendation = _safe_text(audit.get("top_recommendation"), fallback="observe_more")
+    return (
+        f"BOS/Pivot trace audit: top={top_symbol}; h4_bos={h4_bos}; h1_bos={h1_bos}; "
+        f"pivot={pivot}; missing={missing}; recommendation={recommendation}. "
+        "Shadow only; BOS/Pivot 4H/1H did not change trade decision, score, broker, or thresholds."
+    )
+
+
 def _calibration_preview_summary(validation_report: dict[str, Any]) -> str:
     preview = dict(validation_report.get("calibration_preview", {}) or {})
     if not preview:
@@ -612,6 +634,7 @@ def _build_daily_email_body(state: dict[str, Any], validation_report: dict[str, 
     validation_reading_text = _safe_text(consistency.get("validation_reading_message"))
     composite_summary = _composite_summary(validation_report, daily_reports)
     multi_timeframe_summary = _multi_timeframe_summary(validation_report)
+    bos_pivot_trace_summary = _bos_pivot_trace_audit_summary(validation_report)
     calibration_preview_summary = _calibration_preview_summary(validation_report)
     strategy_bottleneck_summary = _strategy_bottleneck_summary(validation_report)
     strategy_structure_audit_summary = _strategy_structure_audit_summary(validation_report)
@@ -647,6 +670,7 @@ def _build_daily_email_body(state: dict[str, Any], validation_report: dict[str, 
         phase2_fine_tune_summary,
         phase2_1_fine_tune_summary,
         f"Multi-timeframe summary: {multi_timeframe_summary}",
+        f"BOS/Pivot trace: {bos_pivot_trace_summary}",
         "",
         "Signal pipeline:",
         *_signal_pipeline_lines(validation_report),

@@ -614,6 +614,11 @@ multi_timeframe_swing_audit = dict(
     or state.get("multi_timeframe_swing_audit", {})
     or {}
 )
+bos_pivot_trace_audit = dict(
+    validation_report.get("bos_pivot_trace_audit")
+    or state.get("bos_pivot_trace_audit", {})
+    or {}
+)
 shadow_decision_simulator = dict(
     validation_report.get("shadow_decision_simulator")
     or state.get("shadow_decision_simulator", {})
@@ -976,6 +981,60 @@ if multi_timeframe_swing_audit:
         st.dataframe(pd.DataFrame(fetch_rows), hide_index=True, use_container_width=True)
     else:
         st.info("Sem diagnostico intraday 4H/1H registrado ainda.")
+    if bos_pivot_trace_audit:
+        st.markdown("##### FASE 2.5B - AUDITORIA FINA BOS/PIVO 4H/1H")
+        st.caption(
+            "SHADOW ONLY: BOS e pivos 4H/1H sao apenas diagnostico estrutural. "
+            "Nao aprovam trade, nao alteram score real, nao mudam broker e preservam PAPER TRADING."
+        )
+        bos_c1, bos_c2, bos_c3, bos_c4 = st.columns(4)
+        bos_c1.metric("Status", bos_pivot_trace_audit.get("mode") or "SHADOW_ONLY")
+        bos_c2.metric("Top ativo", bos_pivot_trace_audit.get("top_symbol") or "-")
+        bos_c3.metric("Top timeframe", bos_pivot_trace_audit.get("top_timeframe") or "-")
+        bos_c4.metric("Relacao 1H/4H", bos_pivot_trace_audit.get("top_relationship") or "INSUFFICIENT_DATA")
+        bos_d1, bos_d2, bos_d3, bos_d4 = st.columns(4)
+        bos_d1.metric("Estado do pivo", bos_pivot_trace_audit.get("top_pivot_state") or "INSUFFICIENT_DATA")
+        bos_d2.metric("Estado do BOS", bos_pivot_trace_audit.get("top_bos_state") or "INSUFFICIENT_DATA")
+        bos_d3.metric("Faltando confirmar", bos_pivot_trace_audit.get("dominant_missing_piece") or bos_pivot_trace_audit.get("top_primary_missing_piece") or "-")
+        bos_d4.metric("Should keep blocked", int(bos_pivot_trace_audit.get("should_keep_blocked_count", 0) or 0))
+        bos_e1, bos_e2, bos_e3, bos_e4 = st.columns(4)
+        bos_e1.metric("BOS por pavio", int(bos_pivot_trace_audit.get("wick_only_bos_count", 0) or 0))
+        bos_e2.metric("Fechamento fraco", int(bos_pivot_trace_audit.get("weak_close_bos_count", 0) or 0))
+        bos_e3.metric("BOS confirmado", int(bos_pivot_trace_audit.get("confirmed_bos_count", 0) or 0))
+        bos_e4.metric("Reteste pendente", int(bos_pivot_trace_audit.get("retest_pending_count", 0) or 0))
+        st.caption(
+            f"Recomendacao: {bos_pivot_trace_audit.get('top_recommendation') or 'observe_more'} | "
+            f"h4_bos_missing={int(bos_pivot_trace_audit.get('h4_bos_missing_count', 0) or 0)} | "
+            f"h1_bos_only={int(bos_pivot_trace_audit.get('h1_bos_only_count', 0) or 0)}"
+        )
+        bos_rows = [
+            {
+                "symbol": row.get("symbol"),
+                "timeframe": row.get("timeframe"),
+                "trend_direction": row.get("trend_direction"),
+                "pivot_state": row.get("pivot_state"),
+                "bos_state": row.get("bos_state"),
+                "relationship_to_higher_tf": row.get("relationship_to_higher_tf"),
+                "bos_level": row.get("bos_level"),
+                "last_close": row.get("last_close"),
+                "close_distance_to_bos_pct": row.get("close_distance_to_bos_pct"),
+                "wick_crossed_level": row.get("wick_crossed_level"),
+                "close_confirmed_level": row.get("close_confirmed_level"),
+                "retest_detected": row.get("retest_detected"),
+                "false_breakout_risk": row.get("false_breakout_risk"),
+                "why_pivot_not_confirmed": row.get("why_pivot_not_confirmed"),
+                "why_bos_not_confirmed": row.get("why_bos_not_confirmed"),
+                "supports_trend_pullback_breakout": row.get("supports_trend_pullback_breakout"),
+                "should_keep_blocked": row.get("should_keep_blocked"),
+                "recommendation": row.get("recommendation"),
+            }
+            for row in list(bos_pivot_trace_audit.get("recent_candidates", []) or [])[:10]
+            if isinstance(row, dict)
+        ]
+        if bos_rows:
+            st.dataframe(pd.DataFrame(bos_rows), hide_index=True, use_container_width=True)
+        else:
+            st.info("Sem candidatos BOS/Pivo 4H/1H registrados ainda.")
     mtf_rows = [
         {
             "symbol": row.get("symbol"),

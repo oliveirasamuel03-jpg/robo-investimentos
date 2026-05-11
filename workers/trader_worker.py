@@ -578,6 +578,84 @@ def _log_multi_timeframe_intraday_fetch_summary(validation_report: dict) -> None
     )
 
 
+def _log_bos_pivot_trace_audit_summary(validation_report: dict) -> None:
+    audit = dict(validation_report.get("bos_pivot_trace_audit", {}) or {})
+    if not audit:
+        return
+    log_event(
+        "INFO",
+        (
+            "[bos_pivot_trace_summary] "
+            f"mode={str(audit.get('mode') or 'SHADOW_ONLY').lower()};"
+            f"feed={str(audit.get('feed_status') or 'UNKNOWN')};"
+            f"provider={str(audit.get('provider_effective') or 'unknown')};"
+            f"top_symbol={str(audit.get('top_symbol') or 'none')};"
+            f"top_timeframe={str(audit.get('top_timeframe') or 'none')};"
+            f"top_pivot={str(audit.get('top_pivot_state') or 'INSUFFICIENT_DATA')};"
+            f"top_bos={str(audit.get('top_bos_state') or 'INSUFFICIENT_DATA')};"
+            f"relationship={str(audit.get('top_relationship') or 'INSUFFICIENT_DATA')};"
+            f"missing={str(audit.get('dominant_missing_piece') or audit.get('top_primary_missing_piece') or 'none')};"
+            "shadow_only=true"
+        ),
+    )
+    log_event(
+        "INFO",
+        (
+            "[bos_pivot_trace_missing_piece] "
+            f"h4_bos_missing={int(audit.get('h4_bos_missing_count', 0) or 0)};"
+            f"h1_bos_only={int(audit.get('h1_bos_only_count', 0) or 0)};"
+            f"wick_only={int(audit.get('wick_only_bos_count', 0) or 0)};"
+            f"weak_close={int(audit.get('weak_close_bos_count', 0) or 0)};"
+            f"confirmed={int(audit.get('confirmed_bos_count', 0) or 0)};"
+            f"keep_blocked={int(audit.get('should_keep_blocked_count', 0) or 0)};"
+            "shadow_only=true"
+        ),
+    )
+    candidates = [item for item in list(audit.get("recent_candidates", []) or []) if isinstance(item, dict)]
+    for row in candidates[:4]:
+        tag = "[bos_pivot_trace_h4] " if str(row.get("timeframe") or "") == "4h" else "[bos_pivot_trace_h1] "
+        log_event(
+            "INFO",
+            (
+                f"{tag}"
+                f"symbol={str(row.get('symbol') or 'none')};"
+                f"timeframe={str(row.get('timeframe') or 'none')};"
+                f"trend={str(row.get('trend_direction') or 'INCONCLUSIVE')};"
+                f"pivot={str(row.get('pivot_state') or 'INSUFFICIENT_DATA')};"
+                f"bos={str(row.get('bos_state') or 'INSUFFICIENT_DATA')};"
+                f"close_distance={row.get('close_distance_to_bos_pct') if row.get('close_distance_to_bos_pct') is not None else 'none'};"
+                f"wick_crossed={int(bool(row.get('wick_crossed_level', False)))};"
+                f"close_confirmed={int(bool(row.get('close_confirmed_level', False)))};"
+                f"keep_blocked={int(bool(row.get('should_keep_blocked', True)))};"
+                "shadow_only=true"
+            ),
+        )
+    if candidates:
+        top = candidates[0]
+        log_event(
+            "INFO",
+            (
+                "[bos_pivot_trace_relationship] "
+                f"symbol={str(top.get('symbol') or 'none')};"
+                f"relationship={str(top.get('relationship_to_higher_tf') or 'INSUFFICIENT_DATA')};"
+                f"reason={str(top.get('relationship_reason') or 'none')};"
+                "shadow_only=true"
+            ),
+        )
+    log_event(
+        "INFO",
+        (
+            "[bos_pivot_trace_safety] "
+            "should_keep_blocked=true;"
+            "trade_authority=false;"
+            "score_authority=false;"
+            "broker_authority=false;"
+            "paper_required=true;"
+            "shadow_only=true"
+        ),
+    )
+
+
 def _log_shadow_decision_simulator_summary(validation_report: dict) -> None:
     simulator = dict(validation_report.get("shadow_decision_simulator", {}) or {})
     if not simulator:
@@ -1152,6 +1230,7 @@ def worker_loop() -> None:
             _log_market_structure_audit_summary(validation_report)
             _log_fib_alignment_audit_summary(validation_report)
             _log_multi_timeframe_intraday_fetch_summary(validation_report)
+            _log_bos_pivot_trace_audit_summary(validation_report)
             _log_multi_timeframe_swing_audit_summary(validation_report)
             _log_shadow_decision_simulator_summary(validation_report)
             _log_phase2_fine_tune_summary(validation_report)
