@@ -21,6 +21,7 @@ from core.config import (
     VALIDATION_TRADING_MODE,
 )
 from core.calibration_preview import build_calibration_preview, default_calibration_preview_state
+from core.bos_pivot_trace_audit import default_bos_pivot_trace_audit_state
 from core.fibonacci_alignment_audit import default_fib_alignment_audit_state
 from core.market_structure_audit import default_market_structure_audit_state
 from core.market_data import build_feed_quality_snapshot
@@ -920,6 +921,9 @@ def _build_operational_consistency(
     multi_timeframe_swing_audit = dict(
         state.get("multi_timeframe_swing_audit", {}) or default_multi_timeframe_swing_audit_state()
     )
+    bos_pivot_trace_audit = dict(
+        state.get("bos_pivot_trace_audit", {}) or default_bos_pivot_trace_audit_state()
+    )
     shadow_decision_simulator = dict(
         state.get("shadow_decision_simulator", {}) or default_shadow_decision_state()
     )
@@ -1006,6 +1010,17 @@ def _build_operational_consistency(
         ),
         "multi_tf_swing_top_recommendation": str(
             multi_timeframe_swing_audit.get("top_recommendation") or "insufficient_data"
+        ),
+        "bos_pivot_trace_mode": bos_pivot_trace_audit.get("mode", "SHADOW_ONLY"),
+        "bos_pivot_trace_top_symbol": str(bos_pivot_trace_audit.get("top_symbol") or ""),
+        "bos_pivot_trace_top_bos_state": str(
+            bos_pivot_trace_audit.get("top_bos_state") or "INSUFFICIENT_DATA"
+        ),
+        "bos_pivot_trace_top_pivot_state": str(
+            bos_pivot_trace_audit.get("top_pivot_state") or "INSUFFICIENT_DATA"
+        ),
+        "bos_pivot_trace_top_recommendation": str(
+            bos_pivot_trace_audit.get("top_recommendation") or "insufficient_data"
         ),
         "shadow_decision_mode": shadow_decision_simulator.get("shadow_decision_mode", "SHADOW_ONLY"),
         "preview_near_approved_count": int(
@@ -1205,6 +1220,9 @@ def build_swing_validation_report(state: dict | None = None, now: datetime | Non
         "multi_timeframe_swing_audit": dict(
             payload.get("multi_timeframe_swing_audit", {}) or default_multi_timeframe_swing_audit_state()
         ),
+        "bos_pivot_trace_audit": dict(
+            payload.get("bos_pivot_trace_audit", {}) or default_bos_pivot_trace_audit_state()
+        ),
         "shadow_decision_simulator": dict(
             payload.get("shadow_decision_simulator", {}) or default_shadow_decision_state()
         ),
@@ -1307,6 +1325,12 @@ def refresh_swing_validation_cycle(
             or (cycle_result.get("validation_cycle", {}) or {}).get("multi_timeframe_swing_audit", {})
             or state.get("multi_timeframe_swing_audit", {})
             or default_multi_timeframe_swing_audit_state()
+        )
+        state["bos_pivot_trace_audit"] = dict(
+            cycle_result.get("bos_pivot_trace_audit")
+            or (cycle_result.get("validation_cycle", {}) or {}).get("bos_pivot_trace_audit", {})
+            or state.get("bos_pivot_trace_audit", {})
+            or default_bos_pivot_trace_audit_state()
         )
         state["shadow_decision_simulator"] = dict(
             cycle_result.get("shadow_decision_simulator")
@@ -1444,6 +1468,11 @@ def refresh_swing_validation_cycle(
         sanitized_report.get("multi_timeframe_swing_audit")
         or updated_state.get("multi_timeframe_swing_audit", {})
         or default_multi_timeframe_swing_audit_state()
+    )
+    updated_state["bos_pivot_trace_audit"] = dict(
+        sanitized_report.get("bos_pivot_trace_audit")
+        or updated_state.get("bos_pivot_trace_audit", {})
+        or default_bos_pivot_trace_audit_state()
     )
     updated_state["shadow_decision_simulator"] = dict(
         sanitized_report.get("shadow_decision_simulator")

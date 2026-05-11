@@ -145,6 +145,8 @@ Variaveis suportadas:
 - `MULTITF_INTRADAY_REQUIRE_LIVE_FEED`
 - `MULTITF_INTRADAY_SHADOW_ONLY`
 - `MULTITF_INTRADAY_PROVIDER_BUDGET_MODE`
+- `BOS_PIVOT_TRACE_AUDIT_ENABLED`
+- `BOS_PIVOT_TRACE_SHADOW_ONLY`
 - `DAILY_LOSS_LIMIT_BRL`
 - `ALERT_EMAIL_ENABLED`
 - `ALERT_EMAIL_PROVIDER`
@@ -211,6 +213,17 @@ Observacoes importantes:
 - `TWELVEDATA_MIN_CACHE_TTL_SECONDS=900` reduz a cadencia do provider principal para caber melhor no plano gratis com a watchlist atual de 5 ativos
 
 Pelos docs oficiais do Twelve Data, o plano gratis inclui cripto em tempo real e o endpoint `time_series` consome `1` credito por simbolo. Isso torna a camada mais resiliente, mas ainda exige monitorar a franquia diaria e o comportamento do worker.
+
+### FASE 2.5B - BOS/Pivot Trace Audit
+
+A FASE 2.5B adiciona uma auditoria SHADOW_ONLY para explicar por que BOS e pivos 4H/1H ainda nao confirmam. Ela reutiliza os candles reais ja obtidos pelo fetcher intraday da FASE 2.5A, portanto nao cria novas chamadas ao provider nem reduz TTL/cache.
+
+- BOS confirmado exige fechamento alem do topo/fundo estrutural com buffer.
+- Pavio isolado vira `BOS_BY_WICK_ONLY`, nunca confirmacao.
+- Fechamento pequeno vira `BOS_BY_CLOSE_WEAK`.
+- Pivo exige estrutura minima de swings e fechamento/ativacao objetiva.
+- A leitura 1H/4H distingue `H1_LEADS_H4`, `H4_CONFIRMS_H1`, conflito, ruido ou dados insuficientes.
+- Tudo permanece `SHADOW_ONLY`: nao aprova trade, nao altera score real, nao muda broker, nao altera PnL e preserva PAPER TRADING.
 
 ## Instalacao local
 

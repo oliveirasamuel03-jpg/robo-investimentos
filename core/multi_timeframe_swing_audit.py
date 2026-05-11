@@ -95,6 +95,10 @@ def _empty_default(reason: str) -> dict[str, Any]:
         "intraday_missing_reason": "",
         "h4_data_quality": "missing",
         "h1_data_quality": "missing",
+        "bos_pivot_trace_relationship": "INSUFFICIENT_DATA",
+        "bos_pivot_top_pivot_state": "INSUFFICIENT_DATA",
+        "bos_pivot_top_bos_state": "INSUFFICIENT_DATA",
+        "bos_pivot_dominant_missing_piece": "",
         "reason": reason,
     }
 
@@ -571,6 +575,50 @@ def _candidate_for_fib(symbol: str, market_structure_audit: dict[str, Any] | Non
     return {}
 
 
+def _trace_candidates_by_symbol(bos_pivot_trace_audit: dict[str, Any] | None) -> dict[str, dict[str, Any]]:
+    trace = dict(bos_pivot_trace_audit or {})
+    grouped: dict[str, dict[str, Any]] = {}
+    for row in list(trace.get("recent_candidates", []) or []):
+        if not isinstance(row, dict):
+            continue
+        symbol = str(row.get("symbol") or "").upper()
+        timeframe = str(row.get("timeframe") or "").lower()
+        if not symbol or timeframe not in {"4h", "1h"}:
+            continue
+        grouped.setdefault(symbol, {})[timeframe] = dict(row)
+    return grouped
+
+
+def _apply_bos_pivot_trace(candidate: dict[str, Any], trace_rows: dict[str, Any]) -> dict[str, Any]:
+    if not trace_rows:
+        return candidate
+    h4 = dict(trace_rows.get("4h", {}) or {})
+    h1 = dict(trace_rows.get("1h", {}) or {})
+    relationship = str((h4 or h1).get("relationship_to_higher_tf") or "INSUFFICIENT_DATA")
+    missing = list(candidate.get("missing_for_setup", []) or [])
+    for piece in (
+        h4.get("primary_missing_piece") if h4 else "",
+        h1.get("primary_missing_piece") if h1 else "",
+    ):
+        text = str(piece or "").strip()
+        if text and text not in missing and text != "real_strategy_still_authoritative":
+            missing.append(text)
+    candidate.update(
+        {
+            "missing_for_setup": missing,
+            "bos_pivot_trace_relationship": relationship,
+            "h4_bos_state": str(h4.get("bos_state") or "INSUFFICIENT_DATA"),
+            "h1_bos_state": str(h1.get("bos_state") or "INSUFFICIENT_DATA"),
+            "h4_pivot_state": str(h4.get("pivot_state") or "INSUFFICIENT_DATA"),
+            "h1_pivot_state": str(h1.get("pivot_state") or "INSUFFICIENT_DATA"),
+            "bos_pivot_primary_missing_piece": str(
+                h4.get("primary_missing_piece") or h1.get("primary_missing_piece") or ""
+            ),
+        }
+    )
+    return candidate
+
+
 def build_multi_timeframe_swing_audit(
     *,
     market_data: dict[str, Any] | None,
@@ -579,6 +627,7 @@ def build_multi_timeframe_swing_audit(
     fib_alignment_audit: dict[str, Any] | None = None,
     intraday_market_data: dict[str, dict[str, pd.DataFrame]] | None = None,
     intraday_fetch_summary: dict[str, Any] | None = None,
+    bos_pivot_trace_audit: dict[str, Any] | None = None,
     enabled: bool = True,
     timeframes: list[str] | tuple[str, ...] | None = None,
     max_symbols: int = DEFAULT_MAX_SYMBOLS,
@@ -612,6 +661,7 @@ def build_multi_timeframe_swing_audit(
     fallback_notes: list[str] = []
     provider_guards: Counter[str] = Counter()
     intraday_available_by_symbol: dict[str, list[str]] = {}
+    trace_by_symbol = _trace_candidates_by_symbol(bos_pivot_trace_audit)
     base_interval = str(status.get("effective_interval") or status.get("requested_interval") or "").strip().lower()
     for symbol, payload in list(data.items())[: max(1, int(max_symbols or DEFAULT_MAX_SYMBOLS))]:
         feed_blocked, provider, provider_guard = _feed_guard_for_symbol(payload, status, require_live_feed)
@@ -636,6 +686,7 @@ def build_multi_timeframe_swing_audit(
             provider_effective=provider,
             fib_candidate=_candidate_for_fib(str(symbol), market_structure_audit),
         )
+        candidate = _apply_bos_pivot_trace(candidate, trace_by_symbol.get(str(symbol).upper(), {}))
         candidates.append(candidate)
 
     candidates.sort(key=lambda item: float(item.get("alignment_score", 0.0) or 0.0), reverse=True)
@@ -706,5 +757,13 @@ def build_multi_timeframe_swing_audit(
         "intraday_missing_reason": intraday_missing_reason,
         "h4_data_quality": h4_quality or "missing",
         "h1_data_quality": h1_quality or "missing",
+        "bos_pivot_trace_relationship": str((bos_pivot_trace_audit or {}).get("top_relationship") or "INSUFFICIENT_DATA"),
+        "bos_pivot_top_pivot_state": str((bos_pivot_trace_audit or {}).get("top_pivot_state") or "INSUFFICIENT_DATA"),
+        "bos_pivot_top_bos_state": str((bos_pivot_trace_audit or {}).get("top_bos_state") or "INSUFFICIENT_DATA"),
+        "bos_pivot_dominant_missing_piece": str(
+            (bos_pivot_trace_audit or {}).get("dominant_missing_piece")
+            or (bos_pivot_trace_audit or {}).get("top_primary_missing_piece")
+            or ""
+        ),
         "reason": reason,
     }

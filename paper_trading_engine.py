@@ -11,6 +11,7 @@ import pandas as pd
 import plotly.graph_objects as go
 
 from core.config import (
+    BOS_PIVOT_TRACE_AUDIT_ENABLED,
     BROKER_MODE,
     LEGACY_VALIDATION_INITIAL_CAPITAL_BRL,
     MARKET_DATA_HISTORY_LIMIT,
@@ -33,6 +34,7 @@ from core.config import (
     VALIDATION_TRADING_MODE,
     ensure_app_directories,
 )
+from core.bos_pivot_trace_audit import build_bos_pivot_trace_audit
 from core.market_context import apply_context_filter, get_market_context
 from core.fibonacci_alignment_audit import build_fibonacci_alignment_audit
 from core.macro_alerts import apply_macro_risk_filter, default_macro_alert_state
@@ -1386,6 +1388,13 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[s
         require_live_feed=MULTITF_INTRADAY_REQUIRE_LIVE_FEED,
         provider_budget_mode=MULTITF_INTRADAY_PROVIDER_BUDGET_MODE,
     )
+    bos_pivot_trace_audit = build_bos_pivot_trace_audit(
+        intraday_market_data=multi_timeframe_intraday_fetch.frames,
+        market_data_status=market_data_status,
+        signals=signals,
+        market_structure_audit=market_structure_audit,
+        enabled=BOS_PIVOT_TRACE_AUDIT_ENABLED,
+    )
     multi_timeframe_swing_audit = build_multi_timeframe_swing_audit(
         market_data=market_data,
         market_data_status=market_data_status,
@@ -1393,6 +1402,7 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[s
         fib_alignment_audit=fib_alignment_audit,
         intraday_market_data=multi_timeframe_intraday_fetch.frames,
         intraday_fetch_summary=multi_timeframe_intraday_fetch.summary,
+        bos_pivot_trace_audit=bos_pivot_trace_audit,
         enabled=MULTITF_SWING_AUDIT_ENABLED,
         timeframes=[item.strip() for item in str(MULTITF_SWING_TIMEFRAMES or "").split(",") if item.strip()],
         max_symbols=MULTITF_SWING_MAX_SYMBOLS,
@@ -1411,6 +1421,7 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[s
     cycle_validation["fib_alignment_audit"] = fib_alignment_audit
     cycle_validation["multi_timeframe_intraday_fetcher"] = multi_timeframe_intraday_fetch.summary
     cycle_validation["multi_timeframe_swing_audit"] = multi_timeframe_swing_audit
+    cycle_validation["bos_pivot_trace_audit"] = bos_pivot_trace_audit
     cycle_validation["shadow_decision_simulator"] = shadow_decision_simulator
 
     if not config.allow_new_entries:
@@ -1509,6 +1520,7 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[s
     state["fib_alignment_audit"] = fib_alignment_audit
     state["multi_timeframe_intraday_fetcher"] = multi_timeframe_intraday_fetch.summary
     state["multi_timeframe_swing_audit"] = multi_timeframe_swing_audit
+    state["bos_pivot_trace_audit"] = bos_pivot_trace_audit
     state["shadow_decision_simulator"] = shadow_decision_simulator
 
     history = state.get("history", []) or []
@@ -1559,5 +1571,6 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[s
         "fib_alignment_audit": fib_alignment_audit,
         "multi_timeframe_intraday_fetcher": multi_timeframe_intraday_fetch.summary,
         "multi_timeframe_swing_audit": multi_timeframe_swing_audit,
+        "bos_pivot_trace_audit": bos_pivot_trace_audit,
         "shadow_decision_simulator": shadow_decision_simulator,
     }

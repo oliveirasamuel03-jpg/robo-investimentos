@@ -64,6 +64,11 @@ def test_state_store_bootstraps_files_and_defaults(isolated_storage):
     assert state["multi_timeframe_swing_audit"]["shadow_only"] is True
     assert state["multi_timeframe_swing_audit"]["recent_candidates"] == []
     assert state["multi_timeframe_swing_audit"]["estimated_provider_calls"] == 0
+    assert state["bos_pivot_trace_audit"]["enabled"] == config.BOS_PIVOT_TRACE_AUDIT_ENABLED
+    assert state["bos_pivot_trace_audit"]["mode"] == "SHADOW_ONLY"
+    assert state["bos_pivot_trace_audit"]["shadow_only"] is True
+    assert state["bos_pivot_trace_audit"]["recent_candidates"] == []
+    assert state["bos_pivot_trace_audit"]["should_keep_blocked_count"] == 0
     assert state["shadow_decision_simulator"]["shadow_decision_simulator_enabled"] is True
     assert state["shadow_decision_simulator"]["shadow_decision_mode"] == "SHADOW_ONLY"
     assert state["shadow_decision_simulator"]["shadow_recent_candidates"] == []
@@ -162,6 +167,8 @@ def test_state_store_backfills_strategy_structure_audit_for_old_state(isolated_s
     assert state["shadow_decision_simulator"]["shadow_current_cycle_analyzed_count"] == 0
     assert state["shadow_decision_simulator"]["shadow_current_cycle_analyzed_new_count"] == 0
     assert state["shadow_decision_simulator"]["shadow_counts_scope"] == "current_cycle_and_accumulated_recent"
+    assert state["bos_pivot_trace_audit"]["mode"] == "SHADOW_ONLY"
+    assert state["bos_pivot_trace_audit"]["recent_candidates"] == []
 
 
 def test_update_market_data_status_tracks_last_success_and_error(isolated_storage):

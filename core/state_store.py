@@ -9,6 +9,8 @@ from core.config import (
     ALERT_EMAIL_ENABLED,
     ALERT_EMAIL_PROVIDER,
     APP_SOURCE_COMMIT_SHA,
+    BOS_PIVOT_TRACE_AUDIT_ENABLED,
+    BOS_PIVOT_TRACE_SHADOW_ONLY,
     BUILD_TIMESTAMP,
     BOT_LOG_COLUMNS,
     BOT_LOG_FILE,
@@ -514,6 +516,40 @@ DEFAULT_STATE = {
         "h4_data_quality": "missing",
         "h1_data_quality": "missing",
         "reason": "No multi-timeframe swing audit data yet.",
+    },
+    "bos_pivot_trace_audit": {
+        "enabled": BOS_PIVOT_TRACE_AUDIT_ENABLED,
+        "mode": "SHADOW_ONLY",
+        "generated_at": "",
+        "provider_effective": "",
+        "feed_status": "UNKNOWN",
+        "uses_real_intraday_data": False,
+        "symbols_analyzed": 0,
+        "timeframes_analyzed": ["4h", "1h"],
+        "top_symbol": "",
+        "top_timeframe": "",
+        "top_pivot_state": "INSUFFICIENT_DATA",
+        "top_bos_state": "INSUFFICIENT_DATA",
+        "top_h4_bos_state": "INSUFFICIENT_DATA",
+        "top_h1_bos_state": "INSUFFICIENT_DATA",
+        "top_relationship": "INSUFFICIENT_DATA",
+        "top_recommendation": "insufficient_data",
+        "top_primary_missing_piece": "No BOS/Pivot trace audit data yet.",
+        "dominant_missing_piece": "No BOS/Pivot trace audit data yet.",
+        "h4_bos_missing_count": 0,
+        "h1_bos_only_count": 0,
+        "wick_only_bos_count": 0,
+        "weak_close_bos_count": 0,
+        "confirmed_bos_count": 0,
+        "retest_pending_count": 0,
+        "pivot_forming_count": 0,
+        "pivot_confirmed_count": 0,
+        "pivot_triggered_count": 0,
+        "insufficient_data_count": 0,
+        "should_keep_blocked_count": 0,
+        "recent_candidates": [],
+        "reason": "No BOS/Pivot trace audit data yet.",
+        "shadow_only": BOS_PIVOT_TRACE_SHADOW_ONLY,
     },
     "shadow_decision_simulator": {
         "shadow_decision_simulator_enabled": True,
@@ -1133,6 +1169,10 @@ def load_bot_state() -> dict:
         ("intraday_missing_reason", ""),
         ("h4_data_quality", "missing"),
         ("h1_data_quality", "missing"),
+        ("bos_pivot_trace_relationship", "INSUFFICIENT_DATA"),
+        ("bos_pivot_top_pivot_state", "INSUFFICIENT_DATA"),
+        ("bos_pivot_top_bos_state", "INSUFFICIENT_DATA"),
+        ("bos_pivot_dominant_missing_piece", ""),
         ("reason", "No multi-timeframe swing audit data yet."),
     ):
         multi_tf_state[key] = str(multi_tf_state.get(key) or fallback)
@@ -1184,6 +1224,59 @@ def load_bot_state() -> dict:
         if isinstance(item, dict)
     ][:10]
     state["multi_timeframe_swing_audit"] = multi_tf_state
+    bos_pivot_state = state.get("bos_pivot_trace_audit", {}) or {}
+    bos_pivot_state["enabled"] = BOS_PIVOT_TRACE_AUDIT_ENABLED
+    bos_pivot_state["shadow_only"] = BOS_PIVOT_TRACE_SHADOW_ONLY
+    for key, fallback in (
+        ("mode", "SHADOW_ONLY"),
+        ("generated_at", ""),
+        ("provider_effective", ""),
+        ("feed_status", "UNKNOWN"),
+        ("top_symbol", ""),
+        ("top_timeframe", ""),
+        ("top_pivot_state", "INSUFFICIENT_DATA"),
+        ("top_bos_state", "INSUFFICIENT_DATA"),
+        ("top_h4_bos_state", "INSUFFICIENT_DATA"),
+        ("top_h1_bos_state", "INSUFFICIENT_DATA"),
+        ("top_relationship", "INSUFFICIENT_DATA"),
+        ("top_recommendation", "insufficient_data"),
+        ("top_primary_missing_piece", "No BOS/Pivot trace audit data yet."),
+        ("dominant_missing_piece", "No BOS/Pivot trace audit data yet."),
+        ("reason", "No BOS/Pivot trace audit data yet."),
+    ):
+        bos_pivot_state[key] = str(bos_pivot_state.get(key) or fallback)
+    bos_pivot_state["uses_real_intraday_data"] = bool(
+        bos_pivot_state.get("uses_real_intraday_data", False)
+    )
+    for key in (
+        "symbols_analyzed",
+        "h4_bos_missing_count",
+        "h1_bos_only_count",
+        "wick_only_bos_count",
+        "weak_close_bos_count",
+        "confirmed_bos_count",
+        "retest_pending_count",
+        "pivot_forming_count",
+        "pivot_confirmed_count",
+        "pivot_triggered_count",
+        "insufficient_data_count",
+        "should_keep_blocked_count",
+    ):
+        try:
+            bos_pivot_state[key] = int(bos_pivot_state.get(key, 0) or 0)
+        except (TypeError, ValueError):
+            bos_pivot_state[key] = 0
+    bos_pivot_state["timeframes_analyzed"] = [
+        str(item).strip().lower()
+        for item in list(bos_pivot_state.get("timeframes_analyzed", ["4h", "1h"]) or ["4h", "1h"])
+        if str(item).strip()
+    ][:4]
+    bos_pivot_state["recent_candidates"] = [
+        item
+        for item in list(bos_pivot_state.get("recent_candidates", []) or [])
+        if isinstance(item, dict)
+    ][:12]
+    state["bos_pivot_trace_audit"] = bos_pivot_state
     shadow_state = state.get("shadow_decision_simulator", {}) or {}
     shadow_state["shadow_decision_simulator_enabled"] = bool(
         shadow_state.get("shadow_decision_simulator_enabled", True)
