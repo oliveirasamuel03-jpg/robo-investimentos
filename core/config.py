@@ -120,6 +120,9 @@ MULTITF_INTRADAY_SHADOW_ONLY = True
 BOS_PIVOT_TRACE_AUDIT_ENABLED = env_flag("BOS_PIVOT_TRACE_AUDIT_ENABLED", True)
 # Non-negotiable safety: FASE 2.5B is traceability only, never approval authority.
 BOS_PIVOT_TRACE_SHADOW_ONLY = True
+STRATEGY_DECISION_BRIDGE_TRACE_ENABLED = env_flag("STRATEGY_DECISION_BRIDGE_TRACE_ENABLED", True)
+# Non-negotiable safety: FASE 2.5B.1 only reconciles diagnostics with real blockers.
+STRATEGY_DECISION_BRIDGE_TRACE_SHADOW_ONLY = True
 BROKER_PROVIDER = _env_str("BROKER_PROVIDER", "paper") or "paper"
 BROKER_MODE = _env_str("BROKER_MODE", "paper") or "paper"
 BROKER_ACCOUNT_ID = _env_str("BROKER_ACCOUNT_ID", "")

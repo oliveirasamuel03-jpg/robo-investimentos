@@ -54,6 +54,8 @@ from core.config import (
     REPORT_EMAIL_WEEKLY_ENABLED,
     SERVICE_NAME,
     STATE_SCHEMA_VERSION,
+    STRATEGY_DECISION_BRIDGE_TRACE_ENABLED,
+    STRATEGY_DECISION_BRIDGE_TRACE_SHADOW_ONLY,
     RETENTION_ARCHIVE_TRADER_ORDERS,
     RETENTION_DAYS,
     RETENTION_ENABLED,
@@ -550,6 +552,28 @@ DEFAULT_STATE = {
         "recent_candidates": [],
         "reason": "No BOS/Pivot trace audit data yet.",
         "shadow_only": BOS_PIVOT_TRACE_SHADOW_ONLY,
+    },
+    "strategy_decision_bridge_trace": {
+        "enabled": STRATEGY_DECISION_BRIDGE_TRACE_ENABLED,
+        "mode": "SHADOW_ONLY",
+        "generated_at": "",
+        "provider_effective": "",
+        "feed_status": "UNKNOWN",
+        "symbols_analyzed": 0,
+        "top_symbol": "",
+        "top_bridge_status": "INSUFFICIENT_TRACE_DATA",
+        "top_real_blocker": "",
+        "top_structure_status": "",
+        "top_reconciliation_status": "UNKNOWN_MISMATCH",
+        "structure_confirmed_but_blocked_count": 0,
+        "fallback_scope_mismatch_count": 0,
+        "multi_tf_vs_bos_mismatch_count": 0,
+        "real_strategy_authority_count": 0,
+        "should_keep_blocked_count": 0,
+        "recommendation": "observe_more",
+        "recent_candidates": [],
+        "reason": "No strategy decision bridge trace data yet.",
+        "shadow_only": STRATEGY_DECISION_BRIDGE_TRACE_SHADOW_ONLY,
     },
     "shadow_decision_simulator": {
         "shadow_decision_simulator_enabled": True,
@@ -1277,6 +1301,41 @@ def load_bot_state() -> dict:
         if isinstance(item, dict)
     ][:12]
     state["bos_pivot_trace_audit"] = bos_pivot_state
+    bridge_state = state.get("strategy_decision_bridge_trace", {}) or {}
+    bridge_state["enabled"] = STRATEGY_DECISION_BRIDGE_TRACE_ENABLED
+    bridge_state["shadow_only"] = STRATEGY_DECISION_BRIDGE_TRACE_SHADOW_ONLY
+    for key, fallback in (
+        ("mode", "SHADOW_ONLY"),
+        ("generated_at", ""),
+        ("provider_effective", ""),
+        ("feed_status", "UNKNOWN"),
+        ("top_symbol", ""),
+        ("top_bridge_status", "INSUFFICIENT_TRACE_DATA"),
+        ("top_real_blocker", ""),
+        ("top_structure_status", ""),
+        ("top_reconciliation_status", "UNKNOWN_MISMATCH"),
+        ("recommendation", "observe_more"),
+        ("reason", "No strategy decision bridge trace data yet."),
+    ):
+        bridge_state[key] = str(bridge_state.get(key) or fallback)
+    for key in (
+        "symbols_analyzed",
+        "structure_confirmed_but_blocked_count",
+        "fallback_scope_mismatch_count",
+        "multi_tf_vs_bos_mismatch_count",
+        "real_strategy_authority_count",
+        "should_keep_blocked_count",
+    ):
+        try:
+            bridge_state[key] = int(bridge_state.get(key, 0) or 0)
+        except (TypeError, ValueError):
+            bridge_state[key] = 0
+    bridge_state["recent_candidates"] = [
+        item
+        for item in list(bridge_state.get("recent_candidates", []) or [])
+        if isinstance(item, dict)
+    ][:12]
+    state["strategy_decision_bridge_trace"] = bridge_state
     shadow_state = state.get("shadow_decision_simulator", {}) or {}
     shadow_state["shadow_decision_simulator_enabled"] = bool(
         shadow_state.get("shadow_decision_simulator_enabled", True)

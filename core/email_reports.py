@@ -375,6 +375,30 @@ def _bos_pivot_trace_audit_summary(validation_report: dict[str, Any]) -> str:
     )
 
 
+def _strategy_decision_bridge_trace_summary(validation_report: dict[str, Any]) -> str:
+    bridge = dict(validation_report.get("strategy_decision_bridge_trace", {}) or {})
+    if not bridge:
+        return "Strategy decision bridge: no bridge trace sample yet. Shadow only; no trade decision changed."
+    if not bool(bridge.get("enabled", True)):
+        return "Strategy decision bridge: disabled. Shadow only; no trade decision changed."
+    top_symbol = _safe_text(bridge.get("top_symbol"), fallback="none")
+    blocker = _safe_text(bridge.get("top_real_blocker"), fallback="none")
+    structure = _safe_text(bridge.get("top_structure_status"), fallback="none")
+    reconciliation = _safe_text(bridge.get("top_reconciliation_status"), fallback="UNKNOWN_MISMATCH")
+    recommendation = _safe_text(bridge.get("recommendation"), fallback="observe_more")
+    top = {}
+    candidates = [row for row in list(bridge.get("recent_candidates", []) or []) if isinstance(row, dict)]
+    if candidates:
+        top = dict(candidates[0])
+    h4_bos = _safe_text(top.get("bos_state_4h"), fallback="none")
+    pivot = _safe_text(top.get("pivot_state_4h"), fallback="none")
+    return (
+        f"Strategy decision bridge: top={top_symbol}; structure={h4_bos}/{pivot}; "
+        f"real_blocker={blocker}; bridge_status={structure}; reconciliation={reconciliation}; "
+        f"recommendation={recommendation}. Shadow only; no trade decision changed."
+    )
+
+
 def _calibration_preview_summary(validation_report: dict[str, Any]) -> str:
     preview = dict(validation_report.get("calibration_preview", {}) or {})
     if not preview:
@@ -635,6 +659,7 @@ def _build_daily_email_body(state: dict[str, Any], validation_report: dict[str, 
     composite_summary = _composite_summary(validation_report, daily_reports)
     multi_timeframe_summary = _multi_timeframe_summary(validation_report)
     bos_pivot_trace_summary = _bos_pivot_trace_audit_summary(validation_report)
+    strategy_decision_bridge_summary = _strategy_decision_bridge_trace_summary(validation_report)
     calibration_preview_summary = _calibration_preview_summary(validation_report)
     strategy_bottleneck_summary = _strategy_bottleneck_summary(validation_report)
     strategy_structure_audit_summary = _strategy_structure_audit_summary(validation_report)
@@ -671,6 +696,7 @@ def _build_daily_email_body(state: dict[str, Any], validation_report: dict[str, 
         phase2_1_fine_tune_summary,
         f"Multi-timeframe summary: {multi_timeframe_summary}",
         f"BOS/Pivot trace: {bos_pivot_trace_summary}",
+        strategy_decision_bridge_summary,
         "",
         "Signal pipeline:",
         *_signal_pipeline_lines(validation_report),
