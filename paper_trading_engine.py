@@ -28,6 +28,7 @@ from core.config import (
     MULTITF_SWING_REQUIRE_LIVE_FEED,
     MULTITF_SWING_TIMEFRAMES,
     RUNTIME_DIR,
+    STRATEGY_DECISION_BRIDGE_TRACE_ENABLED,
     SWING_VALIDATION_RECOMMENDED_WATCHLIST,
     VALIDATION_DEFAULT_MAX_OPEN_POSITIONS,
     VALIDATION_INITIAL_CAPITAL_BRL,
@@ -42,6 +43,7 @@ from core.market_structure_audit import build_market_structure_audit
 from core.multi_timeframe_data_fetcher import build_intraday_symbol_priority, fetch_multi_timeframe_intraday_data
 from core.multi_timeframe_swing_audit import build_multi_timeframe_swing_audit
 from core.shadow_decision_simulator import build_shadow_decision_simulator
+from core.strategy_decision_bridge_trace import build_strategy_decision_bridge_trace
 from core.market_data import (
     fallback_data as build_fallback_market_data,
     fetch_market_data_frame,
@@ -1416,6 +1418,20 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[s
         market_structure_audit=market_structure_audit,
         fib_alignment_audit=fib_alignment_audit,
     )
+    strategy_decision_bridge_trace = build_strategy_decision_bridge_trace(
+        signals=signals,
+        shadow_decision_simulator=shadow_decision_simulator,
+        multi_timeframe_swing_audit=multi_timeframe_swing_audit,
+        bos_pivot_trace_audit=bos_pivot_trace_audit,
+        market_structure_audit=market_structure_audit,
+        fib_alignment_audit=fib_alignment_audit,
+        market_data_status=market_data_status,
+        validation_state=dict(state.get("validation", {}) or {}),
+        paper_state=state,
+        daily_loss_block_active=daily_loss_block_active,
+        slots_left=slots_left,
+        enabled=STRATEGY_DECISION_BRIDGE_TRACE_ENABLED,
+    )
     cycle_validation["strategy_structure_audit"] = strategy_structure_audit
     cycle_validation["market_structure_audit"] = market_structure_audit
     cycle_validation["fib_alignment_audit"] = fib_alignment_audit
@@ -1423,6 +1439,7 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[s
     cycle_validation["multi_timeframe_swing_audit"] = multi_timeframe_swing_audit
     cycle_validation["bos_pivot_trace_audit"] = bos_pivot_trace_audit
     cycle_validation["shadow_decision_simulator"] = shadow_decision_simulator
+    cycle_validation["strategy_decision_bridge_trace"] = strategy_decision_bridge_trace
 
     if not config.allow_new_entries:
         for candidate in candidates:
@@ -1522,6 +1539,7 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[s
     state["multi_timeframe_swing_audit"] = multi_timeframe_swing_audit
     state["bos_pivot_trace_audit"] = bos_pivot_trace_audit
     state["shadow_decision_simulator"] = shadow_decision_simulator
+    state["strategy_decision_bridge_trace"] = strategy_decision_bridge_trace
 
     history = state.get("history", []) or []
     history.append(
@@ -1573,4 +1591,5 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[s
         "multi_timeframe_swing_audit": multi_timeframe_swing_audit,
         "bos_pivot_trace_audit": bos_pivot_trace_audit,
         "shadow_decision_simulator": shadow_decision_simulator,
+        "strategy_decision_bridge_trace": strategy_decision_bridge_trace,
     }

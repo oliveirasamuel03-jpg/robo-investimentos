@@ -619,6 +619,11 @@ bos_pivot_trace_audit = dict(
     or state.get("bos_pivot_trace_audit", {})
     or {}
 )
+strategy_decision_bridge_trace = dict(
+    validation_report.get("strategy_decision_bridge_trace")
+    or state.get("strategy_decision_bridge_trace", {})
+    or {}
+)
 shadow_decision_simulator = dict(
     validation_report.get("shadow_decision_simulator")
     or state.get("shadow_decision_simulator", {})
@@ -1035,6 +1040,53 @@ if multi_timeframe_swing_audit:
             st.dataframe(pd.DataFrame(bos_rows), hide_index=True, use_container_width=True)
         else:
             st.info("Sem candidatos BOS/Pivo 4H/1H registrados ainda.")
+    if strategy_decision_bridge_trace:
+        st.markdown("##### FASE 2.5B.1 - PONTE ENTRE ESTRUTURA E DECISAO REAL")
+        st.caption(
+            "SHADOW ONLY: esta camada explica por que uma estrutura confirmada no diagnostico ainda nao virou "
+            "entrada real/paper oficial. Nao aprova trade, nao altera score, nao muda broker, nao muda "
+            "thresholds e preserva PAPER TRADING."
+        )
+        bridge_c1, bridge_c2, bridge_c3, bridge_c4, bridge_c5 = st.columns(5)
+        bridge_c1.metric("Status", strategy_decision_bridge_trace.get("mode") or "SHADOW_ONLY")
+        bridge_c2.metric("Top ativo", strategy_decision_bridge_trace.get("top_symbol") or "-")
+        bridge_c3.metric("Status da ponte", strategy_decision_bridge_trace.get("top_bridge_status") or "INSUFFICIENT_TRACE_DATA")
+        bridge_c4.metric("Bloqueador real", strategy_decision_bridge_trace.get("top_real_blocker") or "-")
+        bridge_c5.metric("Estrutura shadow", strategy_decision_bridge_trace.get("top_structure_status") or "-")
+        bridge_d1, bridge_d2, bridge_d3, bridge_d4, bridge_d5 = st.columns(5)
+        bridge_d1.metric("Reconciliacao", strategy_decision_bridge_trace.get("top_reconciliation_status") or "UNKNOWN_MISMATCH")
+        bridge_d2.metric("Fallback mismatch", int(strategy_decision_bridge_trace.get("fallback_scope_mismatch_count", 0) or 0))
+        bridge_d3.metric("Multi-TF vs BOS/Pivo", int(strategy_decision_bridge_trace.get("multi_tf_vs_bos_mismatch_count", 0) or 0))
+        bridge_d4.metric("Deve manter bloqueado", int(strategy_decision_bridge_trace.get("should_keep_blocked_count", 0) or 0))
+        bridge_d5.metric("Recomendacao", strategy_decision_bridge_trace.get("recommendation") or "observe_more")
+        bridge_rows = [
+            {
+                "symbol": row.get("symbol"),
+                "real_score": row.get("real_score"),
+                "min_score": row.get("min_score"),
+                "score_gap": row.get("score_gap"),
+                "real_rejection_reason": row.get("real_rejection_reason"),
+                "primary_real_blocker": row.get("primary_real_blocker"),
+                "secondary_real_blocker": row.get("secondary_real_blocker"),
+                "multi_tf_alignment_status": row.get("multi_tf_alignment_status"),
+                "bos_state_4h": row.get("bos_state_4h"),
+                "bos_state_1h": row.get("bos_state_1h"),
+                "pivot_state_4h": row.get("pivot_state_4h"),
+                "pivot_state_1h": row.get("pivot_state_1h"),
+                "relationship_1h_4h": row.get("relationship_1h_4h"),
+                "fallback_blocker_scope": row.get("fallback_blocker_scope"),
+                "reconciliation_status": row.get("reconciliation_status"),
+                "final_bridge_reason": row.get("final_bridge_reason"),
+                "should_keep_blocked": row.get("should_keep_blocked"),
+                "recommendation": row.get("recommendation"),
+            }
+            for row in list(strategy_decision_bridge_trace.get("recent_candidates", []) or [])[:10]
+            if isinstance(row, dict)
+        ]
+        if bridge_rows:
+            st.dataframe(pd.DataFrame(bridge_rows), hide_index=True, use_container_width=True)
+        else:
+            st.info("Sem candidatos de ponte entre estrutura e decisao real ainda.")
     mtf_rows = [
         {
             "symbol": row.get("symbol"),

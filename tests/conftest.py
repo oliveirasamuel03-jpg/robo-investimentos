@@ -29,6 +29,7 @@ MODULES_TO_CLEAR = [
     "core.multi_timeframe_data_fetcher",
     "core.multi_timeframe_swing_audit",
     "core.shadow_decision_simulator",
+    "core.strategy_decision_bridge_trace",
     "core.strategy_bottleneck",
     "core.strategy_structure_audit",
     "core.signal_rejection_analysis",

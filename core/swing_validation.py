@@ -28,6 +28,7 @@ from core.market_data import build_feed_quality_snapshot
 from core.multi_timeframe_data_fetcher import default_multi_timeframe_intraday_fetcher_state
 from core.multi_timeframe_swing_audit import default_multi_timeframe_swing_audit_state
 from core.shadow_decision_simulator import default_shadow_decision_state
+from core.strategy_decision_bridge_trace import default_strategy_decision_bridge_trace_state
 from core.state_store import load_bot_state, read_storage_table, save_bot_state
 from core.signal_rejection_analysis import (
     build_feed_rejection_consistency_diagnostic,
@@ -924,6 +925,9 @@ def _build_operational_consistency(
     bos_pivot_trace_audit = dict(
         state.get("bos_pivot_trace_audit", {}) or default_bos_pivot_trace_audit_state()
     )
+    strategy_decision_bridge_trace = dict(
+        state.get("strategy_decision_bridge_trace", {}) or default_strategy_decision_bridge_trace_state()
+    )
     shadow_decision_simulator = dict(
         state.get("shadow_decision_simulator", {}) or default_shadow_decision_state()
     )
@@ -1021,6 +1025,14 @@ def _build_operational_consistency(
         ),
         "bos_pivot_trace_top_recommendation": str(
             bos_pivot_trace_audit.get("top_recommendation") or "insufficient_data"
+        ),
+        "strategy_decision_bridge_mode": strategy_decision_bridge_trace.get("mode", "SHADOW_ONLY"),
+        "strategy_decision_bridge_top_symbol": str(strategy_decision_bridge_trace.get("top_symbol") or ""),
+        "strategy_decision_bridge_status": str(
+            strategy_decision_bridge_trace.get("top_bridge_status") or "INSUFFICIENT_TRACE_DATA"
+        ),
+        "strategy_decision_bridge_reconciliation": str(
+            strategy_decision_bridge_trace.get("top_reconciliation_status") or "UNKNOWN_MISMATCH"
         ),
         "shadow_decision_mode": shadow_decision_simulator.get("shadow_decision_mode", "SHADOW_ONLY"),
         "preview_near_approved_count": int(
@@ -1223,6 +1235,9 @@ def build_swing_validation_report(state: dict | None = None, now: datetime | Non
         "bos_pivot_trace_audit": dict(
             payload.get("bos_pivot_trace_audit", {}) or default_bos_pivot_trace_audit_state()
         ),
+        "strategy_decision_bridge_trace": dict(
+            payload.get("strategy_decision_bridge_trace", {}) or default_strategy_decision_bridge_trace_state()
+        ),
         "shadow_decision_simulator": dict(
             payload.get("shadow_decision_simulator", {}) or default_shadow_decision_state()
         ),
@@ -1331,6 +1346,12 @@ def refresh_swing_validation_cycle(
             or (cycle_result.get("validation_cycle", {}) or {}).get("bos_pivot_trace_audit", {})
             or state.get("bos_pivot_trace_audit", {})
             or default_bos_pivot_trace_audit_state()
+        )
+        state["strategy_decision_bridge_trace"] = dict(
+            cycle_result.get("strategy_decision_bridge_trace")
+            or (cycle_result.get("validation_cycle", {}) or {}).get("strategy_decision_bridge_trace", {})
+            or state.get("strategy_decision_bridge_trace", {})
+            or default_strategy_decision_bridge_trace_state()
         )
         state["shadow_decision_simulator"] = dict(
             cycle_result.get("shadow_decision_simulator")
@@ -1473,6 +1494,11 @@ def refresh_swing_validation_cycle(
         sanitized_report.get("bos_pivot_trace_audit")
         or updated_state.get("bos_pivot_trace_audit", {})
         or default_bos_pivot_trace_audit_state()
+    )
+    updated_state["strategy_decision_bridge_trace"] = dict(
+        sanitized_report.get("strategy_decision_bridge_trace")
+        or updated_state.get("strategy_decision_bridge_trace", {})
+        or default_strategy_decision_bridge_trace_state()
     )
     updated_state["shadow_decision_simulator"] = dict(
         sanitized_report.get("shadow_decision_simulator")

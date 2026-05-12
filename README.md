@@ -147,6 +147,8 @@ Variaveis suportadas:
 - `MULTITF_INTRADAY_PROVIDER_BUDGET_MODE`
 - `BOS_PIVOT_TRACE_AUDIT_ENABLED`
 - `BOS_PIVOT_TRACE_SHADOW_ONLY`
+- `STRATEGY_DECISION_BRIDGE_TRACE_ENABLED`
+- `STRATEGY_DECISION_BRIDGE_TRACE_SHADOW_ONLY`
 - `DAILY_LOSS_LIMIT_BRL`
 - `ALERT_EMAIL_ENABLED`
 - `ALERT_EMAIL_PROVIDER`
@@ -224,6 +226,16 @@ A FASE 2.5B adiciona uma auditoria SHADOW_ONLY para explicar por que BOS e pivos
 - Pivo exige estrutura minima de swings e fechamento/ativacao objetiva.
 - A leitura 1H/4H distingue `H1_LEADS_H4`, `H4_CONFIRMS_H1`, conflito, ruido ou dados insuficientes.
 - Tudo permanece `SHADOW_ONLY`: nao aprova trade, nao altera score real, nao muda broker, nao altera PnL e preserva PAPER TRADING.
+
+### FASE 2.5B.1 - Strategy Decision Bridge Trace
+
+A FASE 2.5B.1 adiciona uma ponte SHADOW_ONLY entre a estrutura confirmada em diagnostico e os bloqueios reais da estrategia. Ela responde por simbolo se o bloqueio veio de score, RSI, setup inelegivel, fallback atual/historico, guards ou divergencia entre Multi-TF e BOS/Pivo.
+
+- Se BOS/Pivo 4H/1H confirmar estrutura, isso continua sem autoridade de entrada.
+- A ponte separa fallback do ciclo atual de fallback acumulado/historico.
+- A ponte mostra quando `h4_bos_missing` vem do top ativo ou de leitura agregada da watchlist.
+- Recomendacoes sao apenas diagnosticas, como `study_real_strategy_blocker` ou `reconcile_feed_scope`.
+- Nenhum score, threshold, broker, posicao, PnL ou ordem paper/real e alterado.
 
 ## Instalacao local
 

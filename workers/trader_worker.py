@@ -656,6 +656,81 @@ def _log_bos_pivot_trace_audit_summary(validation_report: dict) -> None:
     )
 
 
+def _log_strategy_decision_bridge_trace_summary(validation_report: dict) -> None:
+    bridge = dict(validation_report.get("strategy_decision_bridge_trace", {}) or {})
+    if not bridge:
+        return
+    log_event(
+        "INFO",
+        (
+            "[strategy_decision_bridge_summary] "
+            f"mode={str(bridge.get('mode') or 'SHADOW_ONLY').lower()};"
+            f"top_symbol={str(bridge.get('top_symbol') or 'none')};"
+            f"bridge_status={str(bridge.get('top_bridge_status') or 'INSUFFICIENT_TRACE_DATA')};"
+            f"real_blocker={str(bridge.get('top_real_blocker') or 'none')};"
+            f"structure_status={str(bridge.get('top_structure_status') or 'none')};"
+            f"reconciliation={str(bridge.get('top_reconciliation_status') or 'UNKNOWN_MISMATCH')};"
+            f"recommendation={str(bridge.get('recommendation') or 'observe_more')};"
+            "shadow_only=true"
+        ),
+    )
+    candidates = [item for item in list(bridge.get("recent_candidates", []) or []) if isinstance(item, dict)]
+    for row in candidates[:4]:
+        log_event(
+            "INFO",
+            (
+                "[strategy_decision_bridge_candidate] "
+                f"symbol={str(row.get('symbol') or 'none')};"
+                f"score={row.get('real_score') if row.get('real_score') is not None else 'none'};"
+                f"min_score={row.get('min_score') if row.get('min_score') is not None else 'none'};"
+                f"gap={row.get('score_gap') if row.get('score_gap') is not None else 'none'};"
+                f"bridge_status={str(row.get('decision_bridge_status') or 'unknown')};"
+                f"real_blocker={str(row.get('primary_real_blocker') or row.get('real_bottleneck_category') or 'none')};"
+                f"fallback_scope={str(row.get('fallback_blocker_scope') or 'UNKNOWN')};"
+                f"keep_blocked={int(bool(row.get('should_keep_blocked', True)))};"
+                "shadow_only=true"
+            ),
+        )
+    if candidates:
+        top = candidates[0]
+        log_event(
+            "INFO",
+            (
+                "[strategy_decision_bridge_reconciliation] "
+                f"symbol={str(top.get('symbol') or 'none')};"
+                f"multi_tf={str(top.get('multi_tf_alignment_status') or 'none')};"
+                f"h4_bos={str(top.get('bos_state_4h') or 'none')};"
+                f"h1_bos={str(top.get('bos_state_1h') or 'none')};"
+                f"reconciliation={str(top.get('reconciliation_status') or 'UNKNOWN_MISMATCH')};"
+                f"reason={str(top.get('reconciliation_reason') or 'none').replace(' ', '_')};"
+                "shadow_only=true"
+            ),
+        )
+        log_event(
+            "INFO",
+            (
+                "[strategy_decision_bridge_real_blocker] "
+                f"symbol={str(top.get('symbol') or 'none')};"
+                f"primary={str(top.get('primary_real_blocker') or 'none')};"
+                f"secondary={str(top.get('secondary_real_blocker') or 'none')};"
+                f"reason={str(top.get('real_rejection_reason') or 'none').replace(' ', '_')};"
+                "shadow_only=true"
+            ),
+        )
+    log_event(
+        "INFO",
+        (
+            "[strategy_decision_bridge_safety] "
+            f"keep_blocked={int(bridge.get('should_keep_blocked_count', 0) or 0)};"
+            "trade_authority=false;"
+            "score_authority=false;"
+            "broker_authority=false;"
+            "paper_required=true;"
+            "shadow_only=true"
+        ),
+    )
+
+
 def _log_shadow_decision_simulator_summary(validation_report: dict) -> None:
     simulator = dict(validation_report.get("shadow_decision_simulator", {}) or {})
     if not simulator:
@@ -1232,6 +1307,7 @@ def worker_loop() -> None:
             _log_multi_timeframe_intraday_fetch_summary(validation_report)
             _log_bos_pivot_trace_audit_summary(validation_report)
             _log_multi_timeframe_swing_audit_summary(validation_report)
+            _log_strategy_decision_bridge_trace_summary(validation_report)
             _log_shadow_decision_simulator_summary(validation_report)
             _log_phase2_fine_tune_summary(validation_report)
             _log_phase2_1_fine_tune_summary(validation_report)
