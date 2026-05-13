@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 
 import pandas as pd
 
+from core.no_setup_eligible_decomposition import default_no_setup_eligible_decomposition_state
 from core.config import (
     ALERT_EMAIL_ENABLED,
     ALERT_EMAIL_PROVIDER,
@@ -606,6 +607,7 @@ DEFAULT_STATE = {
         "recommendation": "observe_more",
         "notes": "No feed scope reconciliation data yet.",
     },
+    "no_setup_eligible_decomposition": default_no_setup_eligible_decomposition_state(),
     "shadow_decision_simulator": {
         "shadow_decision_simulator_enabled": True,
         "shadow_decision_mode": "SHADOW_ONLY",
@@ -1416,6 +1418,54 @@ def load_bot_state() -> dict:
     feed_scope_state["current_feed_is_clean"] = bool(feed_scope_state.get("current_feed_is_clean", False))
     feed_scope_state["candidate_fallback_flags"] = dict(feed_scope_state.get("candidate_fallback_flags", {}) or {})
     state["feed_scope_reconciliation"] = feed_scope_state
+    no_setup_state = state.get("no_setup_eligible_decomposition", {}) or {}
+    no_setup_defaults = default_no_setup_eligible_decomposition_state()
+    for key, fallback in no_setup_defaults.items():
+        if key not in no_setup_state:
+            no_setup_state[key] = fallback
+    for key, fallback in (
+        ("mode", "DIAGNOSTIC_ONLY"),
+        ("safety_mode", "SHADOW_ONLY"),
+        ("status", "INSUFFICIENT_DATA"),
+        ("generated_at", ""),
+        ("target_setup", "trend_pullback_breakout"),
+        ("top_symbol", ""),
+        ("top_setup", "trend_pullback_breakout"),
+        ("top_reason_bucket", "INSUFFICIENT_DATA_FOR_DECOMPOSITION"),
+        ("top_real_blocker", ""),
+        ("top_secondary_blocker", ""),
+        ("fallback_blocker_scope", "UNKNOWN"),
+        ("recommendation", "insufficient_data"),
+        ("notes", "No NO_SETUP_ELIGIBLE decomposition data yet."),
+    ):
+        no_setup_state[key] = str(no_setup_state.get(key) or fallback)
+    no_setup_state["enabled"] = bool(no_setup_state.get("enabled", True))
+    no_setup_state["should_keep_blocked"] = True
+    no_setup_state["shadow_only"] = bool(no_setup_state.get("shadow_only", True))
+    no_setup_state["current_feed_is_clean"] = bool(no_setup_state.get("current_feed_is_clean", False))
+    for key in (
+        "total_candidates_checked",
+        "no_setup_eligible_count",
+        "structure_confirmed_count",
+        "structure_confirmed_but_no_setup_count",
+        "near_approved_no_setup_count",
+    ):
+        try:
+            no_setup_state[key] = int(no_setup_state.get(key, 0) or 0)
+        except (TypeError, ValueError):
+            no_setup_state[key] = 0
+    for key in ("top_score", "top_min_score", "top_score_gap"):
+        value = no_setup_state.get(key)
+        try:
+            no_setup_state[key] = None if value in (None, "") else float(value)
+        except (TypeError, ValueError):
+            no_setup_state[key] = None
+    no_setup_state["candidates"] = [
+        item
+        for item in list(no_setup_state.get("candidates", []) or [])
+        if isinstance(item, dict)
+    ][:10]
+    state["no_setup_eligible_decomposition"] = no_setup_state
     shadow_state = state.get("shadow_decision_simulator", {}) or {}
     shadow_state["shadow_decision_simulator_enabled"] = bool(
         shadow_state.get("shadow_decision_simulator_enabled", True)

@@ -247,6 +247,16 @@ A FASE 2.5B.1A adiciona uma reconciliacao DIAGNOSTIC_ONLY para separar fallback 
 - A Strategy Decision Bridge usa essa leitura para explicar que score/setup/RSI seguem como bloqueios reais quando o feed atual esta limpo.
 - Nada muda em score real, thresholds, provider, cache/TTL, budget da Twelve Data, broker, posicoes, PnL, historico ou ordens.
 
+### FASE 2.5B.2 - NO_SETUP_ELIGIBLE Decomposition
+
+A FASE 2.5B.2 adiciona uma camada DIAGNOSTIC_ONLY / SHADOW_ONLY para explicar por que o setup real ainda retorna `NO_SETUP_ELIGIBLE` mesmo quando estrutura, BOS/Pivo, Multi-TF ou Fibonacci aparecem favoraveis.
+
+- A decomposicao cruza candidatos reais rejeitados, Strategy Decision Bridge, BOS/Pivo, Multi-TF, Fibonacci/estrutura e Feed/Fallback Scope.
+- O bloco separa casos como estrutura confirmada mas setup real inelegivel, score quase no minimo com breakout ausente e pullback/reacao ainda nao mapeados pela regra real.
+- O feed atual limpo continua explicitamente marcado como nao bloqueador quando `fallback_current=0`.
+- Recomendacoes sao apenas diagnosticas, como `study_real_rule_mapping`, `study_breakout_confirmation` ou `keep_blocked_until_real_setup_maps_structure`.
+- Nada muda em score real, thresholds, provider, cache/TTL, budget da Twelve Data, broker, posicoes, PnL, historico ou ordens.
+
 ## Instalacao local
 
 ### 1. Criar ambiente virtual

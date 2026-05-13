@@ -78,6 +78,11 @@ def test_state_store_bootstraps_files_and_defaults(isolated_storage):
     assert state["feed_scope_reconciliation"]["fallback_scope_status"] == "UNKNOWN_SCOPE"
     assert state["feed_scope_reconciliation"]["fallback_blocker_scope"] == "UNKNOWN"
     assert state["feed_scope_reconciliation"]["current_feed_is_clean"] is False
+    assert state["no_setup_eligible_decomposition"]["mode"] == "DIAGNOSTIC_ONLY"
+    assert state["no_setup_eligible_decomposition"]["safety_mode"] == "SHADOW_ONLY"
+    assert state["no_setup_eligible_decomposition"]["should_keep_blocked"] is True
+    assert state["no_setup_eligible_decomposition"]["recommendation"] == "insufficient_data"
+    assert state["no_setup_eligible_decomposition"]["candidates"] == []
     assert state["shadow_decision_simulator"]["shadow_decision_simulator_enabled"] is True
     assert state["shadow_decision_simulator"]["shadow_decision_mode"] == "SHADOW_ONLY"
     assert state["shadow_decision_simulator"]["shadow_recent_candidates"] == []
@@ -182,6 +187,10 @@ def test_state_store_backfills_strategy_structure_audit_for_old_state(isolated_s
     assert state["strategy_decision_bridge_trace"]["recent_candidates"] == []
     assert state["feed_scope_reconciliation"]["mode"] == "DIAGNOSTIC_ONLY"
     assert state["feed_scope_reconciliation"]["fallback_scope_status"] == "UNKNOWN_SCOPE"
+    assert state["no_setup_eligible_decomposition"]["mode"] == "DIAGNOSTIC_ONLY"
+    assert state["no_setup_eligible_decomposition"]["safety_mode"] == "SHADOW_ONLY"
+    assert state["no_setup_eligible_decomposition"]["should_keep_blocked"] is True
+    assert state["no_setup_eligible_decomposition"]["candidates"] == []
 
 
 def test_update_market_data_status_tracks_last_success_and_error(isolated_storage):

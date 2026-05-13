@@ -629,6 +629,11 @@ feed_scope_reconciliation = dict(
     or state.get("feed_scope_reconciliation", {})
     or {}
 )
+no_setup_eligible_decomposition = dict(
+    validation_report.get("no_setup_eligible_decomposition")
+    or state.get("no_setup_eligible_decomposition", {})
+    or {}
+)
 shadow_decision_simulator = dict(
     validation_report.get("shadow_decision_simulator")
     or state.get("shadow_decision_simulator", {})
@@ -1111,6 +1116,51 @@ if multi_timeframe_swing_audit:
         if bool(feed_scope_reconciliation.get("current_feed_is_clean", False)) and int(feed_scope_reconciliation.get("accumulated_fallback_count", 0) or 0) > 0:
             st.info("O fallback exibido e acumulado/historico, nao do ciclo atual.")
         st.caption(feed_scope_reconciliation.get("notes") or "Sem nota de reconciliacao de feed.")
+    if no_setup_eligible_decomposition:
+        st.markdown("##### FASE 2.5B.2 - DECOMPOSICAO NO_SETUP_ELIGIBLE")
+        st.caption(
+            "DIAGNOSTIC ONLY: esta camada explica por que NO_SETUP_ELIGIBLE bloqueou candidatos. "
+            "Nao aprova trade, nao altera score, nao muda broker, nao muda thresholds e preserva PAPER TRADING."
+        )
+        ns_c1, ns_c2, ns_c3, ns_c4, ns_c5 = st.columns(5)
+        ns_c1.metric("Top ativo", no_setup_eligible_decomposition.get("top_symbol") or "-")
+        ns_c2.metric("Setup analisado", no_setup_eligible_decomposition.get("top_setup") or "trend_pullback_breakout")
+        ns_c3.metric("Bloqueador real", no_setup_eligible_decomposition.get("top_real_blocker") or "-")
+        ns_c4.metric("Bucket principal", no_setup_eligible_decomposition.get("top_reason_bucket") or "INSUFFICIENT_DATA")
+        ns_c5.metric("Deve manter bloqueado", "Sim" if bool(no_setup_eligible_decomposition.get("should_keep_blocked", True)) else "Nao")
+        ns_d1, ns_d2, ns_d3, ns_d4, ns_d5 = st.columns(5)
+        ns_d1.metric("Score", no_setup_eligible_decomposition.get("top_score") if no_setup_eligible_decomposition.get("top_score") is not None else "-")
+        ns_d2.metric("Min score", no_setup_eligible_decomposition.get("top_min_score") if no_setup_eligible_decomposition.get("top_min_score") is not None else "-")
+        ns_d3.metric("Gap", no_setup_eligible_decomposition.get("top_score_gap") if no_setup_eligible_decomposition.get("top_score_gap") is not None else "-")
+        ns_d4.metric("Estrutura confirmada", int(no_setup_eligible_decomposition.get("structure_confirmed_count", 0) or 0))
+        ns_d5.metric("Feed atual limpo?", "Sim" if bool(no_setup_eligible_decomposition.get("current_feed_is_clean", False)) else "Nao")
+        ns_e1, ns_e2, ns_e3 = st.columns(3)
+        ns_e1.metric("No setup count", int(no_setup_eligible_decomposition.get("no_setup_eligible_count", 0) or 0))
+        ns_e2.metric("Near no setup", int(no_setup_eligible_decomposition.get("near_approved_no_setup_count", 0) or 0))
+        ns_e3.metric("Recomendacao", no_setup_eligible_decomposition.get("recommendation") or "insufficient_data")
+        no_setup_rows = [
+            {
+                "symbol": row.get("symbol"),
+                "setup": row.get("setup"),
+                "score": row.get("score"),
+                "gap": row.get("score_gap"),
+                "primary_real_blocker": row.get("primary_real_blocker"),
+                "secondary_real_blocker": row.get("secondary_real_blocker"),
+                "reason_bucket": row.get("reason_bucket"),
+                "multi_tf_alignment_status": row.get("multi_tf_alignment_status"),
+                "bos_state": row.get("bos_state"),
+                "pivot_state": row.get("pivot_state"),
+                "suggested_future_study": row.get("suggested_future_study"),
+                "should_keep_blocked": row.get("should_keep_blocked"),
+            }
+            for row in list(no_setup_eligible_decomposition.get("candidates", []) or [])[:10]
+            if isinstance(row, dict)
+        ]
+        if no_setup_rows:
+            st.dataframe(pd.DataFrame(no_setup_rows), hide_index=True, use_container_width=True)
+        else:
+            st.info("Sem amostra NO_SETUP_ELIGIBLE suficiente para decomposicao.")
+        st.caption(no_setup_eligible_decomposition.get("notes") or "Diagnostico sem autoridade operacional.")
     mtf_rows = [
         {
             "symbol": row.get("symbol"),

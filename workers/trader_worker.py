@@ -801,6 +801,85 @@ def _log_feed_scope_reconciliation_summary(validation_report: dict) -> None:
     )
 
 
+def _log_no_setup_eligible_decomposition_summary(validation_report: dict) -> None:
+    decomposition = dict(validation_report.get("no_setup_eligible_decomposition", {}) or {})
+    if not decomposition:
+        return
+    log_event(
+        "INFO",
+        (
+            "[no_setup_decomposition_summary] "
+            f"mode={str(decomposition.get('mode') or 'DIAGNOSTIC_ONLY').lower()};"
+            f"safety_mode={str(decomposition.get('safety_mode') or 'SHADOW_ONLY').lower()};"
+            f"top_symbol={str(decomposition.get('top_symbol') or 'none')};"
+            f"top_setup={str(decomposition.get('top_setup') or 'trend_pullback_breakout')};"
+            f"top_reason_bucket={str(decomposition.get('top_reason_bucket') or 'INSUFFICIENT_DATA_FOR_DECOMPOSITION')};"
+            f"no_setup_count={int(decomposition.get('no_setup_eligible_count', 0) or 0)};"
+            f"structure_confirmed_but_no_setup={int(decomposition.get('structure_confirmed_but_no_setup_count', 0) or 0)};"
+            f"near_approved_no_setup={int(decomposition.get('near_approved_no_setup_count', 0) or 0)};"
+            f"current_feed_clean={int(bool(decomposition.get('current_feed_is_clean', False)))};"
+            f"fallback_scope={str(decomposition.get('fallback_blocker_scope') or 'UNKNOWN')};"
+            f"recommendation={str(decomposition.get('recommendation') or 'insufficient_data')};"
+            f"keep_blocked={int(bool(decomposition.get('should_keep_blocked', True)))};"
+            "diagnostic_only=true"
+        ),
+    )
+    candidates = [item for item in list(decomposition.get("candidates", []) or []) if isinstance(item, dict)]
+    for row in candidates[:4]:
+        log_event(
+            "INFO",
+            (
+                "[no_setup_decomposition_candidate] "
+                f"symbol={str(row.get('symbol') or 'none')};"
+                f"setup={str(row.get('setup') or 'trend_pullback_breakout')};"
+                f"score={row.get('score') if row.get('score') is not None else 'none'};"
+                f"min_score={row.get('min_score') if row.get('min_score') is not None else 'none'};"
+                f"gap={row.get('score_gap') if row.get('score_gap') is not None else 'none'};"
+                f"primary={str(row.get('primary_real_blocker') or 'none')};"
+                f"secondary={str(row.get('secondary_real_blocker') or 'none')};"
+                f"bucket={str(row.get('reason_bucket') or 'UNKNOWN_NO_SETUP_REASON')};"
+                f"keep_blocked={int(bool(row.get('should_keep_blocked', True)))};"
+                "diagnostic_only=true"
+            ),
+        )
+    if candidates:
+        top = candidates[0]
+        log_event(
+            "INFO",
+            (
+                "[no_setup_decomposition_bucket] "
+                f"symbol={str(top.get('symbol') or 'none')};"
+                f"bucket={str(top.get('reason_bucket') or 'UNKNOWN_NO_SETUP_REASON')};"
+                f"detail={str(top.get('reason_detail') or 'none').replace(' ', '_')};"
+                f"future_study={str(top.get('suggested_future_study') or 'observe_more')};"
+                "diagnostic_only=true"
+            ),
+        )
+    log_event(
+        "INFO",
+        (
+            "[no_setup_decomposition_recommendation] "
+            f"recommendation={str(decomposition.get('recommendation') or 'insufficient_data')};"
+            "allowed=diagnostic_whitelist;"
+            "diagnostic_only=true"
+        ),
+    )
+    log_event(
+        "INFO",
+        (
+            "[no_setup_decomposition_safety] "
+            "should_keep_blocked=true;"
+            "safe_to_change_threshold_now=false;"
+            "trade_authority=false;"
+            "score_authority=false;"
+            "broker_authority=false;"
+            "threshold_authority=false;"
+            "paper_required=true;"
+            "shadow_only=true"
+        ),
+    )
+
+
 def _log_shadow_decision_simulator_summary(validation_report: dict) -> None:
     simulator = dict(validation_report.get("shadow_decision_simulator", {}) or {})
     if not simulator:
@@ -1379,6 +1458,7 @@ def worker_loop() -> None:
             _log_multi_timeframe_swing_audit_summary(validation_report)
             _log_feed_scope_reconciliation_summary(validation_report)
             _log_strategy_decision_bridge_trace_summary(validation_report)
+            _log_no_setup_eligible_decomposition_summary(validation_report)
             _log_shadow_decision_simulator_summary(validation_report)
             _log_phase2_fine_tune_summary(validation_report)
             _log_phase2_1_fine_tune_summary(validation_report)
