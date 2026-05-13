@@ -565,6 +565,9 @@ DEFAULT_STATE = {
         "top_real_blocker": "",
         "top_structure_status": "",
         "top_reconciliation_status": "UNKNOWN_MISMATCH",
+        "fallback_scope_status": "UNKNOWN_SCOPE",
+        "fallback_blocker_scope": "UNKNOWN",
+        "current_feed_is_clean": False,
         "structure_confirmed_but_blocked_count": 0,
         "fallback_scope_mismatch_count": 0,
         "multi_tf_vs_bos_mismatch_count": 0,
@@ -574,6 +577,34 @@ DEFAULT_STATE = {
         "recent_candidates": [],
         "reason": "No strategy decision bridge trace data yet.",
         "shadow_only": STRATEGY_DECISION_BRIDGE_TRACE_SHADOW_ONLY,
+    },
+    "feed_scope_reconciliation": {
+        "enabled": True,
+        "mode": "DIAGNOSTIC_ONLY",
+        "generated_at": "",
+        "provider_effective": "",
+        "current_feed_status": "UNKNOWN",
+        "current_cycle_feed_status": "UNKNOWN",
+        "current_cycle_provider": "",
+        "current_live_count": 0,
+        "current_cycle_live_count": 0,
+        "current_fallback_count": 0,
+        "current_cycle_fallback_count": 0,
+        "current_cycle_unknown_count": 0,
+        "visual_feed_status": "UNKNOWN",
+        "visual_chart_feed_status": "UNKNOWN",
+        "worker_feed_status": "UNKNOWN",
+        "accumulated_fallback_count": 0,
+        "accumulated_strategy_count": 0,
+        "historical_fallback_count": 0,
+        "candidate_fallback_flags": {},
+        "dominant_rejection_current": "",
+        "dominant_rejection_accumulated": "",
+        "fallback_scope_status": "UNKNOWN_SCOPE",
+        "fallback_blocker_scope": "UNKNOWN",
+        "current_feed_is_clean": False,
+        "recommendation": "observe_more",
+        "notes": "No feed scope reconciliation data yet.",
     },
     "shadow_decision_simulator": {
         "shadow_decision_simulator_enabled": True,
@@ -646,6 +677,15 @@ DEFAULT_STATE = {
         "shadow_best_strategy": "",
         "shadow_best_candidate_score": None,
         "shadow_dominant_block_reason": "",
+        "shadow_dominant_block_reason_current": "",
+        "shadow_dominant_block_reason_accumulated": "",
+        "dominant_exclusion_current_scope": "",
+        "dominant_exclusion_accumulated_scope": "",
+        "fallback_blocker_scope": "UNKNOWN",
+        "fallback_current_count": 0,
+        "fallback_accumulated_count": 0,
+        "fallback_scope_status": "UNKNOWN_SCOPE",
+        "fallback_scope_note": "",
         "shadow_policy_recommendation": "observe_more",
         "shadow_current_cycle_candidates": [],
         "shadow_accumulated_recent_candidates": [],
@@ -1314,10 +1354,13 @@ def load_bot_state() -> dict:
         ("top_real_blocker", ""),
         ("top_structure_status", ""),
         ("top_reconciliation_status", "UNKNOWN_MISMATCH"),
+        ("fallback_scope_status", "UNKNOWN_SCOPE"),
+        ("fallback_blocker_scope", "UNKNOWN"),
         ("recommendation", "observe_more"),
         ("reason", "No strategy decision bridge trace data yet."),
     ):
         bridge_state[key] = str(bridge_state.get(key) or fallback)
+    bridge_state["current_feed_is_clean"] = bool(bridge_state.get("current_feed_is_clean", False))
     for key in (
         "symbols_analyzed",
         "structure_confirmed_but_blocked_count",
@@ -1336,6 +1379,43 @@ def load_bot_state() -> dict:
         if isinstance(item, dict)
     ][:12]
     state["strategy_decision_bridge_trace"] = bridge_state
+    feed_scope_state = state.get("feed_scope_reconciliation", {}) or {}
+    feed_scope_state["enabled"] = bool(feed_scope_state.get("enabled", True))
+    for key, fallback in (
+        ("mode", "DIAGNOSTIC_ONLY"),
+        ("generated_at", ""),
+        ("provider_effective", ""),
+        ("current_feed_status", "UNKNOWN"),
+        ("current_cycle_feed_status", "UNKNOWN"),
+        ("current_cycle_provider", ""),
+        ("visual_feed_status", "UNKNOWN"),
+        ("visual_chart_feed_status", "UNKNOWN"),
+        ("worker_feed_status", "UNKNOWN"),
+        ("dominant_rejection_current", ""),
+        ("dominant_rejection_accumulated", ""),
+        ("fallback_scope_status", "UNKNOWN_SCOPE"),
+        ("fallback_blocker_scope", "UNKNOWN"),
+        ("recommendation", "observe_more"),
+        ("notes", "No feed scope reconciliation data yet."),
+    ):
+        feed_scope_state[key] = str(feed_scope_state.get(key) or fallback)
+    for key in (
+        "current_live_count",
+        "current_cycle_live_count",
+        "current_fallback_count",
+        "current_cycle_fallback_count",
+        "current_cycle_unknown_count",
+        "accumulated_fallback_count",
+        "accumulated_strategy_count",
+        "historical_fallback_count",
+    ):
+        try:
+            feed_scope_state[key] = int(feed_scope_state.get(key, 0) or 0)
+        except (TypeError, ValueError):
+            feed_scope_state[key] = 0
+    feed_scope_state["current_feed_is_clean"] = bool(feed_scope_state.get("current_feed_is_clean", False))
+    feed_scope_state["candidate_fallback_flags"] = dict(feed_scope_state.get("candidate_fallback_flags", {}) or {})
+    state["feed_scope_reconciliation"] = feed_scope_state
     shadow_state = state.get("shadow_decision_simulator", {}) or {}
     shadow_state["shadow_decision_simulator_enabled"] = bool(
         shadow_state.get("shadow_decision_simulator_enabled", True)
@@ -1347,6 +1427,13 @@ def load_bot_state() -> dict:
         ("shadow_best_symbol", ""),
         ("shadow_best_strategy", ""),
         ("shadow_dominant_block_reason", ""),
+        ("shadow_dominant_block_reason_current", ""),
+        ("shadow_dominant_block_reason_accumulated", ""),
+        ("dominant_exclusion_current_scope", ""),
+        ("dominant_exclusion_accumulated_scope", ""),
+        ("fallback_blocker_scope", "UNKNOWN"),
+        ("fallback_scope_status", "UNKNOWN_SCOPE"),
+        ("fallback_scope_note", ""),
         ("shadow_policy_recommendation", "observe_more"),
         ("shadow_ignored_reason", ""),
         ("shadow_counts_scope", "current_cycle_and_accumulated_recent"),
@@ -1412,6 +1499,8 @@ def load_bot_state() -> dict:
         "shadow_pending_count",
         "shadow_would_win_count",
         "shadow_would_lose_count",
+        "fallback_current_count",
+        "fallback_accumulated_count",
         "shadow_max_hold_cycles",
     ):
         try:

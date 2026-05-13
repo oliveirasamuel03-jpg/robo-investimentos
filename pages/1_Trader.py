@@ -1321,6 +1321,12 @@ strategy_decision_bridge_trace = dict(
     or state.get("strategy_decision_bridge_trace", {})
     or {}
 )
+feed_scope_reconciliation = dict(
+    validation_last_report.get("feed_scope_reconciliation")
+    or current_audit_state.get("feed_scope_reconciliation", {})
+    or state.get("feed_scope_reconciliation", {})
+    or {}
+)
 shadow_decision_simulator = dict(
     validation_last_report.get("shadow_decision_simulator")
     or current_audit_state.get("shadow_decision_simulator", {})
@@ -2314,6 +2320,25 @@ if multi_timeframe_swing_audit:
             st.dataframe(pd.DataFrame(bridge_rows), hide_index=True, use_container_width=True)
         else:
             st.info("Sem candidatos de ponte entre estrutura e decisao real ainda.")
+    if feed_scope_reconciliation:
+        st.markdown("##### FASE 2.5B.1A - RECONCILIACAO DE ESCOPO DO FEED/FALLBACK")
+        st.caption(
+            "DIAGNOSTIC ONLY: esta camada separa fallback atual, acumulado e historico. "
+            "Nao aprova trade, nao altera score, nao muda broker, nao muda thresholds e preserva PAPER TRADING."
+        )
+        fs_c1, fs_c2, fs_c3, fs_c4 = st.columns(4)
+        fs_c1.metric("Feed atual", feed_scope_reconciliation.get("current_feed_status") or "UNKNOWN")
+        fs_c2.metric("Fallback atual", int(feed_scope_reconciliation.get("current_fallback_count", 0) or 0))
+        fs_c3.metric("Fallback acumulado", int(feed_scope_reconciliation.get("accumulated_fallback_count", 0) or 0))
+        fs_c4.metric("Escopo do fallback", feed_scope_reconciliation.get("fallback_blocker_scope") or "UNKNOWN")
+        fs_d1, fs_d2, fs_d3, fs_d4 = st.columns(4)
+        fs_d1.metric("Feed atual limpo?", "Sim" if bool(feed_scope_reconciliation.get("current_feed_is_clean", False)) else "Nao")
+        fs_d2.metric("Rejeicao atual dominante", feed_scope_reconciliation.get("dominant_rejection_current") or "-")
+        fs_d3.metric("Rejeicao acumulada", feed_scope_reconciliation.get("dominant_rejection_accumulated") or "-")
+        fs_d4.metric("Recomendacao", feed_scope_reconciliation.get("recommendation") or "observe_more")
+        if bool(feed_scope_reconciliation.get("current_feed_is_clean", False)) and int(feed_scope_reconciliation.get("accumulated_fallback_count", 0) or 0) > 0:
+            st.info("O fallback exibido e acumulado/historico, nao do ciclo atual.")
+        st.caption(feed_scope_reconciliation.get("notes") or "Sem nota de reconciliacao de feed.")
     mtf_rows = [
         {
             "symbol": row.get("symbol"),
@@ -2355,6 +2380,9 @@ if shadow_decision_simulator:
     sd_d4.metric("Melhor setup", shadow_decision_simulator.get("shadow_best_strategy") or "-")
     st.caption(
         f"Bloqueio dominante: {shadow_decision_simulator.get('shadow_dominant_block_reason') or '-'} | "
+        f"Atual: {shadow_decision_simulator.get('dominant_exclusion_current_scope') or '-'} | "
+        f"Acumulado: {shadow_decision_simulator.get('dominant_exclusion_accumulated_scope') or '-'} | "
+        f"Escopo fallback: {shadow_decision_simulator.get('fallback_blocker_scope') or 'UNKNOWN'} | "
         f"Recomendacao: {shadow_decision_simulator.get('shadow_policy_recommendation') or 'observe_more'} | "
         f"Politica: {shadow_decision_simulator.get('shadow_entry_policy') or 'conservative_v1'}"
     )
@@ -2460,6 +2488,8 @@ if shadow_decision_simulator:
     tr_e4.metric("Escopo da tabela", trace_table_scope)
     st.caption(
         f"Motivo principal de exclusao: {shadow_decision_simulator.get('shadow_dominant_block_reason') or '-'} | "
+        f"Atual: {shadow_decision_simulator.get('dominant_exclusion_current_scope') or '-'} | "
+        f"Acumulado: {shadow_decision_simulator.get('dominant_exclusion_accumulated_scope') or '-'} | "
         f"Primario novo: {trace_primary_current} | Secundario novo: {trace_secondary_current} | "
         f"Ignorados: {shadow_decision_simulator.get('shadow_ignored_reason') or '-'}"
     )

@@ -399,6 +399,23 @@ def _strategy_decision_bridge_trace_summary(validation_report: dict[str, Any]) -
     )
 
 
+def _feed_scope_reconciliation_summary(validation_report: dict[str, Any]) -> str:
+    feed_scope = dict(validation_report.get("feed_scope_reconciliation", {}) or {})
+    if not feed_scope:
+        return "Feed scope reconciliation: no scope sample yet. Diagnostic only; no trade decision changed."
+    if not bool(feed_scope.get("enabled", True)):
+        return "Feed scope reconciliation: disabled. Diagnostic only; no trade decision changed."
+    return (
+        "Feed scope reconciliation: "
+        f"current_feed={_safe_text(feed_scope.get('current_feed_status'), fallback='UNKNOWN')}; "
+        f"current_fallback={int(feed_scope.get('current_fallback_count', 0) or 0)}; "
+        f"accumulated_fallback={int(feed_scope.get('accumulated_fallback_count', 0) or 0)}; "
+        f"scope={_safe_text(feed_scope.get('fallback_scope_status'), fallback='UNKNOWN_SCOPE')}; "
+        f"note={_safe_text(feed_scope.get('notes'), fallback='fallback scope unavailable')}. "
+        "Diagnostic only; no trade decision changed."
+    )
+
+
 def _calibration_preview_summary(validation_report: dict[str, Any]) -> str:
     preview = dict(validation_report.get("calibration_preview", {}) or {})
     if not preview:
@@ -660,6 +677,7 @@ def _build_daily_email_body(state: dict[str, Any], validation_report: dict[str, 
     multi_timeframe_summary = _multi_timeframe_summary(validation_report)
     bos_pivot_trace_summary = _bos_pivot_trace_audit_summary(validation_report)
     strategy_decision_bridge_summary = _strategy_decision_bridge_trace_summary(validation_report)
+    feed_scope_reconciliation_summary = _feed_scope_reconciliation_summary(validation_report)
     calibration_preview_summary = _calibration_preview_summary(validation_report)
     strategy_bottleneck_summary = _strategy_bottleneck_summary(validation_report)
     strategy_structure_audit_summary = _strategy_structure_audit_summary(validation_report)
@@ -697,6 +715,7 @@ def _build_daily_email_body(state: dict[str, Any], validation_report: dict[str, 
         f"Multi-timeframe summary: {multi_timeframe_summary}",
         f"BOS/Pivot trace: {bos_pivot_trace_summary}",
         strategy_decision_bridge_summary,
+        feed_scope_reconciliation_summary,
         "",
         "Signal pipeline:",
         *_signal_pipeline_lines(validation_report),

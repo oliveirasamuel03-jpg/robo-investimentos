@@ -731,6 +731,76 @@ def _log_strategy_decision_bridge_trace_summary(validation_report: dict) -> None
     )
 
 
+def _log_feed_scope_reconciliation_summary(validation_report: dict) -> None:
+    feed_scope = dict(validation_report.get("feed_scope_reconciliation", {}) or {})
+    if not feed_scope:
+        return
+    log_event(
+        "INFO",
+        (
+            "[feed_scope_reconciliation_summary] "
+            f"mode={str(feed_scope.get('mode') or 'DIAGNOSTIC_ONLY').lower()};"
+            f"current_feed_status={str(feed_scope.get('current_feed_status') or 'UNKNOWN')};"
+            f"current_fallback_count={int(feed_scope.get('current_fallback_count', 0) or 0)};"
+            f"current_live_count={int(feed_scope.get('current_live_count', 0) or 0)};"
+            f"accumulated_fallback_count={int(feed_scope.get('accumulated_fallback_count', 0) or 0)};"
+            f"fallback_scope_status={str(feed_scope.get('fallback_scope_status') or 'UNKNOWN_SCOPE')};"
+            f"fallback_blocker_scope={str(feed_scope.get('fallback_blocker_scope') or 'UNKNOWN')};"
+            f"current_feed_clean={int(bool(feed_scope.get('current_feed_is_clean', False)))};"
+            f"recommendation={str(feed_scope.get('recommendation') or 'observe_more')};"
+            "diagnostic_only=true"
+        ),
+    )
+    flags = dict(feed_scope.get("candidate_fallback_flags", {}) or {})
+    log_event(
+        "INFO",
+        (
+            "[feed_scope_reconciliation_current] "
+            f"worker_feed={str(feed_scope.get('worker_feed_status') or 'UNKNOWN')};"
+            f"provider={str(feed_scope.get('provider_effective') or 'unknown')};"
+            f"live={int(feed_scope.get('current_live_count', 0) or 0)};"
+            f"fallback={int(feed_scope.get('current_fallback_count', 0) or 0)};"
+            f"unknown={int(feed_scope.get('current_cycle_unknown_count', 0) or 0)};"
+            f"current_rejection={str(feed_scope.get('dominant_rejection_current') or 'none')};"
+            "diagnostic_only=true"
+        ),
+    )
+    log_event(
+        "INFO",
+        (
+            "[feed_scope_reconciliation_accumulated] "
+            f"accumulated_fallback={int(feed_scope.get('accumulated_fallback_count', 0) or 0)};"
+            f"historical_fallback={int(feed_scope.get('historical_fallback_count', 0) or 0)};"
+            f"accumulated_strategy={int(feed_scope.get('accumulated_strategy_count', 0) or 0)};"
+            f"accumulated_rejection={str(feed_scope.get('dominant_rejection_accumulated') or 'none')};"
+            "diagnostic_only=true"
+        ),
+    )
+    log_event(
+        "INFO",
+        (
+            "[feed_scope_reconciliation_candidate] "
+            f"current_candidate_fallback={int(flags.get('current_cycle_candidate_fallback_count', 0) or 0)};"
+            f"accumulated_candidate_fallback={int(flags.get('accumulated_candidate_fallback_count', 0) or 0)};"
+            f"visual_chart_fallback={int(bool(flags.get('visual_chart_fallback', False)))};"
+            f"visual_feed={str(feed_scope.get('visual_feed_status') or 'UNKNOWN')};"
+            "diagnostic_only=true"
+        ),
+    )
+    log_event(
+        "INFO",
+        (
+            "[feed_scope_reconciliation_safety] "
+            "trade_authority=false;"
+            "score_authority=false;"
+            "broker_authority=false;"
+            "threshold_authority=false;"
+            "paper_required=true;"
+            "diagnostic_only=true"
+        ),
+    )
+
+
 def _log_shadow_decision_simulator_summary(validation_report: dict) -> None:
     simulator = dict(validation_report.get("shadow_decision_simulator", {}) or {})
     if not simulator:
@@ -1307,6 +1377,7 @@ def worker_loop() -> None:
             _log_multi_timeframe_intraday_fetch_summary(validation_report)
             _log_bos_pivot_trace_audit_summary(validation_report)
             _log_multi_timeframe_swing_audit_summary(validation_report)
+            _log_feed_scope_reconciliation_summary(validation_report)
             _log_strategy_decision_bridge_trace_summary(validation_report)
             _log_shadow_decision_simulator_summary(validation_report)
             _log_phase2_fine_tune_summary(validation_report)
