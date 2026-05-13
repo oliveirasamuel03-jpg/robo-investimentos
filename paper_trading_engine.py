@@ -43,6 +43,7 @@ from core.macro_alerts import apply_macro_risk_filter, default_macro_alert_state
 from core.market_structure_audit import build_market_structure_audit
 from core.multi_timeframe_data_fetcher import build_intraday_symbol_priority, fetch_multi_timeframe_intraday_data
 from core.multi_timeframe_swing_audit import build_multi_timeframe_swing_audit
+from core.no_setup_eligible_decomposition import build_no_setup_eligible_decomposition
 from core.shadow_decision_simulator import build_shadow_decision_simulator
 from core.strategy_decision_bridge_trace import build_strategy_decision_bridge_trace
 from core.market_data import (
@@ -1443,6 +1444,15 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[s
         feed_scope_reconciliation=feed_scope_reconciliation,
         enabled=STRATEGY_DECISION_BRIDGE_TRACE_ENABLED,
     )
+    no_setup_eligible_decomposition = build_no_setup_eligible_decomposition(
+        signals=signals,
+        strategy_decision_bridge_trace=strategy_decision_bridge_trace,
+        multi_timeframe_swing_audit=multi_timeframe_swing_audit,
+        bos_pivot_trace_audit=bos_pivot_trace_audit,
+        market_structure_audit=market_structure_audit,
+        fib_alignment_audit=fib_alignment_audit,
+        feed_scope_reconciliation=feed_scope_reconciliation,
+    )
     cycle_validation["strategy_structure_audit"] = strategy_structure_audit
     cycle_validation["market_structure_audit"] = market_structure_audit
     cycle_validation["fib_alignment_audit"] = fib_alignment_audit
@@ -1452,6 +1462,7 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[s
     cycle_validation["shadow_decision_simulator"] = shadow_decision_simulator
     cycle_validation["strategy_decision_bridge_trace"] = strategy_decision_bridge_trace
     cycle_validation["feed_scope_reconciliation"] = feed_scope_reconciliation
+    cycle_validation["no_setup_eligible_decomposition"] = no_setup_eligible_decomposition
 
     if not config.allow_new_entries:
         for candidate in candidates:
@@ -1553,6 +1564,7 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[s
     state["shadow_decision_simulator"] = shadow_decision_simulator
     state["strategy_decision_bridge_trace"] = strategy_decision_bridge_trace
     state["feed_scope_reconciliation"] = feed_scope_reconciliation
+    state["no_setup_eligible_decomposition"] = no_setup_eligible_decomposition
 
     history = state.get("history", []) or []
     history.append(
@@ -1606,4 +1618,5 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[s
         "shadow_decision_simulator": shadow_decision_simulator,
         "strategy_decision_bridge_trace": strategy_decision_bridge_trace,
         "feed_scope_reconciliation": feed_scope_reconciliation,
+        "no_setup_eligible_decomposition": no_setup_eligible_decomposition,
     }

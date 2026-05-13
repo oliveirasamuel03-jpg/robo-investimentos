@@ -416,6 +416,23 @@ def _feed_scope_reconciliation_summary(validation_report: dict[str, Any]) -> str
     )
 
 
+def _no_setup_eligible_decomposition_summary(validation_report: dict[str, Any]) -> str:
+    decomposition = dict(validation_report.get("no_setup_eligible_decomposition", {}) or {})
+    if not decomposition:
+        return "NO_SETUP_ELIGIBLE decomposition: no decomposition sample yet. Diagnostic only; no trade decision changed."
+    if not bool(decomposition.get("enabled", True)):
+        return "NO_SETUP_ELIGIBLE decomposition: disabled. Diagnostic only; no trade decision changed."
+    return (
+        "NO_SETUP_ELIGIBLE decomposition: "
+        f"top={_safe_text(decomposition.get('top_symbol'), fallback='none')}; "
+        f"bucket={_safe_text(decomposition.get('top_reason_bucket'), fallback='INSUFFICIENT_DATA_FOR_DECOMPOSITION')}; "
+        f"blocker={_safe_text(decomposition.get('top_real_blocker'), fallback='none')}; "
+        f"feed_clean={str(bool(decomposition.get('current_feed_is_clean', False))).lower()}; "
+        f"recommendation={_safe_text(decomposition.get('recommendation'), fallback='insufficient_data')}. "
+        "Diagnostic only; no trade decision changed."
+    )
+
+
 def _calibration_preview_summary(validation_report: dict[str, Any]) -> str:
     preview = dict(validation_report.get("calibration_preview", {}) or {})
     if not preview:
@@ -678,6 +695,7 @@ def _build_daily_email_body(state: dict[str, Any], validation_report: dict[str, 
     bos_pivot_trace_summary = _bos_pivot_trace_audit_summary(validation_report)
     strategy_decision_bridge_summary = _strategy_decision_bridge_trace_summary(validation_report)
     feed_scope_reconciliation_summary = _feed_scope_reconciliation_summary(validation_report)
+    no_setup_eligible_decomposition_summary = _no_setup_eligible_decomposition_summary(validation_report)
     calibration_preview_summary = _calibration_preview_summary(validation_report)
     strategy_bottleneck_summary = _strategy_bottleneck_summary(validation_report)
     strategy_structure_audit_summary = _strategy_structure_audit_summary(validation_report)
@@ -716,6 +734,7 @@ def _build_daily_email_body(state: dict[str, Any], validation_report: dict[str, 
         f"BOS/Pivot trace: {bos_pivot_trace_summary}",
         strategy_decision_bridge_summary,
         feed_scope_reconciliation_summary,
+        no_setup_eligible_decomposition_summary,
         "",
         "Signal pipeline:",
         *_signal_pipeline_lines(validation_report),

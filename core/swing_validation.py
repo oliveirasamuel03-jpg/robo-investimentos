@@ -28,6 +28,7 @@ from core.market_structure_audit import default_market_structure_audit_state
 from core.market_data import build_feed_quality_snapshot
 from core.multi_timeframe_data_fetcher import default_multi_timeframe_intraday_fetcher_state
 from core.multi_timeframe_swing_audit import default_multi_timeframe_swing_audit_state
+from core.no_setup_eligible_decomposition import default_no_setup_eligible_decomposition_state
 from core.shadow_decision_simulator import default_shadow_decision_state
 from core.strategy_decision_bridge_trace import default_strategy_decision_bridge_trace_state
 from core.state_store import load_bot_state, read_storage_table, save_bot_state
@@ -932,6 +933,9 @@ def _build_operational_consistency(
     feed_scope_reconciliation = dict(
         state.get("feed_scope_reconciliation", {}) or default_feed_scope_reconciliation_state()
     )
+    no_setup_eligible_decomposition = dict(
+        state.get("no_setup_eligible_decomposition", {}) or default_no_setup_eligible_decomposition_state()
+    )
     shadow_decision_simulator = dict(
         state.get("shadow_decision_simulator", {}) or default_shadow_decision_state()
     )
@@ -1043,6 +1047,14 @@ def _build_operational_consistency(
         ),
         "feed_scope_blocker_scope": str(feed_scope_reconciliation.get("fallback_blocker_scope") or "UNKNOWN"),
         "feed_scope_current_feed_is_clean": bool(feed_scope_reconciliation.get("current_feed_is_clean", False)),
+        "no_setup_decomposition_mode": no_setup_eligible_decomposition.get("mode", "DIAGNOSTIC_ONLY"),
+        "no_setup_decomposition_top_symbol": str(no_setup_eligible_decomposition.get("top_symbol") or ""),
+        "no_setup_decomposition_top_bucket": str(
+            no_setup_eligible_decomposition.get("top_reason_bucket") or "INSUFFICIENT_DATA_FOR_DECOMPOSITION"
+        ),
+        "no_setup_decomposition_recommendation": str(
+            no_setup_eligible_decomposition.get("recommendation") or "insufficient_data"
+        ),
         "shadow_decision_mode": shadow_decision_simulator.get("shadow_decision_mode", "SHADOW_ONLY"),
         "preview_near_approved_count": int(
             shadow_decision_simulator.get("preview_near_approved_count", 0) or 0
@@ -1250,6 +1262,9 @@ def build_swing_validation_report(state: dict | None = None, now: datetime | Non
         "feed_scope_reconciliation": dict(
             payload.get("feed_scope_reconciliation", {}) or default_feed_scope_reconciliation_state()
         ),
+        "no_setup_eligible_decomposition": dict(
+            payload.get("no_setup_eligible_decomposition", {}) or default_no_setup_eligible_decomposition_state()
+        ),
         "shadow_decision_simulator": dict(
             payload.get("shadow_decision_simulator", {}) or default_shadow_decision_state()
         ),
@@ -1370,6 +1385,12 @@ def refresh_swing_validation_cycle(
             or (cycle_result.get("validation_cycle", {}) or {}).get("feed_scope_reconciliation", {})
             or state.get("feed_scope_reconciliation", {})
             or default_feed_scope_reconciliation_state()
+        )
+        state["no_setup_eligible_decomposition"] = dict(
+            cycle_result.get("no_setup_eligible_decomposition")
+            or (cycle_result.get("validation_cycle", {}) or {}).get("no_setup_eligible_decomposition", {})
+            or state.get("no_setup_eligible_decomposition", {})
+            or default_no_setup_eligible_decomposition_state()
         )
         state["shadow_decision_simulator"] = dict(
             cycle_result.get("shadow_decision_simulator")
@@ -1522,6 +1543,11 @@ def refresh_swing_validation_cycle(
         sanitized_report.get("feed_scope_reconciliation")
         or updated_state.get("feed_scope_reconciliation", {})
         or default_feed_scope_reconciliation_state()
+    )
+    updated_state["no_setup_eligible_decomposition"] = dict(
+        sanitized_report.get("no_setup_eligible_decomposition")
+        or updated_state.get("no_setup_eligible_decomposition", {})
+        or default_no_setup_eligible_decomposition_state()
     )
     updated_state["shadow_decision_simulator"] = dict(
         sanitized_report.get("shadow_decision_simulator")
