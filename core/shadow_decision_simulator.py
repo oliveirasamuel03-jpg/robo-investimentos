@@ -4,6 +4,8 @@ from collections import Counter
 from datetime import datetime, timezone
 from typing import Any
 
+from core.feed_scope_reconciliation import build_feed_scope_reconciliation
+
 
 MODE = "SHADOW_ONLY"
 POLICY = "conservative_v1"
@@ -204,6 +206,15 @@ def default_shadow_decision_state(reason: str = "No shadow decision simulator da
         "shadow_best_strategy": "",
         "shadow_best_candidate_score": None,
         "shadow_dominant_block_reason": "",
+        "shadow_dominant_block_reason_current": "",
+        "shadow_dominant_block_reason_accumulated": "",
+        "dominant_exclusion_current_scope": "",
+        "dominant_exclusion_accumulated_scope": "",
+        "fallback_blocker_scope": "UNKNOWN",
+        "fallback_current_count": 0,
+        "fallback_accumulated_count": 0,
+        "fallback_scope_status": "UNKNOWN_SCOPE",
+        "fallback_scope_note": "",
         "shadow_policy_recommendation": "observe_more",
         "shadow_current_cycle_candidates": [],
         "shadow_accumulated_recent_candidates": [],
@@ -629,6 +640,7 @@ def build_shadow_decision_simulator(
     market_data: dict[str, Any] | None,
     market_structure_audit: dict[str, Any] | None = None,
     fib_alignment_audit: dict[str, Any] | None = None,
+    market_data_status: dict[str, Any] | None = None,
     enabled: bool = True,
 ) -> dict[str, Any]:
     if not enabled:
@@ -722,6 +734,13 @@ def build_shadow_decision_simulator(
         for item in combined
         if not bool(item.get("shadow_would_enter", False))
     )
+    current_block_counter = Counter(
+        str(item.get("why_not_safe") or item.get("shadow_block_reason") or "none")
+        for item in new_candidates
+        if not bool(item.get("shadow_would_enter", False))
+    )
+    accumulated_dominant_block = block_counter.most_common(1)[0][0] if block_counter else ""
+    current_dominant_block = current_block_counter.most_common(1)[0][0] if current_block_counter else ""
     best = sorted(combined, key=lambda item: float(item.get("current_score") or 0.0), reverse=True)[0] if combined else {}
     current_safe = [item for item in new_candidates if item.get("candidate_class") == "SAFE_NEAR_APPROVED"]
     current_marginal = [item for item in new_candidates if item.get("candidate_class") == "MARGINAL_NEAR_APPROVED"]
@@ -754,6 +773,21 @@ def build_shadow_decision_simulator(
         counter_health_status = "high_raw_repetition"
     else:
         counter_health_status = "healthy"
+
+    feed_scope = build_feed_scope_reconciliation(
+        market_data_status=market_data_status or root_state.get("market_data", {}),
+        validation_state=dict(root_state.get("validation", {}) or {}),
+        shadow_decision_simulator={"shadow_dominant_block_reason": accumulated_dominant_block},
+        signals=rejected_signals,
+    )
+    if bool(feed_scope.get("current_feed_is_clean")) and current_dominant_block == "blocked_by_fallback":
+        current_dominant_block = next(
+            (reason for reason, _count in current_block_counter.most_common() if reason != "blocked_by_fallback"),
+            "current_feed_clean_no_current_fallback",
+        )
+    dominant_block_reason = current_dominant_block or accumulated_dominant_block
+    if bool(feed_scope.get("current_feed_is_clean")) and dominant_block_reason == "blocked_by_fallback":
+        dominant_block_reason = "accumulated_fallback_only"
 
     if wins and len(wins) >= len(losses) + 2:
         recommendation = "study_future_relaxation"
@@ -834,7 +868,16 @@ def build_shadow_decision_simulator(
         "shadow_best_symbol": str(best.get("symbol") or ""),
         "shadow_best_strategy": str(best.get("strategy") or ""),
         "shadow_best_candidate_score": best.get("current_score"),
-        "shadow_dominant_block_reason": block_counter.most_common(1)[0][0] if block_counter else "",
+        "shadow_dominant_block_reason": dominant_block_reason,
+        "shadow_dominant_block_reason_current": current_dominant_block,
+        "shadow_dominant_block_reason_accumulated": accumulated_dominant_block,
+        "dominant_exclusion_current_scope": current_dominant_block,
+        "dominant_exclusion_accumulated_scope": accumulated_dominant_block,
+        "fallback_blocker_scope": str(feed_scope.get("fallback_blocker_scope") or "UNKNOWN"),
+        "fallback_current_count": int(feed_scope.get("current_cycle_fallback_count", 0) or 0),
+        "fallback_accumulated_count": int(feed_scope.get("accumulated_fallback_count", 0) or 0),
+        "fallback_scope_status": str(feed_scope.get("fallback_scope_status") or "UNKNOWN_SCOPE"),
+        "fallback_scope_note": str(feed_scope.get("notes") or ""),
         "shadow_policy_recommendation": recommendation,
         "shadow_current_cycle_candidates": current_cycle_candidates[:MAX_RECENT_CANDIDATES],
         "shadow_accumulated_recent_candidates": accumulated_recent_candidates[:MAX_RECENT_CANDIDATES],

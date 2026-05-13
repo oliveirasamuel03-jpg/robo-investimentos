@@ -38,6 +38,7 @@ from core.config import (
 from core.bos_pivot_trace_audit import build_bos_pivot_trace_audit
 from core.market_context import apply_context_filter, get_market_context
 from core.fibonacci_alignment_audit import build_fibonacci_alignment_audit
+from core.feed_scope_reconciliation import build_feed_scope_reconciliation
 from core.macro_alerts import apply_macro_risk_filter, default_macro_alert_state
 from core.market_structure_audit import build_market_structure_audit
 from core.multi_timeframe_data_fetcher import build_intraday_symbol_priority, fetch_multi_timeframe_intraday_data
@@ -1417,6 +1418,15 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[s
         market_data=market_data,
         market_structure_audit=market_structure_audit,
         fib_alignment_audit=fib_alignment_audit,
+        market_data_status=market_data_status,
+    )
+    market_data_contexts = dict((state.get("market_data", {}) or {}).get("contexts", {}) or {})
+    feed_scope_reconciliation = build_feed_scope_reconciliation(
+        market_data_status=market_data_status,
+        visual_chart_status=dict(market_data_contexts.get("trader_chart", {}) or {}),
+        validation_state=dict(state.get("validation", {}) or {}),
+        shadow_decision_simulator=shadow_decision_simulator,
+        signals=signals,
     )
     strategy_decision_bridge_trace = build_strategy_decision_bridge_trace(
         signals=signals,
@@ -1430,6 +1440,7 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[s
         paper_state=state,
         daily_loss_block_active=daily_loss_block_active,
         slots_left=slots_left,
+        feed_scope_reconciliation=feed_scope_reconciliation,
         enabled=STRATEGY_DECISION_BRIDGE_TRACE_ENABLED,
     )
     cycle_validation["strategy_structure_audit"] = strategy_structure_audit
@@ -1440,6 +1451,7 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[s
     cycle_validation["bos_pivot_trace_audit"] = bos_pivot_trace_audit
     cycle_validation["shadow_decision_simulator"] = shadow_decision_simulator
     cycle_validation["strategy_decision_bridge_trace"] = strategy_decision_bridge_trace
+    cycle_validation["feed_scope_reconciliation"] = feed_scope_reconciliation
 
     if not config.allow_new_entries:
         for candidate in candidates:
@@ -1540,6 +1552,7 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[s
     state["bos_pivot_trace_audit"] = bos_pivot_trace_audit
     state["shadow_decision_simulator"] = shadow_decision_simulator
     state["strategy_decision_bridge_trace"] = strategy_decision_bridge_trace
+    state["feed_scope_reconciliation"] = feed_scope_reconciliation
 
     history = state.get("history", []) or []
     history.append(
@@ -1592,4 +1605,5 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[s
         "bos_pivot_trace_audit": bos_pivot_trace_audit,
         "shadow_decision_simulator": shadow_decision_simulator,
         "strategy_decision_bridge_trace": strategy_decision_bridge_trace,
+        "feed_scope_reconciliation": feed_scope_reconciliation,
     }

@@ -77,7 +77,10 @@ def _build(**overrides):
         "market_data_status": {
             "feed_status": "LIVE",
             "provider_effective": "twelvedata",
-            "source_breakdown": {"market": 5, "fallback": 0},
+            "symbols": ["BTC-USD", "ETH-USD", "BNB-USD", "SOL-USD", "LINK-USD"],
+            "live_symbols": ["BTC-USD", "ETH-USD", "BNB-USD", "SOL-USD", "LINK-USD"],
+            "fallback_symbols": [],
+            "source_breakdown": {"market": 5, "cached": 0, "fallback": 0, "unknown": 0},
         },
         "validation_state": {},
         "paper_state": {"positions": {}, "market_context": {"market_context_status": "FAVORAVEL"}},

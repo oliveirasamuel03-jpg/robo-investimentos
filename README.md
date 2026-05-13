@@ -234,8 +234,18 @@ A FASE 2.5B.1 adiciona uma ponte SHADOW_ONLY entre a estrutura confirmada em dia
 - Se BOS/Pivo 4H/1H confirmar estrutura, isso continua sem autoridade de entrada.
 - A ponte separa fallback do ciclo atual de fallback acumulado/historico.
 - A ponte mostra quando `h4_bos_missing` vem do top ativo ou de leitura agregada da watchlist.
-- Recomendacoes sao apenas diagnosticas, como `study_real_strategy_blocker` ou `reconcile_feed_scope`.
+- Recomendacoes sao apenas diagnosticas, como `study_real_strategy_blocker` ou `accumulated_fallback_only`.
 - Nenhum score, threshold, broker, posicao, PnL ou ordem paper/real e alterado.
+
+### FASE 2.5B.1A - Feed/Fallback Scope Reconciliation
+
+A FASE 2.5B.1A adiciona uma reconciliacao DIAGNOSTIC_ONLY para separar fallback do ciclo atual, fallback acumulado/historico, fallback de candidato antigo e fallback apenas visual do grafico.
+
+- Se o worker esta `LIVE`, com fallback atual `0` e ativos live no ciclo, o escopo nao pode ser `CURRENT_CYCLE`.
+- Fallback antigo continua visivel como acumulado/historico, mas deixa de parecer gargalo atual.
+- O Shadow Decision Simulator passa a mostrar dominante atual e dominante acumulado separadamente.
+- A Strategy Decision Bridge usa essa leitura para explicar que score/setup/RSI seguem como bloqueios reais quando o feed atual esta limpo.
+- Nada muda em score real, thresholds, provider, cache/TTL, budget da Twelve Data, broker, posicoes, PnL, historico ou ordens.
 
 ## Instalacao local
 

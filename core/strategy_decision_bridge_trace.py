@@ -4,6 +4,8 @@ from collections import Counter
 from datetime import datetime, timezone
 from typing import Any
 
+from core.feed_scope_reconciliation import build_feed_scope_reconciliation
+
 
 MODE = "SHADOW_ONLY"
 MAX_RECENT_CANDIDATES = 12
@@ -18,6 +20,11 @@ SAFE_RECOMMENDATIONS = {
     "study_future_calibration",
     "no_threshold_change",
     "keep_current_strategy",
+    "observe_current_feed_clean",
+    "accumulated_fallback_only",
+    "historical_fallback_only",
+    "candidate_old_fallback_only",
+    "visual_only_fallback",
 }
 
 
@@ -68,6 +75,9 @@ def default_strategy_decision_bridge_trace_state(
         "top_real_blocker": "",
         "top_structure_status": "",
         "top_reconciliation_status": "UNKNOWN_MISMATCH",
+        "fallback_scope_status": "UNKNOWN_SCOPE",
+        "fallback_blocker_scope": "UNKNOWN",
+        "current_feed_is_clean": False,
         "structure_confirmed_but_blocked_count": 0,
         "fallback_scope_mismatch_count": 0,
         "multi_tf_vs_bos_mismatch_count": 0,
@@ -280,6 +290,7 @@ def _reconciliation_status(
     symbol: str,
     primary_blocker: str,
     fallback_scope: str,
+    feed_scope_reconciliation: dict[str, Any],
     multi_tf: dict[str, Any],
     h4: dict[str, Any],
     h1: dict[str, Any],
@@ -292,8 +303,9 @@ def _reconciliation_status(
     h1_confirmed = str(h1.get("bos_state") or "") in CONFIRMED_BOS_STATES
     top_mtf = str(multi_timeframe_swing_audit.get("top_symbol") or "").upper()
     top_bos = str(bos_pivot_trace_audit.get("top_symbol") or "").upper()
-    if fallback_scope in {"ACCUMULATED", "HISTORICAL"}:
-        return "FALLBACK_SCOPE_MISMATCH", "Fallback blocker appears accumulated/historical while current feed is not fallback."
+    if fallback_scope in {"ACCUMULATED", "HISTORICAL", "CANDIDATE_OLD", "VISUAL_CHART_ONLY"}:
+        note = str(feed_scope_reconciliation.get("notes") or "Fallback is not a current-cycle worker blocker.")
+        return "FALLBACK_SCOPE_MISMATCH", note
     if primary_blocker == "NO_SETUP_ELIGIBLE" and (h4_confirmed or h1_confirmed):
         return "BOS_CONFIRMED_BUT_REAL_SETUP_MISSING", "BOS/Pivot trace has confirmed structure, but the real setup was not eligible."
     if mtf_status == "INSUFFICIENT_DATA" and (h4_confirmed or h1_confirmed):
@@ -307,8 +319,14 @@ def _reconciliation_status(
 
 
 def _safe_recommendation(candidate: dict[str, Any]) -> str:
-    if candidate["fallback_blocker_scope"] in {"ACCUMULATED", "HISTORICAL"}:
-        return "reconcile_feed_scope"
+    if candidate["fallback_blocker_scope"] == "ACCUMULATED":
+        return "accumulated_fallback_only"
+    if candidate["fallback_blocker_scope"] == "HISTORICAL":
+        return "historical_fallback_only"
+    if candidate["fallback_blocker_scope"] == "CANDIDATE_OLD":
+        return "candidate_old_fallback_only"
+    if candidate["fallback_blocker_scope"] == "VISUAL_CHART_ONLY":
+        return "visual_only_fallback"
     if candidate["decision_bridge_status"] == "STRUCTURE_CONFIRMED_BUT_REAL_BLOCKED":
         if candidate["primary_real_blocker"] in {"SCORE_BELOW_MIN", "RSI_OUT_OF_RANGE", "NO_SETUP_ELIGIBLE"}:
             return "study_real_strategy_blocker"
@@ -331,6 +349,7 @@ def _candidate_payload(
     shadow_decision_simulator: dict[str, Any],
     bos_pivot_trace_audit: dict[str, Any],
     multi_timeframe_swing_audit: dict[str, Any],
+    feed_scope_reconciliation: dict[str, Any],
     context_status: str,
     daily_loss_block_active: bool,
     position_limit_block_active: bool,
@@ -344,16 +363,22 @@ def _candidate_payload(
     h4 = dict(bos_rows.get("4h", {}) or {})
     h1 = dict(bos_rows.get("1h", {}) or {})
     structure_status = _structure_status(h4, h1)
-    fallback_scope, fallback_current, fallback_accumulated = _fallback_scope(
-        signal=signal,
-        market_data_status=market_data_status,
-        validation_state=validation_state,
-        shadow_decision_simulator=shadow_decision_simulator,
-    )
+    if feed_scope_reconciliation:
+        fallback_scope = str(feed_scope_reconciliation.get("fallback_blocker_scope") or "UNKNOWN")
+        fallback_current = bool(fallback_scope == "CURRENT_CYCLE")
+        fallback_accumulated = bool(fallback_scope in {"ACCUMULATED", "HISTORICAL", "CANDIDATE_OLD"})
+    else:
+        fallback_scope, fallback_current, fallback_accumulated = _fallback_scope(
+            signal=signal,
+            market_data_status=market_data_status,
+            validation_state=validation_state,
+            shadow_decision_simulator=shadow_decision_simulator,
+        )
     reconciliation, reconciliation_reason = _reconciliation_status(
         symbol=symbol,
         primary_blocker=primary,
         fallback_scope=fallback_scope,
+        feed_scope_reconciliation=feed_scope_reconciliation,
         multi_tf=multi_tf,
         h4=h4,
         h1=h1,
@@ -384,6 +409,11 @@ def _candidate_payload(
         "fallback_current": bool(fallback_current),
         "fallback_accumulated": bool(fallback_accumulated),
         "fallback_blocker_scope": fallback_scope,
+        "fallback_scope_status": str(feed_scope_reconciliation.get("fallback_scope_status") or "UNKNOWN_SCOPE"),
+        "fallback_mismatch_reason": str(feed_scope_reconciliation.get("notes") or ""),
+        "current_feed_is_clean": bool(feed_scope_reconciliation.get("current_feed_is_clean", False)),
+        "fallback_is_historical_only": bool(fallback_scope in {"ACCUMULATED", "HISTORICAL", "CANDIDATE_OLD"}),
+        "fallback_is_current_cycle": bool(fallback_scope == "CURRENT_CYCLE"),
         "context_status": str(signal.get("context_status") or context_status or "UNKNOWN"),
         "risk_guard_status": "BLOCKED" if daily_loss_block_active or position_limit_block_active else "CLEAR",
         "daily_loss_block_active": bool(daily_loss_block_active),
@@ -418,7 +448,8 @@ def _candidate_payload(
     }
     candidate["final_bridge_reason"] = (
         f"{structure_status.lower()} with real_blocker={primary or category}; "
-        f"reconciliation={reconciliation}; real strategy remains authoritative."
+        f"fallback_scope={fallback_scope}; reconciliation={reconciliation}; "
+        "real strategy remains authoritative."
     )
     candidate["recommendation"] = _safe_recommendation(candidate)
     if candidate["recommendation"] not in SAFE_RECOMMENDATIONS:
@@ -437,6 +468,7 @@ def build_strategy_decision_bridge_trace(
     market_data_status: dict[str, Any] | None = None,
     validation_state: dict[str, Any] | None = None,
     paper_state: dict[str, Any] | None = None,
+    feed_scope_reconciliation: dict[str, Any] | None = None,
     daily_loss_block_active: bool = False,
     slots_left: int | None = None,
     enabled: bool = True,
@@ -454,6 +486,15 @@ def build_strategy_decision_bridge_trace(
     status = dict(market_data_status or {})
     validation = dict(validation_state or {})
     state = dict(paper_state or {})
+    feed_scope = dict(
+        feed_scope_reconciliation
+        or build_feed_scope_reconciliation(
+            market_data_status=status,
+            validation_state=validation,
+            shadow_decision_simulator=shadow_payload,
+            signals=list(signals or []),
+        )
+    )
     context_status = str((state.get("market_context", {}) or {}).get("market_context_status") or "")
     position_limit_block_active = bool(slots_left is not None and int(slots_left or 0) <= 0 and bool(state.get("positions")))
     symbols = set(signal_map.keys())
@@ -486,6 +527,7 @@ def build_strategy_decision_bridge_trace(
             shadow_decision_simulator=shadow_payload,
             bos_pivot_trace_audit=bos_payload,
             multi_timeframe_swing_audit=mtf_payload,
+            feed_scope_reconciliation=feed_scope,
             context_status=context_status,
             daily_loss_block_active=daily_loss_block_active,
             position_limit_block_active=position_limit_block_active,
@@ -517,6 +559,9 @@ def build_strategy_decision_bridge_trace(
         "top_real_blocker": str(top.get("primary_real_blocker") or top.get("real_bottleneck_category") or ""),
         "top_structure_status": str(top.get("bos_pivot_status") or ""),
         "top_reconciliation_status": str(top.get("reconciliation_status") or "UNKNOWN_MISMATCH"),
+        "fallback_scope_status": str(feed_scope.get("fallback_scope_status") or "UNKNOWN_SCOPE"),
+        "fallback_blocker_scope": str(feed_scope.get("fallback_blocker_scope") or "UNKNOWN"),
+        "current_feed_is_clean": bool(feed_scope.get("current_feed_is_clean", False)),
         "structure_confirmed_but_blocked_count": int(
             bridge_counts.get("STRUCTURE_CONFIRMED_BUT_REAL_BLOCKED", 0)
         ),
