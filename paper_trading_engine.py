@@ -45,6 +45,7 @@ from core.multi_timeframe_data_fetcher import build_intraday_symbol_priority, fe
 from core.multi_timeframe_swing_audit import build_multi_timeframe_swing_audit
 from core.no_setup_eligible_decomposition import build_no_setup_eligible_decomposition
 from core.reversal_blocker_routing_audit import build_reversal_blocker_routing_audit
+from core.setup_blocker_taxonomy_audit import build_setup_blocker_taxonomy_audit
 from core.shadow_decision_simulator import build_shadow_decision_simulator
 from core.strategy_decision_bridge_trace import build_strategy_decision_bridge_trace
 from core.market_data import (
@@ -1464,6 +1465,20 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[s
         fib_alignment_audit=fib_alignment_audit,
         feed_scope_reconciliation=feed_scope_reconciliation,
     )
+    setup_blocker_taxonomy_audit = build_setup_blocker_taxonomy_audit(
+        signals=signals,
+        strategy_bottleneck=dict(state.get("strategy_bottleneck", {}) or {}),
+        strategy_structure_audit=strategy_structure_audit,
+        market_structure_audit=market_structure_audit,
+        fib_alignment_audit=fib_alignment_audit,
+        multi_timeframe_swing_audit=multi_timeframe_swing_audit,
+        bos_pivot_trace_audit=bos_pivot_trace_audit,
+        strategy_decision_bridge_trace=strategy_decision_bridge_trace,
+        feed_scope_reconciliation=feed_scope_reconciliation,
+        no_setup_eligible_decomposition=no_setup_eligible_decomposition,
+        reversal_blocker_routing_audit=reversal_blocker_routing_audit,
+        state=state,
+    )
     cycle_validation["strategy_structure_audit"] = strategy_structure_audit
     cycle_validation["market_structure_audit"] = market_structure_audit
     cycle_validation["fib_alignment_audit"] = fib_alignment_audit
@@ -1475,6 +1490,7 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[s
     cycle_validation["feed_scope_reconciliation"] = feed_scope_reconciliation
     cycle_validation["no_setup_eligible_decomposition"] = no_setup_eligible_decomposition
     cycle_validation["reversal_blocker_routing_audit"] = reversal_blocker_routing_audit
+    cycle_validation["setup_blocker_taxonomy_audit"] = setup_blocker_taxonomy_audit
 
     if not config.allow_new_entries:
         for candidate in candidates:
@@ -1578,6 +1594,7 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[s
     state["feed_scope_reconciliation"] = feed_scope_reconciliation
     state["no_setup_eligible_decomposition"] = no_setup_eligible_decomposition
     state["reversal_blocker_routing_audit"] = reversal_blocker_routing_audit
+    state["setup_blocker_taxonomy_audit"] = setup_blocker_taxonomy_audit
 
     history = state.get("history", []) or []
     history.append(
@@ -1633,4 +1650,5 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[s
         "feed_scope_reconciliation": feed_scope_reconciliation,
         "no_setup_eligible_decomposition": no_setup_eligible_decomposition,
         "reversal_blocker_routing_audit": reversal_blocker_routing_audit,
+        "setup_blocker_taxonomy_audit": setup_blocker_taxonomy_audit,
     }

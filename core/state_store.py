@@ -7,6 +7,7 @@ import pandas as pd
 
 from core.no_setup_eligible_decomposition import default_no_setup_eligible_decomposition_state
 from core.reversal_blocker_routing_audit import default_reversal_blocker_routing_audit_state
+from core.setup_blocker_taxonomy_audit import default_setup_blocker_taxonomy_audit_state
 from core.config import (
     ALERT_EMAIL_ENABLED,
     ALERT_EMAIL_PROVIDER,
@@ -610,6 +611,7 @@ DEFAULT_STATE = {
     },
     "no_setup_eligible_decomposition": default_no_setup_eligible_decomposition_state(),
     "reversal_blocker_routing_audit": default_reversal_blocker_routing_audit_state(),
+    "setup_blocker_taxonomy_audit": default_setup_blocker_taxonomy_audit_state(),
     "shadow_decision_simulator": {
         "shadow_decision_simulator_enabled": True,
         "shadow_decision_mode": "SHADOW_ONLY",
@@ -1520,6 +1522,57 @@ def load_bot_state() -> dict:
         if isinstance(item, dict)
     ][:10]
     state["reversal_blocker_routing_audit"] = reversal_routing_state
+    taxonomy_state = state.get("setup_blocker_taxonomy_audit", {}) or {}
+    taxonomy_defaults = default_setup_blocker_taxonomy_audit_state()
+    for key, fallback in taxonomy_defaults.items():
+        if key not in taxonomy_state:
+            taxonomy_state[key] = fallback
+    for key, fallback in (
+        ("mode", "DIAGNOSTIC_ONLY"),
+        ("safety_mode", "SHADOW_ONLY"),
+        ("status", "INSUFFICIENT_DATA"),
+        ("generated_at", ""),
+        ("target_setup", "trend_pullback_breakout"),
+        ("top_symbol", ""),
+        ("top_setup", "trend_pullback_breakout"),
+        ("official_primary_blocker", ""),
+        ("official_secondary_blocker", ""),
+        ("normalized_primary_reason", "INSUFFICIENT_DATA"),
+        ("normalized_secondary_reason", "INSUFFICIENT_DATA"),
+        ("taxonomy_status", "INSUFFICIENT_DATA_FOR_TAXONOMY"),
+        ("fallback_blocker_scope", "UNKNOWN"),
+        ("recommendation", "insufficient_data"),
+        ("notes", "No setup/blocker taxonomy audit data yet."),
+    ):
+        taxonomy_state[key] = str(taxonomy_state.get(key) or fallback)
+    taxonomy_state["enabled"] = bool(taxonomy_state.get("enabled", True))
+    taxonomy_state["should_keep_blocked"] = True
+    taxonomy_state["safe_to_change_strategy_now"] = False
+    taxonomy_state["safe_to_change_threshold_now"] = False
+    taxonomy_state["shadow_only"] = bool(taxonomy_state.get("shadow_only", True))
+    taxonomy_state["current_feed_is_clean"] = bool(taxonomy_state.get("current_feed_is_clean", False))
+    for key in (
+        "total_candidates_checked",
+        "taxonomy_cases_count",
+        "mixed_taxonomy_count",
+        "reversal_as_primary_count",
+        "reversal_as_context_count",
+        "no_setup_taxonomy_count",
+    ):
+        try:
+            taxonomy_state[key] = int(taxonomy_state.get(key, 0) or 0)
+        except (TypeError, ValueError):
+            taxonomy_state[key] = 0
+    try:
+        taxonomy_state["taxonomy_confidence"] = float(taxonomy_state.get("taxonomy_confidence", 0.0) or 0.0)
+    except (TypeError, ValueError):
+        taxonomy_state["taxonomy_confidence"] = 0.0
+    taxonomy_state["candidates"] = [
+        item
+        for item in list(taxonomy_state.get("candidates", []) or [])
+        if isinstance(item, dict)
+    ][:10]
+    state["setup_blocker_taxonomy_audit"] = taxonomy_state
     shadow_state = state.get("shadow_decision_simulator", {}) or {}
     shadow_state["shadow_decision_simulator_enabled"] = bool(
         shadow_state.get("shadow_decision_simulator_enabled", True)

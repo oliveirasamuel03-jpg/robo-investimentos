@@ -1339,6 +1339,12 @@ reversal_blocker_routing_audit = dict(
     or state.get("reversal_blocker_routing_audit", {})
     or {}
 )
+setup_blocker_taxonomy_audit = dict(
+    validation_last_report.get("setup_blocker_taxonomy_audit")
+    or current_audit_state.get("setup_blocker_taxonomy_audit", {})
+    or state.get("setup_blocker_taxonomy_audit", {})
+    or {}
+)
 shadow_decision_simulator = dict(
     validation_last_report.get("shadow_decision_simulator")
     or current_audit_state.get("shadow_decision_simulator", {})
@@ -2444,6 +2450,57 @@ if multi_timeframe_swing_audit:
         else:
             st.info("Sem amostra REVERSAL_NOT_ELIGIBLE suficiente para auditoria de roteamento.")
         st.caption(reversal_blocker_routing_audit.get("notes") or "Diagnostico sem autoridade operacional.")
+    if setup_blocker_taxonomy_audit:
+        st.markdown("##### FASE 2.5B.2B - CLAREZA DE TAXONOMIA SETUP/BLOQUEADOR")
+        st.caption(
+            "DIAGNOSTIC ONLY: esta camada clarifica a taxonomia dos bloqueios entre setup de tendencia, "
+            "reversao, score, BOS, pivo, pullback e Multi-TF. Nao aprova trade, nao altera score, "
+            "nao muda broker, nao muda thresholds e preserva PAPER TRADING."
+        )
+        tx_c1, tx_c2, tx_c3, tx_c4, tx_c5 = st.columns(5)
+        tx_c1.metric("Top ativo", setup_blocker_taxonomy_audit.get("top_symbol") or "-")
+        tx_c2.metric("Setup analisado", setup_blocker_taxonomy_audit.get("top_setup") or "trend_pullback_breakout")
+        tx_c3.metric("Blocker oficial primario", setup_blocker_taxonomy_audit.get("official_primary_blocker") or "-")
+        tx_c4.metric("Blocker oficial secundario", setup_blocker_taxonomy_audit.get("official_secondary_blocker") or "-")
+        tx_c5.metric("Status taxonomia", setup_blocker_taxonomy_audit.get("taxonomy_status") or "INSUFFICIENT_DATA")
+        tx_d1, tx_d2, tx_d3, tx_d4, tx_d5 = st.columns(5)
+        tx_d1.metric("Razao normalizada prim.", setup_blocker_taxonomy_audit.get("normalized_primary_reason") or "UNKNOWN")
+        tx_d2.metric("Razao normalizada sec.", setup_blocker_taxonomy_audit.get("normalized_secondary_reason") or "UNKNOWN")
+        tx_d3.metric("Confianca", setup_blocker_taxonomy_audit.get("taxonomy_confidence") if setup_blocker_taxonomy_audit.get("taxonomy_confidence") is not None else "-")
+        tx_d4.metric("Feed atual limpo?", "Sim" if bool(setup_blocker_taxonomy_audit.get("current_feed_is_clean", False)) else "Nao")
+        tx_d5.metric("Recomendacao", setup_blocker_taxonomy_audit.get("recommendation") or "insufficient_data")
+        tx_e1, tx_e2, tx_e3, tx_e4 = st.columns(4)
+        tx_e1.metric("Deve manter bloqueado", "Sim" if bool(setup_blocker_taxonomy_audit.get("should_keep_blocked", True)) else "Nao")
+        tx_e2.metric("Seguro alterar estrategia agora?", "Sim" if bool(setup_blocker_taxonomy_audit.get("safe_to_change_strategy_now", False)) else "Nao")
+        tx_e3.metric("Seguro alterar threshold agora?", "Sim" if bool(setup_blocker_taxonomy_audit.get("safe_to_change_threshold_now", False)) else "Nao")
+        tx_e4.metric("Taxonomias mistas", int(setup_blocker_taxonomy_audit.get("mixed_taxonomy_count", 0) or 0))
+        taxonomy_rows = [
+            {
+                "symbol": row.get("symbol"),
+                "setup": row.get("setup"),
+                "score": row.get("score"),
+                "score_gap": row.get("score_gap"),
+                "official_primary_blocker": row.get("official_primary_blocker"),
+                "official_secondary_blocker": row.get("official_secondary_blocker"),
+                "normalized_primary_reason": row.get("normalized_primary_reason"),
+                "normalized_secondary_reason": row.get("normalized_secondary_reason"),
+                "taxonomy_status": row.get("taxonomy_status"),
+                "route_status": row.get("route_status"),
+                "no_setup_bucket": row.get("no_setup_bucket"),
+                "bos_state": row.get("bos_state"),
+                "pivot_state": row.get("pivot_state"),
+                "suggested_ui_message": row.get("suggested_ui_message"),
+                "suggested_future_study": row.get("suggested_future_study"),
+                "should_keep_blocked": row.get("should_keep_blocked"),
+            }
+            for row in list(setup_blocker_taxonomy_audit.get("candidates", []) or [])[:10]
+            if isinstance(row, dict)
+        ]
+        if taxonomy_rows:
+            st.dataframe(pd.DataFrame(taxonomy_rows), hide_index=True, use_container_width=True)
+        else:
+            st.info("Sem amostra suficiente para clarificar taxonomia setup/bloqueador.")
+        st.caption(setup_blocker_taxonomy_audit.get("notes") or "Diagnostico sem autoridade operacional.")
     mtf_rows = [
         {
             "symbol": row.get("symbol"),

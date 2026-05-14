@@ -267,6 +267,18 @@ A FASE 2.5B.2A adiciona uma camada DIAGNOSTIC_ONLY / SHADOW_ONLY para explicar q
 - `should_keep_blocked` permanece verdadeiro e `safe_to_change_strategy_now` permanece falso.
 - Nada muda em score real, thresholds, provider, cache/TTL, budget da Twelve Data, broker, posicoes, PnL, historico ou ordens.
 
+### FASE 2.5B.2B - Setup/Blocker Taxonomy Clarification
+
+A FASE 2.5B.2B adiciona uma camada DIAGNOSTIC_ONLY / SHADOW_ONLY para clarificar a taxonomia dos bloqueios entre setup de tendencia, reversao, score, BOS, pivo, pullback e Multi-TF.
+
+- A auditoria cruza NO_SETUP_ELIGIBLE Decomposition, Reversal Blocker Routing Audit, Strategy Decision Bridge, BOS/Pivo, Multi-TF, Fibonacci/estrutura e Feed/Fallback Scope.
+- A camada separa blocker oficial real de motivo explicativo normalizado, sem alterar a rejeicao oficial.
+- Casos como pivo acionado sem BOS viram leitura explicativa `NO_SETUP_WITH_PIVOT_BUT_NO_BOS`, mantendo o candidato bloqueado.
+- `REVERSAL_NOT_ELIGIBLE` pode aparecer como contexto de risco sem virar automaticamente motivo primario normalizado para `trend_pullback_breakout`.
+- Mensagens sugeridas para UI/email/log sao apenas explicativas e evitam linguagem operacional de compra/entrada.
+- `should_keep_blocked` permanece verdadeiro, `safe_to_change_strategy_now` permanece falso e `safe_to_change_threshold_now` permanece falso.
+- Nada muda em score real, thresholds, provider, cache/TTL, budget da Twelve Data, broker, posicoes, PnL, historico ou ordens.
+
 ## Instalacao local
 
 ### 1. Criar ambiente virtual

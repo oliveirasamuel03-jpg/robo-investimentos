@@ -450,6 +450,24 @@ def _reversal_blocker_routing_audit_summary(validation_report: dict[str, Any]) -
     )
 
 
+def _setup_blocker_taxonomy_audit_summary(validation_report: dict[str, Any]) -> str:
+    audit = dict(validation_report.get("setup_blocker_taxonomy_audit", {}) or {})
+    if not audit:
+        return "Setup/blocker taxonomy audit: no taxonomy sample yet. Diagnostic only; no trade decision changed."
+    if not bool(audit.get("enabled", True)):
+        return "Setup/blocker taxonomy audit: disabled. Diagnostic only; no trade decision changed."
+    return (
+        "Setup/blocker taxonomy audit: "
+        f"top={_safe_text(audit.get('top_symbol'), fallback='none')}; "
+        f"official={_safe_text(audit.get('official_primary_blocker'), fallback='none')}; "
+        f"normalized={_safe_text(audit.get('normalized_primary_reason'), fallback='UNKNOWN')}; "
+        f"status={_safe_text(audit.get('taxonomy_status'), fallback='INSUFFICIENT_DATA_FOR_TAXONOMY')}; "
+        f"feed_clean={str(bool(audit.get('current_feed_is_clean', False))).lower()}; "
+        f"recommendation={_safe_text(audit.get('recommendation'), fallback='insufficient_data')}. "
+        "Diagnostic only; no trade decision changed."
+    )
+
+
 def _calibration_preview_summary(validation_report: dict[str, Any]) -> str:
     preview = dict(validation_report.get("calibration_preview", {}) or {})
     if not preview:
@@ -714,6 +732,7 @@ def _build_daily_email_body(state: dict[str, Any], validation_report: dict[str, 
     feed_scope_reconciliation_summary = _feed_scope_reconciliation_summary(validation_report)
     no_setup_eligible_decomposition_summary = _no_setup_eligible_decomposition_summary(validation_report)
     reversal_blocker_routing_audit_summary = _reversal_blocker_routing_audit_summary(validation_report)
+    setup_blocker_taxonomy_audit_summary = _setup_blocker_taxonomy_audit_summary(validation_report)
     calibration_preview_summary = _calibration_preview_summary(validation_report)
     strategy_bottleneck_summary = _strategy_bottleneck_summary(validation_report)
     strategy_structure_audit_summary = _strategy_structure_audit_summary(validation_report)
@@ -754,6 +773,7 @@ def _build_daily_email_body(state: dict[str, Any], validation_report: dict[str, 
         feed_scope_reconciliation_summary,
         no_setup_eligible_decomposition_summary,
         reversal_blocker_routing_audit_summary,
+        setup_blocker_taxonomy_audit_summary,
         "",
         "Signal pipeline:",
         *_signal_pipeline_lines(validation_report),
