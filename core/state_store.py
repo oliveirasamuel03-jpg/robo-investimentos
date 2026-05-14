@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 import pandas as pd
 
 from core.no_setup_eligible_decomposition import default_no_setup_eligible_decomposition_state
+from core.reversal_blocker_routing_audit import default_reversal_blocker_routing_audit_state
 from core.config import (
     ALERT_EMAIL_ENABLED,
     ALERT_EMAIL_PROVIDER,
@@ -608,6 +609,7 @@ DEFAULT_STATE = {
         "notes": "No feed scope reconciliation data yet.",
     },
     "no_setup_eligible_decomposition": default_no_setup_eligible_decomposition_state(),
+    "reversal_blocker_routing_audit": default_reversal_blocker_routing_audit_state(),
     "shadow_decision_simulator": {
         "shadow_decision_simulator_enabled": True,
         "shadow_decision_mode": "SHADOW_ONLY",
@@ -1466,6 +1468,58 @@ def load_bot_state() -> dict:
         if isinstance(item, dict)
     ][:10]
     state["no_setup_eligible_decomposition"] = no_setup_state
+    reversal_routing_state = state.get("reversal_blocker_routing_audit", {}) or {}
+    reversal_routing_defaults = default_reversal_blocker_routing_audit_state()
+    for key, fallback in reversal_routing_defaults.items():
+        if key not in reversal_routing_state:
+            reversal_routing_state[key] = fallback
+    for key, fallback in (
+        ("mode", "DIAGNOSTIC_ONLY"),
+        ("safety_mode", "SHADOW_ONLY"),
+        ("status", "INSUFFICIENT_DATA"),
+        ("generated_at", ""),
+        ("target_setup", "trend_pullback_breakout"),
+        ("observed_blocker", "REVERSAL_NOT_ELIGIBLE"),
+        ("top_symbol", ""),
+        ("top_setup", "trend_pullback_breakout"),
+        ("top_route_status", "INSUFFICIENT_DATA_FOR_ROUTING"),
+        ("top_reason", ""),
+        ("top_alternative_bucket", "INSUFFICIENT_DATA_FOR_ROUTING"),
+        ("fallback_blocker_scope", "UNKNOWN"),
+        ("recommendation", "insufficient_data"),
+        ("notes", "No reversal blocker routing audit data yet."),
+    ):
+        reversal_routing_state[key] = str(reversal_routing_state.get(key) or fallback)
+    reversal_routing_state["enabled"] = bool(reversal_routing_state.get("enabled", True))
+    reversal_routing_state["should_keep_blocked"] = True
+    reversal_routing_state["safe_to_change_strategy_now"] = False
+    reversal_routing_state["shadow_only"] = bool(reversal_routing_state.get("shadow_only", True))
+    reversal_routing_state["current_feed_is_clean"] = bool(
+        reversal_routing_state.get("current_feed_is_clean", False)
+    )
+    for key in (
+        "total_candidates_checked",
+        "reversal_blocker_count",
+        "trend_candidates_with_reversal_blocker",
+        "reversal_candidates_with_reversal_blocker",
+        "mixed_routing_count",
+    ):
+        try:
+            reversal_routing_state[key] = int(reversal_routing_state.get(key, 0) or 0)
+        except (TypeError, ValueError):
+            reversal_routing_state[key] = 0
+    for key in ("top_score", "top_min_score", "top_score_gap"):
+        value = reversal_routing_state.get(key)
+        try:
+            reversal_routing_state[key] = None if value in (None, "") else float(value)
+        except (TypeError, ValueError):
+            reversal_routing_state[key] = None
+    reversal_routing_state["candidates"] = [
+        item
+        for item in list(reversal_routing_state.get("candidates", []) or [])
+        if isinstance(item, dict)
+    ][:10]
+    state["reversal_blocker_routing_audit"] = reversal_routing_state
     shadow_state = state.get("shadow_decision_simulator", {}) or {}
     shadow_state["shadow_decision_simulator_enabled"] = bool(
         shadow_state.get("shadow_decision_simulator_enabled", True)

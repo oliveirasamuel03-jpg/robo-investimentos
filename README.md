@@ -257,6 +257,16 @@ A FASE 2.5B.2 adiciona uma camada DIAGNOSTIC_ONLY / SHADOW_ONLY para explicar po
 - Recomendacoes sao apenas diagnosticas, como `study_real_rule_mapping`, `study_breakout_confirmation` ou `keep_blocked_until_real_setup_maps_structure`.
 - Nada muda em score real, thresholds, provider, cache/TTL, budget da Twelve Data, broker, posicoes, PnL, historico ou ordens.
 
+### FASE 2.5B.2A - Reversal Blocker Routing Audit
+
+A FASE 2.5B.2A adiciona uma camada DIAGNOSTIC_ONLY / SHADOW_ONLY para explicar quando `REVERSAL_NOT_ELIGIBLE` aparece no roteamento do `trend_pullback_breakout`.
+
+- A auditoria cruza sinais rejeitados, Strategy Decision Bridge, NO_SETUP_ELIGIBLE Decomposition, Multi-TF, BOS/Pivo, Fibonacci/estrutura e Feed/Fallback Scope.
+- O bloco separa risco legitimo de reversao, conflito Multi-TF, blocker de reversao em setup de tendencia e possivel roteamento misto com `reversal_v_pattern`.
+- Recomendacoes permanecem em whitelist diagnostica, como `study_routing_map`, `study_multitf_conflict` e `keep_blocked_until_structure_confirms`.
+- `should_keep_blocked` permanece verdadeiro e `safe_to_change_strategy_now` permanece falso.
+- Nada muda em score real, thresholds, provider, cache/TTL, budget da Twelve Data, broker, posicoes, PnL, historico ou ordens.
+
 ## Instalacao local
 
 ### 1. Criar ambiente virtual

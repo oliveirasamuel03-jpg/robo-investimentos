@@ -634,6 +634,11 @@ no_setup_eligible_decomposition = dict(
     or state.get("no_setup_eligible_decomposition", {})
     or {}
 )
+reversal_blocker_routing_audit = dict(
+    validation_report.get("reversal_blocker_routing_audit")
+    or state.get("reversal_blocker_routing_audit", {})
+    or {}
+)
 shadow_decision_simulator = dict(
     validation_report.get("shadow_decision_simulator")
     or state.get("shadow_decision_simulator", {})
@@ -1161,6 +1166,54 @@ if multi_timeframe_swing_audit:
         else:
             st.info("Sem amostra NO_SETUP_ELIGIBLE suficiente para decomposicao.")
         st.caption(no_setup_eligible_decomposition.get("notes") or "Diagnostico sem autoridade operacional.")
+    if reversal_blocker_routing_audit:
+        st.markdown("##### FASE 2.5B.2A - AUDITORIA DE ROTEAMENTO DO BLOQUEADOR DE REVERSAO")
+        st.caption(
+            "DIAGNOSTIC ONLY: esta camada explica por que REVERSAL_NOT_ELIGIBLE apareceu no roteamento do setup. "
+            "Nao aprova trade, nao altera score, nao muda broker, nao muda thresholds e preserva PAPER TRADING."
+        )
+        rr_c1, rr_c2, rr_c3, rr_c4, rr_c5 = st.columns(5)
+        rr_c1.metric("Top ativo", reversal_blocker_routing_audit.get("top_symbol") or "-")
+        rr_c2.metric("Setup analisado", reversal_blocker_routing_audit.get("top_setup") or "trend_pullback_breakout")
+        rr_c3.metric("Blocker observado", reversal_blocker_routing_audit.get("observed_blocker") or "REVERSAL_NOT_ELIGIBLE")
+        rr_c4.metric("Status de roteamento", reversal_blocker_routing_audit.get("top_route_status") or "INSUFFICIENT_DATA")
+        rr_c5.metric("Bucket alternativo", reversal_blocker_routing_audit.get("top_alternative_bucket") or "-")
+        rr_d1, rr_d2, rr_d3, rr_d4, rr_d5 = st.columns(5)
+        rr_d1.metric("Score", reversal_blocker_routing_audit.get("top_score") if reversal_blocker_routing_audit.get("top_score") is not None else "-")
+        rr_d2.metric("Min score", reversal_blocker_routing_audit.get("top_min_score") if reversal_blocker_routing_audit.get("top_min_score") is not None else "-")
+        rr_d3.metric("Gap", reversal_blocker_routing_audit.get("top_score_gap") if reversal_blocker_routing_audit.get("top_score_gap") is not None else "-")
+        rr_d4.metric("Feed atual limpo?", "Sim" if bool(reversal_blocker_routing_audit.get("current_feed_is_clean", False)) else "Nao")
+        rr_d5.metric("Recomendacao", reversal_blocker_routing_audit.get("recommendation") or "insufficient_data")
+        rr_e1, rr_e2, rr_e3, rr_e4 = st.columns(4)
+        rr_e1.metric("Reversal blockers", int(reversal_blocker_routing_audit.get("reversal_blocker_count", 0) or 0))
+        rr_e2.metric("Trend + reversal", int(reversal_blocker_routing_audit.get("trend_candidates_with_reversal_blocker", 0) or 0))
+        rr_e3.metric("Deve manter bloqueado", "Sim" if bool(reversal_blocker_routing_audit.get("should_keep_blocked", True)) else "Nao")
+        rr_e4.metric("Seguro alterar estrategia agora?", "Sim" if bool(reversal_blocker_routing_audit.get("safe_to_change_strategy_now", False)) else "Nao")
+        reversal_rows = [
+            {
+                "symbol": row.get("symbol"),
+                "setup": row.get("setup"),
+                "score": row.get("score"),
+                "score_gap": row.get("score_gap"),
+                "primary_real_blocker": row.get("primary_real_blocker"),
+                "secondary_real_blocker": row.get("secondary_real_blocker"),
+                "route_status": row.get("route_status"),
+                "alternative_bucket": row.get("alternative_bucket"),
+                "multi_tf_alignment_status": row.get("multi_tf_alignment_status"),
+                "bos_state": row.get("bos_state"),
+                "pivot_state": row.get("pivot_state"),
+                "suggested_future_study": row.get("suggested_future_study"),
+                "should_keep_blocked": row.get("should_keep_blocked"),
+                "safe_to_change_strategy_now": row.get("safe_to_change_strategy_now"),
+            }
+            for row in list(reversal_blocker_routing_audit.get("candidates", []) or [])[:10]
+            if isinstance(row, dict)
+        ]
+        if reversal_rows:
+            st.dataframe(pd.DataFrame(reversal_rows), hide_index=True, use_container_width=True)
+        else:
+            st.info("Sem amostra REVERSAL_NOT_ELIGIBLE suficiente para auditoria de roteamento.")
+        st.caption(reversal_blocker_routing_audit.get("notes") or "Diagnostico sem autoridade operacional.")
     mtf_rows = [
         {
             "symbol": row.get("symbol"),
