@@ -30,6 +30,7 @@ from core.multi_timeframe_data_fetcher import default_multi_timeframe_intraday_f
 from core.multi_timeframe_swing_audit import default_multi_timeframe_swing_audit_state
 from core.no_setup_eligible_decomposition import default_no_setup_eligible_decomposition_state
 from core.reversal_blocker_routing_audit import default_reversal_blocker_routing_audit_state
+from core.setup_blocker_taxonomy_audit import default_setup_blocker_taxonomy_audit_state
 from core.shadow_decision_simulator import default_shadow_decision_state
 from core.strategy_decision_bridge_trace import default_strategy_decision_bridge_trace_state
 from core.state_store import load_bot_state, read_storage_table, save_bot_state
@@ -940,6 +941,9 @@ def _build_operational_consistency(
     reversal_blocker_routing_audit = dict(
         state.get("reversal_blocker_routing_audit", {}) or default_reversal_blocker_routing_audit_state()
     )
+    setup_blocker_taxonomy_audit = dict(
+        state.get("setup_blocker_taxonomy_audit", {}) or default_setup_blocker_taxonomy_audit_state()
+    )
     shadow_decision_simulator = dict(
         state.get("shadow_decision_simulator", {}) or default_shadow_decision_state()
     )
@@ -1066,6 +1070,14 @@ def _build_operational_consistency(
         ),
         "reversal_routing_recommendation": str(
             reversal_blocker_routing_audit.get("recommendation") or "insufficient_data"
+        ),
+        "setup_blocker_taxonomy_mode": setup_blocker_taxonomy_audit.get("mode", "DIAGNOSTIC_ONLY"),
+        "setup_blocker_taxonomy_top_symbol": str(setup_blocker_taxonomy_audit.get("top_symbol") or ""),
+        "setup_blocker_taxonomy_status": str(
+            setup_blocker_taxonomy_audit.get("taxonomy_status") or "INSUFFICIENT_DATA_FOR_TAXONOMY"
+        ),
+        "setup_blocker_taxonomy_recommendation": str(
+            setup_blocker_taxonomy_audit.get("recommendation") or "insufficient_data"
         ),
         "shadow_decision_mode": shadow_decision_simulator.get("shadow_decision_mode", "SHADOW_ONLY"),
         "preview_near_approved_count": int(
@@ -1280,6 +1292,9 @@ def build_swing_validation_report(state: dict | None = None, now: datetime | Non
         "reversal_blocker_routing_audit": dict(
             payload.get("reversal_blocker_routing_audit", {}) or default_reversal_blocker_routing_audit_state()
         ),
+        "setup_blocker_taxonomy_audit": dict(
+            payload.get("setup_blocker_taxonomy_audit", {}) or default_setup_blocker_taxonomy_audit_state()
+        ),
         "shadow_decision_simulator": dict(
             payload.get("shadow_decision_simulator", {}) or default_shadow_decision_state()
         ),
@@ -1412,6 +1427,12 @@ def refresh_swing_validation_cycle(
             or (cycle_result.get("validation_cycle", {}) or {}).get("reversal_blocker_routing_audit", {})
             or state.get("reversal_blocker_routing_audit", {})
             or default_reversal_blocker_routing_audit_state()
+        )
+        state["setup_blocker_taxonomy_audit"] = dict(
+            cycle_result.get("setup_blocker_taxonomy_audit")
+            or (cycle_result.get("validation_cycle", {}) or {}).get("setup_blocker_taxonomy_audit", {})
+            or state.get("setup_blocker_taxonomy_audit", {})
+            or default_setup_blocker_taxonomy_audit_state()
         )
         state["shadow_decision_simulator"] = dict(
             cycle_result.get("shadow_decision_simulator")
@@ -1574,6 +1595,11 @@ def refresh_swing_validation_cycle(
         sanitized_report.get("reversal_blocker_routing_audit")
         or updated_state.get("reversal_blocker_routing_audit", {})
         or default_reversal_blocker_routing_audit_state()
+    )
+    updated_state["setup_blocker_taxonomy_audit"] = dict(
+        sanitized_report.get("setup_blocker_taxonomy_audit")
+        or updated_state.get("setup_blocker_taxonomy_audit", {})
+        or default_setup_blocker_taxonomy_audit_state()
     )
     updated_state["shadow_decision_simulator"] = dict(
         sanitized_report.get("shadow_decision_simulator")
