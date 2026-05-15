@@ -279,6 +279,17 @@ A FASE 2.5B.2B adiciona uma camada DIAGNOSTIC_ONLY / SHADOW_ONLY para clarificar
 - `should_keep_blocked` permanece verdadeiro, `safe_to_change_strategy_now` permanece falso e `safe_to_change_threshold_now` permanece falso.
 - Nada muda em score real, thresholds, provider, cache/TTL, budget da Twelve Data, broker, posicoes, PnL, historico ou ordens.
 
+### FASE 2.5B.2C - BOS Confirmation Quality Audit
+
+A FASE 2.5B.2C adiciona uma camada DIAGNOSTIC_ONLY / SHADOW_ONLY para explicar por que BOS nao confirmou, separando pavio, fechamento fraco, fechamento insuficiente, BOS falhado, reteste pendente e conflito multi-timeframe.
+
+- A auditoria cruza BOS/Pivo, Multi-TF, Setup/Blocker Taxonomy, NO_SETUP_ELIGIBLE Decomposition, Strategy Decision Bridge, Fibonacci/estrutura e Feed/Fallback Scope.
+- Pavio isolado vira `BOS_BY_WICK_ONLY`; fechamento pequeno vira `BOS_BY_CLOSE_WEAK`; rompimento que volta para dentro vira `BOS_FAILED`.
+- Casos de 1H sem 4H ou 4H sem 1H aparecem como confirmacao multi-timeframe ausente, sem autoridade operacional.
+- Mensagens de UI/email/log explicam a qualidade do fechamento, reteste e relacao 1H/4H sem sugerir compra ou ajuste de score.
+- `should_keep_blocked` permanece verdadeiro, `safe_to_change_strategy_now` permanece falso e `safe_to_change_threshold_now` permanece falso.
+- Nada muda em score real, thresholds, provider, cache/TTL, budget da Twelve Data, broker, posicoes, PnL, historico ou ordens.
+
 ## Instalacao local
 
 ### 1. Criar ambiente virtual

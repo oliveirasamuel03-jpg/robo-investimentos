@@ -1345,6 +1345,12 @@ setup_blocker_taxonomy_audit = dict(
     or state.get("setup_blocker_taxonomy_audit", {})
     or {}
 )
+bos_confirmation_quality_audit = dict(
+    validation_last_report.get("bos_confirmation_quality_audit")
+    or current_audit_state.get("bos_confirmation_quality_audit", {})
+    or state.get("bos_confirmation_quality_audit", {})
+    or {}
+)
 shadow_decision_simulator = dict(
     validation_last_report.get("shadow_decision_simulator")
     or current_audit_state.get("shadow_decision_simulator", {})
@@ -2501,6 +2507,64 @@ if multi_timeframe_swing_audit:
         else:
             st.info("Sem amostra suficiente para clarificar taxonomia setup/bloqueador.")
         st.caption(setup_blocker_taxonomy_audit.get("notes") or "Diagnostico sem autoridade operacional.")
+    if bos_confirmation_quality_audit:
+        st.markdown("##### FASE 2.5B.2C - QUALIDADE DA CONFIRMACAO DE BOS")
+        st.caption(
+            "DIAGNOSTIC ONLY: esta camada explica por que o BOS nao confirmou ou por que a confirmacao "
+            "estrutural ainda e fraca. Nao aprova trade, nao altera score, nao muda broker, nao muda "
+            "thresholds e preserva PAPER TRADING."
+        )
+        bq_c1, bq_c2, bq_c3, bq_c4, bq_c5 = st.columns(5)
+        bq_c1.metric("Top ativo", bos_confirmation_quality_audit.get("top_symbol") or "-")
+        bq_c2.metric("Setup analisado", bos_confirmation_quality_audit.get("top_setup") or "trend_pullback_breakout")
+        bq_c3.metric("Timeframe principal", bos_confirmation_quality_audit.get("top_timeframe") or "-")
+        bq_c4.metric("Status BOS", bos_confirmation_quality_audit.get("bos_quality_status") or "INSUFFICIENT_DATA")
+        bq_c5.metric("Motivo falha BOS", bos_confirmation_quality_audit.get("bos_failure_reason") or "insufficient_data")
+        bq_d1, bq_d2, bq_d3, bq_d4, bq_d5 = st.columns(5)
+        bq_d1.metric("Pivo", bos_confirmation_quality_audit.get("pivot_state") or "INSUFFICIENT_DATA")
+        bq_d2.metric("BOS 1H", bos_confirmation_quality_audit.get("h1_bos_state") or "INSUFFICIENT_DATA")
+        bq_d3.metric("BOS 4H", bos_confirmation_quality_audit.get("h4_bos_state") or "INSUFFICIENT_DATA")
+        bq_d4.metric("Relacao 1H/4H", bos_confirmation_quality_audit.get("h1_h4_relationship") or "INSUFFICIENT_DATA")
+        bq_d5.metric("Multi-TF", bos_confirmation_quality_audit.get("multi_tf_alignment_status") or "INSUFFICIENT_DATA")
+        bq_e1, bq_e2, bq_e3, bq_e4, bq_e5 = st.columns(5)
+        bq_e1.metric("Dist. fechamento", bos_confirmation_quality_audit.get("close_distance_to_bos_pct") if bos_confirmation_quality_audit.get("close_distance_to_bos_pct") is not None else "-")
+        bq_e2.metric("Cruzou por pavio?", "Sim" if bool(bos_confirmation_quality_audit.get("wick_crossed_level", False)) else "Nao")
+        bq_e3.metric("Fechou alem?", "Sim" if bool(bos_confirmation_quality_audit.get("close_confirmed_beyond_level", False)) else "Nao")
+        bq_e4.metric("Reteste pendente?", "Sim" if bool(bos_confirmation_quality_audit.get("retest_pending", False)) else "Nao")
+        bq_e5.metric("Reteste confirmado?", "Sim" if bool(bos_confirmation_quality_audit.get("retest_confirmed", False)) else "Nao")
+        bq_f1, bq_f2, bq_f3, bq_f4 = st.columns(4)
+        bq_f1.metric("Feed atual limpo?", "Sim" if bool(bos_confirmation_quality_audit.get("current_feed_is_clean", False)) else "Nao")
+        bq_f2.metric("Recomendacao", bos_confirmation_quality_audit.get("recommendation") or "insufficient_data")
+        bq_f3.metric("Deve manter bloqueado", "Sim" if bool(bos_confirmation_quality_audit.get("should_keep_blocked", True)) else "Nao")
+        bq_f4.metric("Seguro alterar threshold?", "Sim" if bool(bos_confirmation_quality_audit.get("safe_to_change_threshold_now", False)) else "Nao")
+        bos_quality_rows = [
+            {
+                "symbol": row.get("symbol"),
+                "setup": row.get("setup"),
+                "score": row.get("score"),
+                "score_gap": row.get("score_gap"),
+                "bos_quality_status": row.get("bos_quality_status"),
+                "bos_failure_reason": row.get("bos_failure_reason"),
+                "h1_bos_state": row.get("h1_bos_state"),
+                "h4_bos_state": row.get("h4_bos_state"),
+                "pivot_state": row.get("pivot_state"),
+                "close_distance_to_bos_pct": row.get("close_distance_to_bos_pct"),
+                "wick_crossed_level": row.get("wick_crossed_level"),
+                "close_confirmed_beyond_level": row.get("close_confirmed_beyond_level"),
+                "retest_pending": row.get("retest_pending"),
+                "retest_confirmed": row.get("retest_confirmed"),
+                "suggested_ui_message": row.get("suggested_ui_message"),
+                "suggested_future_study": row.get("suggested_future_study"),
+                "should_keep_blocked": row.get("should_keep_blocked"),
+            }
+            for row in list(bos_confirmation_quality_audit.get("candidates", []) or [])[:10]
+            if isinstance(row, dict)
+        ]
+        if bos_quality_rows:
+            st.dataframe(pd.DataFrame(bos_quality_rows), hide_index=True, use_container_width=True)
+        else:
+            st.info("Sem amostra suficiente para auditar qualidade de BOS.")
+        st.caption(bos_confirmation_quality_audit.get("notes") or "Diagnostico sem autoridade operacional.")
     mtf_rows = [
         {
             "symbol": row.get("symbol"),

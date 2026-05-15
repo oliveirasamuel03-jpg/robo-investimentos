@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 
 import pandas as pd
 
+from core.bos_confirmation_quality_audit import default_bos_confirmation_quality_audit_state
 from core.no_setup_eligible_decomposition import default_no_setup_eligible_decomposition_state
 from core.reversal_blocker_routing_audit import default_reversal_blocker_routing_audit_state
 from core.setup_blocker_taxonomy_audit import default_setup_blocker_taxonomy_audit_state
@@ -612,6 +613,7 @@ DEFAULT_STATE = {
     "no_setup_eligible_decomposition": default_no_setup_eligible_decomposition_state(),
     "reversal_blocker_routing_audit": default_reversal_blocker_routing_audit_state(),
     "setup_blocker_taxonomy_audit": default_setup_blocker_taxonomy_audit_state(),
+    "bos_confirmation_quality_audit": default_bos_confirmation_quality_audit_state(),
     "shadow_decision_simulator": {
         "shadow_decision_simulator_enabled": True,
         "shadow_decision_mode": "SHADOW_ONLY",
@@ -1573,6 +1575,74 @@ def load_bot_state() -> dict:
         if isinstance(item, dict)
     ][:10]
     state["setup_blocker_taxonomy_audit"] = taxonomy_state
+    bos_quality_state = state.get("bos_confirmation_quality_audit", {}) or {}
+    bos_quality_defaults = default_bos_confirmation_quality_audit_state()
+    for key, fallback in bos_quality_defaults.items():
+        if key not in bos_quality_state:
+            bos_quality_state[key] = fallback
+    for key, fallback in (
+        ("mode", "DIAGNOSTIC_ONLY"),
+        ("safety_mode", "SHADOW_ONLY"),
+        ("status", "INSUFFICIENT_DATA"),
+        ("generated_at", ""),
+        ("target_setup", "trend_pullback_breakout"),
+        ("top_symbol", ""),
+        ("top_setup", "trend_pullback_breakout"),
+        ("top_timeframe", ""),
+        ("bos_quality_status", "INSUFFICIENT_DATA_FOR_BOS_QUALITY"),
+        ("bos_failure_reason", "insufficient_data"),
+        ("h1_bos_state", "INSUFFICIENT_DATA"),
+        ("h4_bos_state", "INSUFFICIENT_DATA"),
+        ("h1_h4_relationship", "INSUFFICIENT_DATA"),
+        ("pivot_state", "INSUFFICIENT_DATA"),
+        ("multi_tf_alignment_status", "INSUFFICIENT_DATA"),
+        ("fallback_blocker_scope", "UNKNOWN"),
+        ("recommendation", "insufficient_data"),
+        ("notes", "No BOS confirmation quality audit data yet."),
+    ):
+        bos_quality_state[key] = str(bos_quality_state.get(key) or fallback)
+    bos_quality_state["enabled"] = bool(bos_quality_state.get("enabled", True))
+    bos_quality_state["should_keep_blocked"] = True
+    bos_quality_state["safe_to_change_strategy_now"] = False
+    bos_quality_state["safe_to_change_threshold_now"] = False
+    bos_quality_state["shadow_only"] = bool(bos_quality_state.get("shadow_only", True))
+    bos_quality_state["current_feed_is_clean"] = bool(bos_quality_state.get("current_feed_is_clean", False))
+    for key in (
+        "total_candidates_checked",
+        "bos_missing_count",
+        "bos_quality_cases_count",
+    ):
+        try:
+            bos_quality_state[key] = int(bos_quality_state.get(key, 0) or 0)
+        except (TypeError, ValueError):
+            bos_quality_state[key] = 0
+    for key in (
+        "bos_level",
+        "last_close",
+        "close_distance_to_bos_pct",
+    ):
+        try:
+            raw_value = bos_quality_state.get(key)
+            bos_quality_state[key] = None if raw_value in (None, "") else float(raw_value)
+        except (TypeError, ValueError):
+            bos_quality_state[key] = None
+    for key in (
+        "close_confirmed_beyond_level",
+        "wick_crossed_level",
+        "close_confirmed_level",
+        "weak_close_detected",
+        "wick_only_detected",
+        "failed_breakout_detected",
+        "retest_pending",
+        "retest_confirmed",
+    ):
+        bos_quality_state[key] = bool(bos_quality_state.get(key, False))
+    bos_quality_state["candidates"] = [
+        item
+        for item in list(bos_quality_state.get("candidates", []) or [])
+        if isinstance(item, dict)
+    ][:10]
+    state["bos_confirmation_quality_audit"] = bos_quality_state
     shadow_state = state.get("shadow_decision_simulator", {}) or {}
     shadow_state["shadow_decision_simulator_enabled"] = bool(
         shadow_state.get("shadow_decision_simulator_enabled", True)

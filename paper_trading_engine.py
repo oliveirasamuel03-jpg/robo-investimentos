@@ -35,6 +35,7 @@ from core.config import (
     VALIDATION_TRADING_MODE,
     ensure_app_directories,
 )
+from core.bos_confirmation_quality_audit import build_bos_confirmation_quality_audit
 from core.bos_pivot_trace_audit import build_bos_pivot_trace_audit
 from core.market_context import apply_context_filter, get_market_context
 from core.fibonacci_alignment_audit import build_fibonacci_alignment_audit
@@ -1479,6 +1480,20 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[s
         reversal_blocker_routing_audit=reversal_blocker_routing_audit,
         state=state,
     )
+    bos_confirmation_quality_audit = build_bos_confirmation_quality_audit(
+        signals=signals,
+        bos_pivot_trace_audit=bos_pivot_trace_audit,
+        multi_timeframe_swing_audit=multi_timeframe_swing_audit,
+        setup_blocker_taxonomy_audit=setup_blocker_taxonomy_audit,
+        no_setup_eligible_decomposition=no_setup_eligible_decomposition,
+        reversal_blocker_routing_audit=reversal_blocker_routing_audit,
+        strategy_decision_bridge_trace=strategy_decision_bridge_trace,
+        market_structure_audit=market_structure_audit,
+        fibonacci_alignment_audit=fib_alignment_audit,
+        feed_scope_reconciliation=feed_scope_reconciliation,
+        strategy_bottleneck=dict(state.get("strategy_bottleneck", {}) or {}),
+        state=state,
+    )
     cycle_validation["strategy_structure_audit"] = strategy_structure_audit
     cycle_validation["market_structure_audit"] = market_structure_audit
     cycle_validation["fib_alignment_audit"] = fib_alignment_audit
@@ -1491,6 +1506,7 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[s
     cycle_validation["no_setup_eligible_decomposition"] = no_setup_eligible_decomposition
     cycle_validation["reversal_blocker_routing_audit"] = reversal_blocker_routing_audit
     cycle_validation["setup_blocker_taxonomy_audit"] = setup_blocker_taxonomy_audit
+    cycle_validation["bos_confirmation_quality_audit"] = bos_confirmation_quality_audit
 
     if not config.allow_new_entries:
         for candidate in candidates:
@@ -1595,6 +1611,7 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[s
     state["no_setup_eligible_decomposition"] = no_setup_eligible_decomposition
     state["reversal_blocker_routing_audit"] = reversal_blocker_routing_audit
     state["setup_blocker_taxonomy_audit"] = setup_blocker_taxonomy_audit
+    state["bos_confirmation_quality_audit"] = bos_confirmation_quality_audit
 
     history = state.get("history", []) or []
     history.append(
@@ -1651,4 +1668,5 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[s
         "no_setup_eligible_decomposition": no_setup_eligible_decomposition,
         "reversal_blocker_routing_audit": reversal_blocker_routing_audit,
         "setup_blocker_taxonomy_audit": setup_blocker_taxonomy_audit,
+        "bos_confirmation_quality_audit": bos_confirmation_quality_audit,
     }
