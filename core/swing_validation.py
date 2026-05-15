@@ -21,6 +21,7 @@ from core.config import (
     VALIDATION_TRADING_MODE,
 )
 from core.calibration_preview import build_calibration_preview, default_calibration_preview_state
+from core.bos_confirmation_quality_audit import default_bos_confirmation_quality_audit_state
 from core.bos_pivot_trace_audit import default_bos_pivot_trace_audit_state
 from core.fibonacci_alignment_audit import default_fib_alignment_audit_state
 from core.feed_scope_reconciliation import default_feed_scope_reconciliation_state
@@ -944,6 +945,9 @@ def _build_operational_consistency(
     setup_blocker_taxonomy_audit = dict(
         state.get("setup_blocker_taxonomy_audit", {}) or default_setup_blocker_taxonomy_audit_state()
     )
+    bos_confirmation_quality_audit = dict(
+        state.get("bos_confirmation_quality_audit", {}) or default_bos_confirmation_quality_audit_state()
+    )
     shadow_decision_simulator = dict(
         state.get("shadow_decision_simulator", {}) or default_shadow_decision_state()
     )
@@ -1078,6 +1082,14 @@ def _build_operational_consistency(
         ),
         "setup_blocker_taxonomy_recommendation": str(
             setup_blocker_taxonomy_audit.get("recommendation") or "insufficient_data"
+        ),
+        "bos_confirmation_quality_mode": bos_confirmation_quality_audit.get("mode", "DIAGNOSTIC_ONLY"),
+        "bos_confirmation_quality_top_symbol": str(bos_confirmation_quality_audit.get("top_symbol") or ""),
+        "bos_confirmation_quality_status": str(
+            bos_confirmation_quality_audit.get("bos_quality_status") or "INSUFFICIENT_DATA_FOR_BOS_QUALITY"
+        ),
+        "bos_confirmation_quality_recommendation": str(
+            bos_confirmation_quality_audit.get("recommendation") or "insufficient_data"
         ),
         "shadow_decision_mode": shadow_decision_simulator.get("shadow_decision_mode", "SHADOW_ONLY"),
         "preview_near_approved_count": int(
@@ -1295,6 +1307,9 @@ def build_swing_validation_report(state: dict | None = None, now: datetime | Non
         "setup_blocker_taxonomy_audit": dict(
             payload.get("setup_blocker_taxonomy_audit", {}) or default_setup_blocker_taxonomy_audit_state()
         ),
+        "bos_confirmation_quality_audit": dict(
+            payload.get("bos_confirmation_quality_audit", {}) or default_bos_confirmation_quality_audit_state()
+        ),
         "shadow_decision_simulator": dict(
             payload.get("shadow_decision_simulator", {}) or default_shadow_decision_state()
         ),
@@ -1433,6 +1448,12 @@ def refresh_swing_validation_cycle(
             or (cycle_result.get("validation_cycle", {}) or {}).get("setup_blocker_taxonomy_audit", {})
             or state.get("setup_blocker_taxonomy_audit", {})
             or default_setup_blocker_taxonomy_audit_state()
+        )
+        state["bos_confirmation_quality_audit"] = dict(
+            cycle_result.get("bos_confirmation_quality_audit")
+            or (cycle_result.get("validation_cycle", {}) or {}).get("bos_confirmation_quality_audit", {})
+            or state.get("bos_confirmation_quality_audit", {})
+            or default_bos_confirmation_quality_audit_state()
         )
         state["shadow_decision_simulator"] = dict(
             cycle_result.get("shadow_decision_simulator")
@@ -1600,6 +1621,11 @@ def refresh_swing_validation_cycle(
         sanitized_report.get("setup_blocker_taxonomy_audit")
         or updated_state.get("setup_blocker_taxonomy_audit", {})
         or default_setup_blocker_taxonomy_audit_state()
+    )
+    updated_state["bos_confirmation_quality_audit"] = dict(
+        sanitized_report.get("bos_confirmation_quality_audit")
+        or updated_state.get("bos_confirmation_quality_audit", {})
+        or default_bos_confirmation_quality_audit_state()
     )
     updated_state["shadow_decision_simulator"] = dict(
         sanitized_report.get("shadow_decision_simulator")

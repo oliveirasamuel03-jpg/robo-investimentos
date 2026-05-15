@@ -468,6 +468,25 @@ def _setup_blocker_taxonomy_audit_summary(validation_report: dict[str, Any]) -> 
     )
 
 
+def _bos_confirmation_quality_audit_summary(validation_report: dict[str, Any]) -> str:
+    audit = dict(validation_report.get("bos_confirmation_quality_audit", {}) or {})
+    if not audit:
+        return "BOS confirmation quality audit: no BOS quality sample yet. Diagnostic only; no trade decision changed."
+    if not bool(audit.get("enabled", True)):
+        return "BOS confirmation quality audit: disabled. Diagnostic only; no trade decision changed."
+    return (
+        "BOS confirmation quality audit: "
+        f"top={_safe_text(audit.get('top_symbol'), fallback='none')}; "
+        f"status={_safe_text(audit.get('bos_quality_status'), fallback='INSUFFICIENT_DATA_FOR_BOS_QUALITY')}; "
+        f"reason={_safe_text(audit.get('bos_failure_reason'), fallback='insufficient_data')}; "
+        f"h4_bos={_safe_text(audit.get('h4_bos_state'), fallback='INSUFFICIENT_DATA')}; "
+        f"h1_bos={_safe_text(audit.get('h1_bos_state'), fallback='INSUFFICIENT_DATA')}; "
+        f"feed_clean={str(bool(audit.get('current_feed_is_clean', False))).lower()}; "
+        f"recommendation={_safe_text(audit.get('recommendation'), fallback='insufficient_data')}. "
+        "Diagnostic only; no trade decision changed."
+    )
+
+
 def _calibration_preview_summary(validation_report: dict[str, Any]) -> str:
     preview = dict(validation_report.get("calibration_preview", {}) or {})
     if not preview:
@@ -733,6 +752,7 @@ def _build_daily_email_body(state: dict[str, Any], validation_report: dict[str, 
     no_setup_eligible_decomposition_summary = _no_setup_eligible_decomposition_summary(validation_report)
     reversal_blocker_routing_audit_summary = _reversal_blocker_routing_audit_summary(validation_report)
     setup_blocker_taxonomy_audit_summary = _setup_blocker_taxonomy_audit_summary(validation_report)
+    bos_confirmation_quality_audit_summary = _bos_confirmation_quality_audit_summary(validation_report)
     calibration_preview_summary = _calibration_preview_summary(validation_report)
     strategy_bottleneck_summary = _strategy_bottleneck_summary(validation_report)
     strategy_structure_audit_summary = _strategy_structure_audit_summary(validation_report)
@@ -774,6 +794,7 @@ def _build_daily_email_body(state: dict[str, Any], validation_report: dict[str, 
         no_setup_eligible_decomposition_summary,
         reversal_blocker_routing_audit_summary,
         setup_blocker_taxonomy_audit_summary,
+        bos_confirmation_quality_audit_summary,
         "",
         "Signal pipeline:",
         *_signal_pipeline_lines(validation_report),
