@@ -290,6 +290,17 @@ A FASE 2.5B.2C adiciona uma camada DIAGNOSTIC_ONLY / SHADOW_ONLY para explicar p
 - `should_keep_blocked` permanece verdadeiro, `safe_to_change_strategy_now` permanece falso e `safe_to_change_threshold_now` permanece falso.
 - Nada muda em score real, thresholds, provider, cache/TTL, budget da Twelve Data, broker, posicoes, PnL, historico ou ordens.
 
+### FASE 2.5B.2D - H1 Confirmation After H4 BOS Audit
+
+A FASE 2.5B.2D adiciona uma camada DIAGNOSTIC_ONLY / SHADOW_ONLY para explicar por que uma estrutura confirmada no 4H ainda nao recebeu confirmacao suficiente no 1H.
+
+- A auditoria cruza BOS/Pivot trace, BOS Confirmation Quality, Multi-TF, Setup/Blocker Taxonomy, NO_SETUP_ELIGIBLE Decomposition, Strategy Decision Bridge, Fibonacci/estrutura e Feed/Fallback Scope.
+- Diferencia 1H sem dados suficientes, 1H sem BOS, 1H contra o 4H, 1H lateral, pivo 1H formando, reteste 1H pendente e 1H confirmado apenas em shadow.
+- Casos como 4H com `BOS_RETEST_CONFIRMED` e 1H `INSUFFICIENT_DATA` viram `H1_INSUFFICIENT_DATA_AFTER_H4_BOS`, mantendo o bloqueio.
+- Mensagens de UI/email/log explicam timing estrutural sem sugerir compra, ignorar 1H ou usar 4H como autoridade operacional.
+- `should_keep_blocked` permanece verdadeiro, `safe_to_change_strategy_now` permanece falso e `safe_to_change_threshold_now` permanece falso.
+- Nada muda em score real, thresholds, provider, cache/TTL, budget da Twelve Data, broker, posicoes, PnL, historico ou ordens.
+
 ## Instalacao local
 
 ### 1. Criar ambiente virtual

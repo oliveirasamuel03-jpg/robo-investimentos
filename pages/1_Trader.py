@@ -1351,6 +1351,12 @@ bos_confirmation_quality_audit = dict(
     or state.get("bos_confirmation_quality_audit", {})
     or {}
 )
+h1_confirmation_after_h4_bos_audit = dict(
+    validation_last_report.get("h1_confirmation_after_h4_bos_audit")
+    or current_audit_state.get("h1_confirmation_after_h4_bos_audit", {})
+    or state.get("h1_confirmation_after_h4_bos_audit", {})
+    or {}
+)
 shadow_decision_simulator = dict(
     validation_last_report.get("shadow_decision_simulator")
     or current_audit_state.get("shadow_decision_simulator", {})
@@ -2565,6 +2571,68 @@ if multi_timeframe_swing_audit:
         else:
             st.info("Sem amostra suficiente para auditar qualidade de BOS.")
         st.caption(bos_confirmation_quality_audit.get("notes") or "Diagnostico sem autoridade operacional.")
+    if h1_confirmation_after_h4_bos_audit:
+        st.markdown("##### FASE 2.5B.2D - CONFIRMACAO 1H APOS BOS 4H")
+        st.caption(
+            "DIAGNOSTIC ONLY: esta camada explica por que uma estrutura confirmada no 4H ainda nao "
+            "recebeu confirmacao suficiente no 1H. Nao aprova trade, nao altera score, nao muda "
+            "broker, nao muda thresholds e preserva PAPER TRADING."
+        )
+        h1_c1, h1_c2, h1_c3, h1_c4, h1_c5 = st.columns(5)
+        h1_c1.metric("Top ativo", h1_confirmation_after_h4_bos_audit.get("top_symbol") or "-")
+        h1_c2.metric(
+            "Setup analisado",
+            h1_confirmation_after_h4_bos_audit.get("top_setup") or "trend_pullback_breakout",
+        )
+        h1_c3.metric("BOS 4H", h1_confirmation_after_h4_bos_audit.get("h4_bos_state") or "INSUFFICIENT_DATA")
+        h1_c4.metric("Reteste 4H", h1_confirmation_after_h4_bos_audit.get("h4_retest_state") or "UNKNOWN")
+        h1_c5.metric("BOS 1H", h1_confirmation_after_h4_bos_audit.get("h1_bos_state") or "INSUFFICIENT_DATA")
+        h1_d1, h1_d2, h1_d3, h1_d4, h1_d5 = st.columns(5)
+        h1_d1.metric("Estado confirmacao 1H", h1_confirmation_after_h4_bos_audit.get("h1_confirmation_state") or "UNKNOWN")
+        h1_d2.metric("Status confirmacao 1H", h1_confirmation_after_h4_bos_audit.get("h1_confirmation_status") or "INSUFFICIENT_DATA")
+        h1_d3.metric("Motivo falha 1H", h1_confirmation_after_h4_bos_audit.get("h1_failure_reason") or "insufficient_data")
+        h1_d4.metric("Qualidade dados 1H", h1_confirmation_after_h4_bos_audit.get("h1_data_quality") or "missing")
+        h1_d5.metric("Alinhamento 1H/4H", h1_confirmation_after_h4_bos_audit.get("h1_h4_alignment") or "UNKNOWN")
+        h1_e1, h1_e2, h1_e3, h1_e4, h1_e5 = st.columns(5)
+        h1_e1.metric("Direcao 4H", h1_confirmation_after_h4_bos_audit.get("h4_trend_direction") or "INCONCLUSIVE")
+        h1_e2.metric("Direcao 1H", h1_confirmation_after_h4_bos_audit.get("h1_trend_direction") or "INCONCLUSIVE")
+        h1_e3.metric("Reteste 1H", h1_confirmation_after_h4_bos_audit.get("h1_retest_state") or "UNKNOWN")
+        h1_e4.metric("Pivo 1H", h1_confirmation_after_h4_bos_audit.get("h1_pivot_state") or "INSUFFICIENT_DATA")
+        h1_e5.metric("Risco de timing", h1_confirmation_after_h4_bos_audit.get("h1_entry_timing_risk") or "UNKNOWN")
+        h1_f1, h1_f2, h1_f3, h1_f4 = st.columns(4)
+        h1_f1.metric("Feed atual limpo?", "Sim" if bool(h1_confirmation_after_h4_bos_audit.get("current_feed_is_clean", False)) else "Nao")
+        h1_f2.metric("Recomendacao", h1_confirmation_after_h4_bos_audit.get("recommendation") or "insufficient_data")
+        h1_f3.metric("Deve manter bloqueado", "Sim" if bool(h1_confirmation_after_h4_bos_audit.get("should_keep_blocked", True)) else "Nao")
+        h1_f4.metric("Seguro alterar threshold?", "Sim" if bool(h1_confirmation_after_h4_bos_audit.get("safe_to_change_threshold_now", False)) else "Nao")
+        h1_g1, h1_g2 = st.columns(2)
+        h1_g1.metric("Seguro alterar estrategia?", "Sim" if bool(h1_confirmation_after_h4_bos_audit.get("safe_to_change_strategy_now", False)) else "Nao")
+        h1_g2.metric("Fallback scope", h1_confirmation_after_h4_bos_audit.get("fallback_blocker_scope") or "UNKNOWN")
+        h1_after_h4_rows = [
+            {
+                "symbol": row.get("symbol"),
+                "setup": row.get("setup"),
+                "score": row.get("score"),
+                "score_gap": row.get("score_gap"),
+                "h4_bos_state": row.get("h4_bos_state"),
+                "h4_retest_state": row.get("h4_retest_state"),
+                "h1_bos_state": row.get("h1_bos_state"),
+                "h1_confirmation_status": row.get("h1_confirmation_status"),
+                "h1_failure_reason": row.get("h1_failure_reason"),
+                "h1_data_quality": row.get("h1_data_quality"),
+                "h1_h4_alignment": row.get("h1_h4_alignment"),
+                "h1_entry_timing_risk": row.get("h1_entry_timing_risk"),
+                "suggested_ui_message": row.get("suggested_ui_message"),
+                "suggested_future_study": row.get("suggested_future_study"),
+                "should_keep_blocked": row.get("should_keep_blocked"),
+            }
+            for row in list(h1_confirmation_after_h4_bos_audit.get("candidates", []) or [])[:10]
+            if isinstance(row, dict)
+        ]
+        if h1_after_h4_rows:
+            st.dataframe(pd.DataFrame(h1_after_h4_rows), hide_index=True, use_container_width=True)
+        else:
+            st.info("Sem amostra suficiente para auditar confirmacao 1H apos BOS 4H.")
+        st.caption(h1_confirmation_after_h4_bos_audit.get("notes") or "Diagnostico sem autoridade operacional.")
     mtf_rows = [
         {
             "symbol": row.get("symbol"),

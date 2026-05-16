@@ -1138,6 +1138,93 @@ def _log_bos_confirmation_quality_audit_summary(validation_report: dict) -> None
     )
 
 
+def _log_h1_confirmation_after_h4_bos_audit_summary(validation_report: dict) -> None:
+    audit = dict(validation_report.get("h1_confirmation_after_h4_bos_audit", {}) or {})
+    if not audit:
+        return
+    log_event(
+        "INFO",
+        (
+            "[h1_after_h4_bos_summary] "
+            f"mode={str(audit.get('mode') or 'DIAGNOSTIC_ONLY').lower()};"
+            f"safety_mode={str(audit.get('safety_mode') or 'SHADOW_ONLY').lower()};"
+            f"top_symbol={str(audit.get('top_symbol') or 'none')};"
+            f"top_setup={str(audit.get('top_setup') or 'trend_pullback_breakout')};"
+            f"h4_bos_state={str(audit.get('h4_bos_state') or 'INSUFFICIENT_DATA')};"
+            f"h1_bos_state={str(audit.get('h1_bos_state') or 'INSUFFICIENT_DATA')};"
+            f"h1_confirmation_status={str(audit.get('h1_confirmation_status') or 'INSUFFICIENT_DATA_FOR_H1_CONFIRMATION')};"
+            f"h1_failure_reason={str(audit.get('h1_failure_reason') or 'insufficient_data')};"
+            f"h1_h4_alignment={str(audit.get('h1_h4_alignment') or 'INSUFFICIENT_DATA')};"
+            f"current_feed_clean={int(bool(audit.get('current_feed_is_clean', False)))};"
+            f"fallback_scope={str(audit.get('fallback_blocker_scope') or 'UNKNOWN')};"
+            f"recommendation={str(audit.get('recommendation') or 'insufficient_data')};"
+            f"keep_blocked={int(bool(audit.get('should_keep_blocked', True)))};"
+            f"safe_to_change_strategy_now={int(bool(audit.get('safe_to_change_strategy_now', False)))};"
+            f"safe_to_change_threshold_now={int(bool(audit.get('safe_to_change_threshold_now', False)))};"
+            "diagnostic_only=true"
+        ),
+    )
+    candidates = [item for item in list(audit.get("candidates", []) or []) if isinstance(item, dict)]
+    for row in candidates[:4]:
+        log_event(
+            "INFO",
+            (
+                "[h1_after_h4_bos_candidate] "
+                f"symbol={str(row.get('symbol') or 'none')};"
+                f"setup={str(row.get('setup') or 'trend_pullback_breakout')};"
+                f"score={row.get('score') if row.get('score') is not None else 'none'};"
+                f"gap={row.get('score_gap') if row.get('score_gap') is not None else 'none'};"
+                f"h4_bos={str(row.get('h4_bos_state') or 'UNKNOWN')};"
+                f"h1_bos={str(row.get('h1_bos_state') or 'UNKNOWN')};"
+                f"status={str(row.get('h1_confirmation_status') or 'UNKNOWN_H1_CONFIRMATION_STATUS')};"
+                f"reason={str(row.get('h1_failure_reason') or 'unknown')};"
+                f"alignment={str(row.get('h1_h4_alignment') or 'UNKNOWN')};"
+                f"timing_risk={str(row.get('h1_entry_timing_risk') or 'UNKNOWN')};"
+                f"keep_blocked={int(bool(row.get('should_keep_blocked', True)))};"
+                "diagnostic_only=true"
+            ),
+        )
+    if candidates:
+        top = candidates[0]
+        log_event(
+            "INFO",
+            (
+                "[h1_after_h4_bos_status] "
+                f"symbol={str(top.get('symbol') or 'none')};"
+                f"h1_confirmation_status={str(top.get('h1_confirmation_status') or 'UNKNOWN_H1_CONFIRMATION_STATUS')};"
+                f"h1_failure_reason={str(top.get('h1_failure_reason') or 'unknown')};"
+                f"h1_data_quality={str(top.get('h1_data_quality') or 'missing')};"
+                f"h1_retest_state={str(top.get('h1_retest_state') or 'UNKNOWN')};"
+                "diagnostic_only=true"
+            ),
+        )
+        log_event(
+            "INFO",
+            (
+                "[h1_after_h4_bos_message] "
+                f"symbol={str(top.get('symbol') or 'none')};"
+                f"message={str(top.get('suggested_ui_message') or 'none').replace(' ', '_')};"
+                "operational_language=false;"
+                "diagnostic_only=true"
+            ),
+        )
+    log_event(
+        "INFO",
+        (
+            "[h1_after_h4_bos_safety] "
+            "should_keep_blocked=true;"
+            "safe_to_change_strategy_now=false;"
+            "safe_to_change_threshold_now=false;"
+            "trade_authority=false;"
+            "score_authority=false;"
+            "broker_authority=false;"
+            "threshold_authority=false;"
+            "paper_required=true;"
+            "shadow_only=true"
+        ),
+    )
+
+
 def _log_shadow_decision_simulator_summary(validation_report: dict) -> None:
     simulator = dict(validation_report.get("shadow_decision_simulator", {}) or {})
     if not simulator:
@@ -1720,6 +1807,7 @@ def worker_loop() -> None:
             _log_reversal_blocker_routing_audit_summary(validation_report)
             _log_setup_blocker_taxonomy_audit_summary(validation_report)
             _log_bos_confirmation_quality_audit_summary(validation_report)
+            _log_h1_confirmation_after_h4_bos_audit_summary(validation_report)
             _log_shadow_decision_simulator_summary(validation_report)
             _log_phase2_fine_tune_summary(validation_report)
             _log_phase2_1_fine_tune_summary(validation_report)

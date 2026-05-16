@@ -25,6 +25,7 @@ from core.bos_confirmation_quality_audit import default_bos_confirmation_quality
 from core.bos_pivot_trace_audit import default_bos_pivot_trace_audit_state
 from core.fibonacci_alignment_audit import default_fib_alignment_audit_state
 from core.feed_scope_reconciliation import default_feed_scope_reconciliation_state
+from core.h1_confirmation_after_h4_bos_audit import default_h1_confirmation_after_h4_bos_audit_state
 from core.market_structure_audit import default_market_structure_audit_state
 from core.market_data import build_feed_quality_snapshot
 from core.multi_timeframe_data_fetcher import default_multi_timeframe_intraday_fetcher_state
@@ -948,6 +949,9 @@ def _build_operational_consistency(
     bos_confirmation_quality_audit = dict(
         state.get("bos_confirmation_quality_audit", {}) or default_bos_confirmation_quality_audit_state()
     )
+    h1_confirmation_after_h4_bos_audit = dict(
+        state.get("h1_confirmation_after_h4_bos_audit", {}) or default_h1_confirmation_after_h4_bos_audit_state()
+    )
     shadow_decision_simulator = dict(
         state.get("shadow_decision_simulator", {}) or default_shadow_decision_state()
     )
@@ -1090,6 +1094,15 @@ def _build_operational_consistency(
         ),
         "bos_confirmation_quality_recommendation": str(
             bos_confirmation_quality_audit.get("recommendation") or "insufficient_data"
+        ),
+        "h1_after_h4_bos_mode": h1_confirmation_after_h4_bos_audit.get("mode", "DIAGNOSTIC_ONLY"),
+        "h1_after_h4_bos_top_symbol": str(h1_confirmation_after_h4_bos_audit.get("top_symbol") or ""),
+        "h1_after_h4_bos_status": str(
+            h1_confirmation_after_h4_bos_audit.get("h1_confirmation_status")
+            or "INSUFFICIENT_DATA_FOR_H1_CONFIRMATION"
+        ),
+        "h1_after_h4_bos_recommendation": str(
+            h1_confirmation_after_h4_bos_audit.get("recommendation") or "insufficient_data"
         ),
         "shadow_decision_mode": shadow_decision_simulator.get("shadow_decision_mode", "SHADOW_ONLY"),
         "preview_near_approved_count": int(
@@ -1310,6 +1323,10 @@ def build_swing_validation_report(state: dict | None = None, now: datetime | Non
         "bos_confirmation_quality_audit": dict(
             payload.get("bos_confirmation_quality_audit", {}) or default_bos_confirmation_quality_audit_state()
         ),
+        "h1_confirmation_after_h4_bos_audit": dict(
+            payload.get("h1_confirmation_after_h4_bos_audit", {})
+            or default_h1_confirmation_after_h4_bos_audit_state()
+        ),
         "shadow_decision_simulator": dict(
             payload.get("shadow_decision_simulator", {}) or default_shadow_decision_state()
         ),
@@ -1454,6 +1471,12 @@ def refresh_swing_validation_cycle(
             or (cycle_result.get("validation_cycle", {}) or {}).get("bos_confirmation_quality_audit", {})
             or state.get("bos_confirmation_quality_audit", {})
             or default_bos_confirmation_quality_audit_state()
+        )
+        state["h1_confirmation_after_h4_bos_audit"] = dict(
+            cycle_result.get("h1_confirmation_after_h4_bos_audit")
+            or (cycle_result.get("validation_cycle", {}) or {}).get("h1_confirmation_after_h4_bos_audit", {})
+            or state.get("h1_confirmation_after_h4_bos_audit", {})
+            or default_h1_confirmation_after_h4_bos_audit_state()
         )
         state["shadow_decision_simulator"] = dict(
             cycle_result.get("shadow_decision_simulator")
@@ -1626,6 +1649,11 @@ def refresh_swing_validation_cycle(
         sanitized_report.get("bos_confirmation_quality_audit")
         or updated_state.get("bos_confirmation_quality_audit", {})
         or default_bos_confirmation_quality_audit_state()
+    )
+    updated_state["h1_confirmation_after_h4_bos_audit"] = dict(
+        sanitized_report.get("h1_confirmation_after_h4_bos_audit")
+        or updated_state.get("h1_confirmation_after_h4_bos_audit", {})
+        or default_h1_confirmation_after_h4_bos_audit_state()
     )
     updated_state["shadow_decision_simulator"] = dict(
         sanitized_report.get("shadow_decision_simulator")
