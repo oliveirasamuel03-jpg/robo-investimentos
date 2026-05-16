@@ -1357,6 +1357,12 @@ h1_confirmation_after_h4_bos_audit = dict(
     or state.get("h1_confirmation_after_h4_bos_audit", {})
     or {}
 )
+post_10d_calibration_plan = dict(
+    validation_last_report.get("post_10d_calibration_plan")
+    or current_audit_state.get("post_10d_calibration_plan", {})
+    or state.get("post_10d_calibration_plan", {})
+    or {}
+)
 shadow_decision_simulator = dict(
     validation_last_report.get("shadow_decision_simulator")
     or current_audit_state.get("shadow_decision_simulator", {})
@@ -2633,6 +2639,65 @@ if multi_timeframe_swing_audit:
         else:
             st.info("Sem amostra suficiente para auditar confirmacao 1H apos BOS 4H.")
         st.caption(h1_confirmation_after_h4_bos_audit.get("notes") or "Diagnostico sem autoridade operacional.")
+    if post_10d_calibration_plan:
+        st.markdown("##### FASE 2.6A - PLANO DE CALIBRACAO POS-CICLO 10D")
+        st.caption(
+            "PLANNING ONLY: esta camada consolida o ciclo de 10 dias e propoe estudos de ajuste "
+            "controlado. Nao aprova trade, nao altera score, nao muda broker, nao muda thresholds, "
+            "nao altera perfil e preserva PAPER TRADING."
+        )
+        p10_c1, p10_c2, p10_c3, p10_c4 = st.columns(4)
+        p10_c1.metric("Classificacao final", post_10d_calibration_plan.get("final_classification") or "-")
+        p10_c2.metric("Status operacional", post_10d_calibration_plan.get("operational_status") or "UNKNOWN")
+        p10_c3.metric("Status feed", post_10d_calibration_plan.get("feed_status") or "UNKNOWN")
+        p10_c4.metric("Provider", post_10d_calibration_plan.get("provider_effective") or "unknown")
+        p10_d1, p10_d2, p10_d3, p10_d4 = st.columns(4)
+        p10_d1.metric("Gargalo dominante", post_10d_calibration_plan.get("dominant_bottleneck") or "-")
+        p10_d2.metric("Setup dominante", post_10d_calibration_plan.get("dominant_setup") or "-")
+        p10_d3.metric("Proxima fase", post_10d_calibration_plan.get("recommended_next_phase") or "-")
+        p10_d4.metric("Janela validacao", post_10d_calibration_plan.get("recommended_validation_window") or "-")
+        p10_e1, p10_e2, p10_e3, p10_e4 = st.columns(4)
+        p10_e1.metric("Pode operar dinheiro real?", "Sim" if bool(post_10d_calibration_plan.get("should_start_real_money", False)) else "Nao")
+        p10_e2.metric("Pode alterar threshold agora?", "Sim" if bool(post_10d_calibration_plan.get("should_change_threshold_now", False)) else "Nao")
+        p10_e3.metric("Pode alterar perfil agora?", "Sim" if bool(post_10d_calibration_plan.get("should_change_profile_now", False)) else "Nao")
+        p10_e4.metric("Continuar PAPER?", "Sim" if bool(post_10d_calibration_plan.get("should_continue_paper", True)) else "Nao")
+        p10_f1, p10_f2, p10_f3 = st.columns(3)
+        p10_f1.metric("Recomendacao", post_10d_calibration_plan.get("recommendation") or "insufficient_data")
+        p10_f2.metric("Status plano", post_10d_calibration_plan.get("plan_status") or "INSUFFICIENT_DATA_FOR_PLAN")
+        p10_f3.metric("Safety", post_10d_calibration_plan.get("safety_mode") or "SHADOW_ONLY")
+
+        key_findings_rows = [{"achados_principais": item} for item in list(post_10d_calibration_plan.get("key_findings", []) or [])]
+        caution_rows = [{"ressalvas": item} for item in list(post_10d_calibration_plan.get("caution_findings", []) or [])]
+        micro_rows = [
+            {
+                "id": row.get("id"),
+                "title": row.get("title"),
+                "target": row.get("target"),
+                "risk_level": row.get("risk_level"),
+                "allowed_now": row.get("allowed_now"),
+                "requires_next_phase": row.get("requires_next_phase"),
+                "validation_window": row.get("validation_window"),
+                "rollback_condition": row.get("rollback_condition"),
+            }
+            for row in list(post_10d_calibration_plan.get("proposed_micro_adjustments", []) or [])[:10]
+            if isinstance(row, dict)
+        ]
+        blocked_rows = [{"acoes_bloqueadas": item} for item in list(post_10d_calibration_plan.get("blocked_actions", []) or [])]
+        success_rows = [
+            {"criterios_sucesso_proxima_rodada": item}
+            for item in list(post_10d_calibration_plan.get("required_success_criteria_next_cycle", []) or [])
+        ]
+        if key_findings_rows:
+            st.dataframe(pd.DataFrame(key_findings_rows), hide_index=True, use_container_width=True)
+        if caution_rows:
+            st.dataframe(pd.DataFrame(caution_rows), hide_index=True, use_container_width=True)
+        if micro_rows:
+            st.dataframe(pd.DataFrame(micro_rows), hide_index=True, use_container_width=True)
+        if blocked_rows:
+            st.dataframe(pd.DataFrame(blocked_rows), hide_index=True, use_container_width=True)
+        if success_rows:
+            st.dataframe(pd.DataFrame(success_rows), hide_index=True, use_container_width=True)
+        st.caption(post_10d_calibration_plan.get("notes") or "Planejamento sem autoridade operacional.")
     mtf_rows = [
         {
             "symbol": row.get("symbol"),

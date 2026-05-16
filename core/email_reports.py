@@ -504,6 +504,24 @@ def _h1_confirmation_after_h4_bos_audit_summary(validation_report: dict[str, Any
     )
 
 
+def _post_10d_calibration_plan_summary(validation_report: dict[str, Any]) -> str:
+    plan = dict(validation_report.get("post_10d_calibration_plan", {}) or {})
+    if not plan:
+        return "Post-10D calibration plan: no final-cycle plan yet. Planning only; no trade decision changed."
+    if not bool(plan.get("enabled", True)):
+        return "Post-10D calibration plan: disabled. Planning only; no trade decision changed."
+    return (
+        "Post-10D calibration plan: "
+        f"classification={_safe_text(plan.get('final_classification'), fallback='INSUFFICIENT_DATA')}; "
+        f"status={_safe_text(plan.get('plan_status'), fallback='INSUFFICIENT_DATA_FOR_PLAN')}; "
+        f"next={_safe_text(plan.get('recommended_next_phase'), fallback='none')}; "
+        f"real_money={str(bool(plan.get('should_start_real_money', False))).lower()}; "
+        f"threshold_change_now={str(bool(plan.get('should_change_threshold_now', False))).lower()}; "
+        f"continue_paper={str(bool(plan.get('should_continue_paper', True))).lower()}. "
+        "Planning only; no trade decision changed."
+    )
+
+
 def _calibration_preview_summary(validation_report: dict[str, Any]) -> str:
     preview = dict(validation_report.get("calibration_preview", {}) or {})
     if not preview:
@@ -771,6 +789,7 @@ def _build_daily_email_body(state: dict[str, Any], validation_report: dict[str, 
     setup_blocker_taxonomy_audit_summary = _setup_blocker_taxonomy_audit_summary(validation_report)
     bos_confirmation_quality_audit_summary = _bos_confirmation_quality_audit_summary(validation_report)
     h1_confirmation_after_h4_bos_audit_summary = _h1_confirmation_after_h4_bos_audit_summary(validation_report)
+    post_10d_calibration_plan_summary = _post_10d_calibration_plan_summary(validation_report)
     calibration_preview_summary = _calibration_preview_summary(validation_report)
     strategy_bottleneck_summary = _strategy_bottleneck_summary(validation_report)
     strategy_structure_audit_summary = _strategy_structure_audit_summary(validation_report)
@@ -814,6 +833,7 @@ def _build_daily_email_body(state: dict[str, Any], validation_report: dict[str, 
         setup_blocker_taxonomy_audit_summary,
         bos_confirmation_quality_audit_summary,
         h1_confirmation_after_h4_bos_audit_summary,
+        post_10d_calibration_plan_summary,
         "",
         "Signal pipeline:",
         *_signal_pipeline_lines(validation_report),

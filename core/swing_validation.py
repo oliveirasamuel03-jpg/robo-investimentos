@@ -31,6 +31,10 @@ from core.market_data import build_feed_quality_snapshot
 from core.multi_timeframe_data_fetcher import default_multi_timeframe_intraday_fetcher_state
 from core.multi_timeframe_swing_audit import default_multi_timeframe_swing_audit_state
 from core.no_setup_eligible_decomposition import default_no_setup_eligible_decomposition_state
+from core.post_10d_calibration_plan import (
+    build_post_10d_calibration_plan,
+    default_post_10d_calibration_plan_state,
+)
 from core.reversal_blocker_routing_audit import default_reversal_blocker_routing_audit_state
 from core.setup_blocker_taxonomy_audit import default_setup_blocker_taxonomy_audit_state
 from core.shadow_decision_simulator import default_shadow_decision_state
@@ -952,6 +956,9 @@ def _build_operational_consistency(
     h1_confirmation_after_h4_bos_audit = dict(
         state.get("h1_confirmation_after_h4_bos_audit", {}) or default_h1_confirmation_after_h4_bos_audit_state()
     )
+    post_10d_calibration_plan = dict(
+        state.get("post_10d_calibration_plan", {}) or default_post_10d_calibration_plan_state()
+    )
     shadow_decision_simulator = dict(
         state.get("shadow_decision_simulator", {}) or default_shadow_decision_state()
     )
@@ -1104,6 +1111,14 @@ def _build_operational_consistency(
         "h1_after_h4_bos_recommendation": str(
             h1_confirmation_after_h4_bos_audit.get("recommendation") or "insufficient_data"
         ),
+        "post_10d_plan_mode": post_10d_calibration_plan.get("mode", "PLANNING_ONLY"),
+        "post_10d_plan_status": str(
+            post_10d_calibration_plan.get("plan_status") or "INSUFFICIENT_DATA_FOR_PLAN"
+        ),
+        "post_10d_plan_recommendation": str(
+            post_10d_calibration_plan.get("recommendation") or "insufficient_data"
+        ),
+        "post_10d_plan_next_phase": str(post_10d_calibration_plan.get("recommended_next_phase") or ""),
         "shadow_decision_mode": shadow_decision_simulator.get("shadow_decision_mode", "SHADOW_ONLY"),
         "preview_near_approved_count": int(
             shadow_decision_simulator.get("preview_near_approved_count", 0) or 0
@@ -1327,6 +1342,9 @@ def build_swing_validation_report(state: dict | None = None, now: datetime | Non
             payload.get("h1_confirmation_after_h4_bos_audit", {})
             or default_h1_confirmation_after_h4_bos_audit_state()
         ),
+        "post_10d_calibration_plan": dict(
+            payload.get("post_10d_calibration_plan", {}) or default_post_10d_calibration_plan_state()
+        ),
         "shadow_decision_simulator": dict(
             payload.get("shadow_decision_simulator", {}) or default_shadow_decision_state()
         ),
@@ -1357,6 +1375,10 @@ def build_swing_validation_report(state: dict | None = None, now: datetime | Non
         report["verdict_message"] = ""
         report["final_validation_generated_at"] = ""
 
+    report["post_10d_calibration_plan"] = build_post_10d_calibration_plan(
+        state=payload,
+        validation_report=report,
+    )
     return report
 
 
@@ -1477,6 +1499,12 @@ def refresh_swing_validation_cycle(
             or (cycle_result.get("validation_cycle", {}) or {}).get("h1_confirmation_after_h4_bos_audit", {})
             or state.get("h1_confirmation_after_h4_bos_audit", {})
             or default_h1_confirmation_after_h4_bos_audit_state()
+        )
+        state["post_10d_calibration_plan"] = dict(
+            cycle_result.get("post_10d_calibration_plan")
+            or (cycle_result.get("validation_cycle", {}) or {}).get("post_10d_calibration_plan", {})
+            or state.get("post_10d_calibration_plan", {})
+            or default_post_10d_calibration_plan_state()
         )
         state["shadow_decision_simulator"] = dict(
             cycle_result.get("shadow_decision_simulator")
@@ -1654,6 +1682,11 @@ def refresh_swing_validation_cycle(
         sanitized_report.get("h1_confirmation_after_h4_bos_audit")
         or updated_state.get("h1_confirmation_after_h4_bos_audit", {})
         or default_h1_confirmation_after_h4_bos_audit_state()
+    )
+    updated_state["post_10d_calibration_plan"] = dict(
+        sanitized_report.get("post_10d_calibration_plan")
+        or updated_state.get("post_10d_calibration_plan", {})
+        or default_post_10d_calibration_plan_state()
     )
     updated_state["shadow_decision_simulator"] = dict(
         sanitized_report.get("shadow_decision_simulator")
