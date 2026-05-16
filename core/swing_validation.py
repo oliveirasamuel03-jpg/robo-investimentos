@@ -23,6 +23,10 @@ from core.config import (
 from core.calibration_preview import build_calibration_preview, default_calibration_preview_state
 from core.bos_confirmation_quality_audit import default_bos_confirmation_quality_audit_state
 from core.bos_pivot_trace_audit import default_bos_pivot_trace_audit_state
+from core.controlled_micro_adjustment_study import (
+    build_controlled_micro_adjustment_study,
+    default_controlled_micro_adjustment_study_state,
+)
 from core.fibonacci_alignment_audit import default_fib_alignment_audit_state
 from core.feed_scope_reconciliation import default_feed_scope_reconciliation_state
 from core.h1_confirmation_after_h4_bos_audit import default_h1_confirmation_after_h4_bos_audit_state
@@ -959,6 +963,9 @@ def _build_operational_consistency(
     post_10d_calibration_plan = dict(
         state.get("post_10d_calibration_plan", {}) or default_post_10d_calibration_plan_state()
     )
+    controlled_micro_adjustment_study = dict(
+        state.get("controlled_micro_adjustment_study", {}) or default_controlled_micro_adjustment_study_state()
+    )
     shadow_decision_simulator = dict(
         state.get("shadow_decision_simulator", {}) or default_shadow_decision_state()
     )
@@ -1119,6 +1126,16 @@ def _build_operational_consistency(
             post_10d_calibration_plan.get("recommendation") or "insufficient_data"
         ),
         "post_10d_plan_next_phase": str(post_10d_calibration_plan.get("recommended_next_phase") or ""),
+        "controlled_micro_adjustment_mode": controlled_micro_adjustment_study.get("mode", "STUDY_ONLY"),
+        "controlled_micro_adjustment_status": str(
+            controlled_micro_adjustment_study.get("study_status") or "INSUFFICIENT_DATA_FOR_MICRO_ADJUSTMENT"
+        ),
+        "controlled_micro_adjustment_selected": str(
+            controlled_micro_adjustment_study.get("selected_candidate_adjustment") or ""
+        ),
+        "controlled_micro_adjustment_recommendation": str(
+            controlled_micro_adjustment_study.get("recommendation") or "insufficient_data"
+        ),
         "shadow_decision_mode": shadow_decision_simulator.get("shadow_decision_mode", "SHADOW_ONLY"),
         "preview_near_approved_count": int(
             shadow_decision_simulator.get("preview_near_approved_count", 0) or 0
@@ -1345,6 +1362,9 @@ def build_swing_validation_report(state: dict | None = None, now: datetime | Non
         "post_10d_calibration_plan": dict(
             payload.get("post_10d_calibration_plan", {}) or default_post_10d_calibration_plan_state()
         ),
+        "controlled_micro_adjustment_study": dict(
+            payload.get("controlled_micro_adjustment_study", {}) or default_controlled_micro_adjustment_study_state()
+        ),
         "shadow_decision_simulator": dict(
             payload.get("shadow_decision_simulator", {}) or default_shadow_decision_state()
         ),
@@ -1376,6 +1396,10 @@ def build_swing_validation_report(state: dict | None = None, now: datetime | Non
         report["final_validation_generated_at"] = ""
 
     report["post_10d_calibration_plan"] = build_post_10d_calibration_plan(
+        state=payload,
+        validation_report=report,
+    )
+    report["controlled_micro_adjustment_study"] = build_controlled_micro_adjustment_study(
         state=payload,
         validation_report=report,
     )
@@ -1505,6 +1529,12 @@ def refresh_swing_validation_cycle(
             or (cycle_result.get("validation_cycle", {}) or {}).get("post_10d_calibration_plan", {})
             or state.get("post_10d_calibration_plan", {})
             or default_post_10d_calibration_plan_state()
+        )
+        state["controlled_micro_adjustment_study"] = dict(
+            cycle_result.get("controlled_micro_adjustment_study")
+            or (cycle_result.get("validation_cycle", {}) or {}).get("controlled_micro_adjustment_study", {})
+            or state.get("controlled_micro_adjustment_study", {})
+            or default_controlled_micro_adjustment_study_state()
         )
         state["shadow_decision_simulator"] = dict(
             cycle_result.get("shadow_decision_simulator")
@@ -1687,6 +1717,11 @@ def refresh_swing_validation_cycle(
         sanitized_report.get("post_10d_calibration_plan")
         or updated_state.get("post_10d_calibration_plan", {})
         or default_post_10d_calibration_plan_state()
+    )
+    updated_state["controlled_micro_adjustment_study"] = dict(
+        sanitized_report.get("controlled_micro_adjustment_study")
+        or updated_state.get("controlled_micro_adjustment_study", {})
+        or default_controlled_micro_adjustment_study_state()
     )
     updated_state["shadow_decision_simulator"] = dict(
         sanitized_report.get("shadow_decision_simulator")

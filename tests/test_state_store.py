@@ -122,6 +122,16 @@ def test_state_store_bootstraps_files_and_defaults(isolated_storage):
     assert state["post_10d_calibration_plan"]["recommendation"] == "insufficient_data"
     assert "start_real_money" in state["post_10d_calibration_plan"]["blocked_actions"]
     assert "lower_global_min_signal_score_now" in state["post_10d_calibration_plan"]["blocked_actions"]
+    assert state["controlled_micro_adjustment_study"]["mode"] == "STUDY_ONLY"
+    assert state["controlled_micro_adjustment_study"]["diagnostic_mode"] == "DIAGNOSTIC_ONLY"
+    assert state["controlled_micro_adjustment_study"]["safety_mode"] == "SHADOW_ONLY"
+    assert state["controlled_micro_adjustment_study"]["study_status"] == "INSUFFICIENT_DATA_FOR_MICRO_ADJUSTMENT"
+    assert state["controlled_micro_adjustment_study"]["should_continue_paper"] is True
+    assert state["controlled_micro_adjustment_study"]["should_start_real_money"] is False
+    assert state["controlled_micro_adjustment_study"]["should_change_threshold_now"] is False
+    assert state["controlled_micro_adjustment_study"]["should_apply_micro_adjustment_now"] is False
+    assert state["controlled_micro_adjustment_study"]["recommendation"] == "insufficient_data"
+    assert "apply_micro_adjustment_now" in state["controlled_micro_adjustment_study"]["blocked_actions"]
     assert state["shadow_decision_simulator"]["shadow_decision_simulator_enabled"] is True
     assert state["shadow_decision_simulator"]["shadow_decision_mode"] == "SHADOW_ONLY"
     assert state["shadow_decision_simulator"]["shadow_recent_candidates"] == []
@@ -263,6 +273,15 @@ def test_state_store_backfills_strategy_structure_audit_for_old_state(isolated_s
     assert state["post_10d_calibration_plan"]["should_change_threshold_now"] is False
     assert state["post_10d_calibration_plan"]["should_change_profile_now"] is False
     assert "start_real_money" in state["post_10d_calibration_plan"]["blocked_actions"]
+    assert state["controlled_micro_adjustment_study"]["mode"] == "STUDY_ONLY"
+    assert state["controlled_micro_adjustment_study"]["diagnostic_mode"] == "DIAGNOSTIC_ONLY"
+    assert state["controlled_micro_adjustment_study"]["safety_mode"] == "SHADOW_ONLY"
+    assert state["controlled_micro_adjustment_study"]["study_status"] == "INSUFFICIENT_DATA_FOR_MICRO_ADJUSTMENT"
+    assert state["controlled_micro_adjustment_study"]["should_continue_paper"] is True
+    assert state["controlled_micro_adjustment_study"]["should_start_real_money"] is False
+    assert state["controlled_micro_adjustment_study"]["should_change_threshold_now"] is False
+    assert state["controlled_micro_adjustment_study"]["should_apply_micro_adjustment_now"] is False
+    assert "apply_micro_adjustment_now" in state["controlled_micro_adjustment_study"]["blocked_actions"]
 
 
 def test_update_market_data_status_tracks_last_success_and_error(isolated_storage):

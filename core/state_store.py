@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 import pandas as pd
 
 from core.bos_confirmation_quality_audit import default_bos_confirmation_quality_audit_state
+from core.controlled_micro_adjustment_study import default_controlled_micro_adjustment_study_state
 from core.h1_confirmation_after_h4_bos_audit import default_h1_confirmation_after_h4_bos_audit_state
 from core.no_setup_eligible_decomposition import default_no_setup_eligible_decomposition_state
 from core.post_10d_calibration_plan import default_post_10d_calibration_plan_state
@@ -618,6 +619,7 @@ DEFAULT_STATE = {
     "bos_confirmation_quality_audit": default_bos_confirmation_quality_audit_state(),
     "h1_confirmation_after_h4_bos_audit": default_h1_confirmation_after_h4_bos_audit_state(),
     "post_10d_calibration_plan": default_post_10d_calibration_plan_state(),
+    "controlled_micro_adjustment_study": default_controlled_micro_adjustment_study_state(),
     "shadow_decision_simulator": {
         "shadow_decision_simulator_enabled": True,
         "shadow_decision_mode": "SHADOW_ONLY",
@@ -1766,6 +1768,98 @@ def load_bot_state() -> dict:
     if "lower_global_min_signal_score_now" not in post_10d_plan_state["blocked_actions"]:
         post_10d_plan_state["blocked_actions"].append("lower_global_min_signal_score_now")
     state["post_10d_calibration_plan"] = post_10d_plan_state
+    controlled_study_state = state.get("controlled_micro_adjustment_study", {}) or {}
+    controlled_study_defaults = default_controlled_micro_adjustment_study_state()
+    for key, fallback in controlled_study_defaults.items():
+        if key not in controlled_study_state:
+            controlled_study_state[key] = fallback
+    for key, fallback in (
+        ("mode", "STUDY_ONLY"),
+        ("diagnostic_mode", "DIAGNOSTIC_ONLY"),
+        ("safety_mode", "SHADOW_ONLY"),
+        ("generated_at", ""),
+        ("source_phase", "FASE 2.6A"),
+        ("study_status", "INSUFFICIENT_DATA_FOR_MICRO_ADJUSTMENT"),
+        ("market_context_status", "UNKNOWN"),
+        ("feed_status", "UNKNOWN"),
+        ("fallback_blocker_scope", "UNKNOWN"),
+        ("dominant_bottleneck", "UNKNOWN"),
+        ("dominant_setup", "trend_pullback_breakout"),
+        ("selected_candidate_adjustment", ""),
+        ("selected_candidate_reason", "insufficient_data"),
+        ("selected_candidate_risk_level", "BLOCKED"),
+        ("theoretical_impact_summary", "Insufficient data for theoretical impact study."),
+        ("recommendation", "insufficient_data"),
+        ("recommended_next_phase", ""),
+        ("notes", "No controlled micro-adjustment study data yet."),
+    ):
+        controlled_study_state[key] = str(controlled_study_state.get(key) or fallback)
+    if controlled_study_state["recommendation"] not in {
+        "observe_more_before_adjustment",
+        "prepare_single_micro_adjustment_phase",
+        "study_secondary_confirmation_only",
+        "study_breakout_confirmation_only",
+        "study_real_rule_mapping_only",
+        "study_h1_after_h4_bos_only",
+        "study_pullback_quality_only",
+        "no_threshold_change_recommended",
+        "no_profile_change_recommended",
+        "no_real_money_recommended",
+        "insufficient_data",
+    }:
+        controlled_study_state["recommendation"] = "insufficient_data"
+    controlled_study_state["enabled"] = bool(controlled_study_state.get("enabled", True))
+    for key in (
+        "context_allows_adjustment_now",
+        "selected_candidate_allowed_now",
+    ):
+        controlled_study_state[key] = False
+    controlled_study_state["selected_candidate_requires_next_phase"] = True
+    controlled_study_state["should_continue_paper"] = True
+    controlled_study_state["should_start_real_money"] = False
+    controlled_study_state["should_change_threshold_now"] = False
+    controlled_study_state["should_change_profile_now"] = False
+    controlled_study_state["should_apply_micro_adjustment_now"] = False
+    controlled_study_state["study_only"] = True
+    controlled_study_state["diagnostic_only"] = True
+    controlled_study_state["shadow_only"] = True
+    controlled_study_state["current_feed_is_clean"] = bool(
+        controlled_study_state.get("current_feed_is_clean", False)
+    )
+    for key in ("near_approved_count",):
+        try:
+            controlled_study_state[key] = int(controlled_study_state.get(key, 0) or 0)
+        except (TypeError, ValueError):
+            controlled_study_state[key] = 0
+    for key in ("best_seen_score", "current_min_score", "preview_floor"):
+        try:
+            value = controlled_study_state.get(key)
+            controlled_study_state[key] = None if value in (None, "") else float(value)
+        except (TypeError, ValueError):
+            controlled_study_state[key] = None
+    for key in (
+        "theoretical_impact_notes",
+        "unsafe_adjustments",
+        "blocked_actions",
+        "required_conditions_for_2_6c",
+    ):
+        value = controlled_study_state.get(key, [])
+        controlled_study_state[key] = list(value) if isinstance(value, (list, tuple)) else []
+    controlled_study_state["candidate_adjustments"] = [
+        item
+        for item in list(controlled_study_state.get("candidate_adjustments", []) or [])
+        if isinstance(item, dict)
+    ][:10]
+    for item in controlled_study_state["candidate_adjustments"]:
+        item["allowed_now"] = False
+        item["requires_next_phase"] = True
+        item["can_change_threshold"] = False
+        item["can_change_profile"] = False
+        item["can_affect_real_trade"] = False
+    for required_action in controlled_study_defaults.get("blocked_actions", []):
+        if required_action not in controlled_study_state["blocked_actions"]:
+            controlled_study_state["blocked_actions"].append(required_action)
+    state["controlled_micro_adjustment_study"] = controlled_study_state
     shadow_state = state.get("shadow_decision_simulator", {}) or {}
     shadow_state["shadow_decision_simulator_enabled"] = bool(
         shadow_state.get("shadow_decision_simulator_enabled", True)
