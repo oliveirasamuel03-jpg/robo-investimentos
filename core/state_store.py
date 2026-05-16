@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 import pandas as pd
 
 from core.bos_confirmation_quality_audit import default_bos_confirmation_quality_audit_state
+from core.h1_confirmation_after_h4_bos_audit import default_h1_confirmation_after_h4_bos_audit_state
 from core.no_setup_eligible_decomposition import default_no_setup_eligible_decomposition_state
 from core.reversal_blocker_routing_audit import default_reversal_blocker_routing_audit_state
 from core.setup_blocker_taxonomy_audit import default_setup_blocker_taxonomy_audit_state
@@ -614,6 +615,7 @@ DEFAULT_STATE = {
     "reversal_blocker_routing_audit": default_reversal_blocker_routing_audit_state(),
     "setup_blocker_taxonomy_audit": default_setup_blocker_taxonomy_audit_state(),
     "bos_confirmation_quality_audit": default_bos_confirmation_quality_audit_state(),
+    "h1_confirmation_after_h4_bos_audit": default_h1_confirmation_after_h4_bos_audit_state(),
     "shadow_decision_simulator": {
         "shadow_decision_simulator_enabled": True,
         "shadow_decision_mode": "SHADOW_ONLY",
@@ -1643,6 +1645,60 @@ def load_bot_state() -> dict:
         if isinstance(item, dict)
     ][:10]
     state["bos_confirmation_quality_audit"] = bos_quality_state
+    h1_after_h4_state = state.get("h1_confirmation_after_h4_bos_audit", {}) or {}
+    h1_after_h4_defaults = default_h1_confirmation_after_h4_bos_audit_state()
+    for key, fallback in h1_after_h4_defaults.items():
+        if key not in h1_after_h4_state:
+            h1_after_h4_state[key] = fallback
+    for key, fallback in (
+        ("mode", "DIAGNOSTIC_ONLY"),
+        ("safety_mode", "SHADOW_ONLY"),
+        ("status", "INSUFFICIENT_DATA"),
+        ("generated_at", ""),
+        ("target_setup", "trend_pullback_breakout"),
+        ("top_symbol", ""),
+        ("top_setup", "trend_pullback_breakout"),
+        ("h4_bos_state", "INSUFFICIENT_DATA"),
+        ("h4_retest_state", "UNKNOWN"),
+        ("h1_bos_state", "INSUFFICIENT_DATA"),
+        ("h1_confirmation_state", "INSUFFICIENT_DATA"),
+        ("h1_confirmation_status", "INSUFFICIENT_DATA_FOR_H1_CONFIRMATION"),
+        ("h1_failure_reason", "insufficient_data"),
+        ("h1_data_quality", "missing"),
+        ("h1_trend_direction", "INCONCLUSIVE"),
+        ("h4_trend_direction", "INCONCLUSIVE"),
+        ("h1_h4_alignment", "INSUFFICIENT_DATA"),
+        ("h1_retest_state", "UNKNOWN"),
+        ("h1_pivot_state", "INSUFFICIENT_DATA"),
+        ("h1_entry_timing_risk", "UNKNOWN"),
+        ("fallback_blocker_scope", "UNKNOWN"),
+        ("fallback_scope_status", "UNKNOWN_SCOPE"),
+        ("recommendation", "insufficient_data"),
+        ("notes", "No H1-after-H4 BOS confirmation audit data yet."),
+    ):
+        h1_after_h4_state[key] = str(h1_after_h4_state.get(key) or fallback)
+    h1_after_h4_state["enabled"] = bool(h1_after_h4_state.get("enabled", True))
+    h1_after_h4_state["should_keep_blocked"] = True
+    h1_after_h4_state["safe_to_change_strategy_now"] = False
+    h1_after_h4_state["safe_to_change_threshold_now"] = False
+    h1_after_h4_state["shadow_only"] = bool(h1_after_h4_state.get("shadow_only", True))
+    h1_after_h4_state["current_feed_is_clean"] = bool(h1_after_h4_state.get("current_feed_is_clean", False))
+    for key in (
+        "total_candidates_checked",
+        "h4_bos_confirmed_count",
+        "h4_retest_confirmed_count",
+        "h1_missing_confirmation_count",
+    ):
+        try:
+            h1_after_h4_state[key] = int(h1_after_h4_state.get(key, 0) or 0)
+        except (TypeError, ValueError):
+            h1_after_h4_state[key] = 0
+    h1_after_h4_state["candidates"] = [
+        item
+        for item in list(h1_after_h4_state.get("candidates", []) or [])
+        if isinstance(item, dict)
+    ][:10]
+    state["h1_confirmation_after_h4_bos_audit"] = h1_after_h4_state
     shadow_state = state.get("shadow_decision_simulator", {}) or {}
     shadow_state["shadow_decision_simulator_enabled"] = bool(
         shadow_state.get("shadow_decision_simulator_enabled", True)

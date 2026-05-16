@@ -487,6 +487,23 @@ def _bos_confirmation_quality_audit_summary(validation_report: dict[str, Any]) -
     )
 
 
+def _h1_confirmation_after_h4_bos_audit_summary(validation_report: dict[str, Any]) -> str:
+    audit = dict(validation_report.get("h1_confirmation_after_h4_bos_audit", {}) or {})
+    if not audit:
+        return "H1 confirmation after H4 BOS audit: no H1/H4 sample yet. Diagnostic only; no trade decision changed."
+    if not bool(audit.get("enabled", True)):
+        return "H1 confirmation after H4 BOS audit: disabled. Diagnostic only; no trade decision changed."
+    return (
+        "H1 confirmation after H4 BOS audit: "
+        f"top={_safe_text(audit.get('top_symbol'), fallback='none')}; "
+        f"h4_bos={_safe_text(audit.get('h4_bos_state'), fallback='INSUFFICIENT_DATA')}; "
+        f"h1_bos={_safe_text(audit.get('h1_bos_state'), fallback='INSUFFICIENT_DATA')}; "
+        f"status={_safe_text(audit.get('h1_confirmation_status'), fallback='INSUFFICIENT_DATA_FOR_H1_CONFIRMATION')}; "
+        f"recommendation={_safe_text(audit.get('recommendation'), fallback='insufficient_data')}. "
+        "Diagnostic only; no trade decision changed."
+    )
+
+
 def _calibration_preview_summary(validation_report: dict[str, Any]) -> str:
     preview = dict(validation_report.get("calibration_preview", {}) or {})
     if not preview:
@@ -753,6 +770,7 @@ def _build_daily_email_body(state: dict[str, Any], validation_report: dict[str, 
     reversal_blocker_routing_audit_summary = _reversal_blocker_routing_audit_summary(validation_report)
     setup_blocker_taxonomy_audit_summary = _setup_blocker_taxonomy_audit_summary(validation_report)
     bos_confirmation_quality_audit_summary = _bos_confirmation_quality_audit_summary(validation_report)
+    h1_confirmation_after_h4_bos_audit_summary = _h1_confirmation_after_h4_bos_audit_summary(validation_report)
     calibration_preview_summary = _calibration_preview_summary(validation_report)
     strategy_bottleneck_summary = _strategy_bottleneck_summary(validation_report)
     strategy_structure_audit_summary = _strategy_structure_audit_summary(validation_report)
@@ -795,6 +813,7 @@ def _build_daily_email_body(state: dict[str, Any], validation_report: dict[str, 
         reversal_blocker_routing_audit_summary,
         setup_blocker_taxonomy_audit_summary,
         bos_confirmation_quality_audit_summary,
+        h1_confirmation_after_h4_bos_audit_summary,
         "",
         "Signal pipeline:",
         *_signal_pipeline_lines(validation_report),

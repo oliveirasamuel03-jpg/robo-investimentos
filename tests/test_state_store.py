@@ -103,6 +103,14 @@ def test_state_store_bootstraps_files_and_defaults(isolated_storage):
     assert state["bos_confirmation_quality_audit"]["safe_to_change_threshold_now"] is False
     assert state["bos_confirmation_quality_audit"]["recommendation"] == "insufficient_data"
     assert state["bos_confirmation_quality_audit"]["candidates"] == []
+    assert state["h1_confirmation_after_h4_bos_audit"]["mode"] == "DIAGNOSTIC_ONLY"
+    assert state["h1_confirmation_after_h4_bos_audit"]["safety_mode"] == "SHADOW_ONLY"
+    assert state["h1_confirmation_after_h4_bos_audit"]["should_keep_blocked"] is True
+    assert state["h1_confirmation_after_h4_bos_audit"]["safe_to_change_strategy_now"] is False
+    assert state["h1_confirmation_after_h4_bos_audit"]["safe_to_change_threshold_now"] is False
+    assert state["h1_confirmation_after_h4_bos_audit"]["recommendation"] == "insufficient_data"
+    assert state["h1_confirmation_after_h4_bos_audit"]["fallback_scope_status"] == "UNKNOWN_SCOPE"
+    assert state["h1_confirmation_after_h4_bos_audit"]["candidates"] == []
     assert state["shadow_decision_simulator"]["shadow_decision_simulator_enabled"] is True
     assert state["shadow_decision_simulator"]["shadow_decision_mode"] == "SHADOW_ONLY"
     assert state["shadow_decision_simulator"]["shadow_recent_candidates"] == []
@@ -228,6 +236,13 @@ def test_state_store_backfills_strategy_structure_audit_for_old_state(isolated_s
     assert state["bos_confirmation_quality_audit"]["safe_to_change_strategy_now"] is False
     assert state["bos_confirmation_quality_audit"]["safe_to_change_threshold_now"] is False
     assert state["bos_confirmation_quality_audit"]["candidates"] == []
+    assert state["h1_confirmation_after_h4_bos_audit"]["mode"] == "DIAGNOSTIC_ONLY"
+    assert state["h1_confirmation_after_h4_bos_audit"]["safety_mode"] == "SHADOW_ONLY"
+    assert state["h1_confirmation_after_h4_bos_audit"]["should_keep_blocked"] is True
+    assert state["h1_confirmation_after_h4_bos_audit"]["safe_to_change_strategy_now"] is False
+    assert state["h1_confirmation_after_h4_bos_audit"]["safe_to_change_threshold_now"] is False
+    assert state["h1_confirmation_after_h4_bos_audit"]["fallback_scope_status"] == "UNKNOWN_SCOPE"
+    assert state["h1_confirmation_after_h4_bos_audit"]["candidates"] == []
 
 
 def test_update_market_data_status_tracks_last_success_and_error(isolated_storage):
