@@ -28,6 +28,7 @@ MODULES_TO_CLEAR = [
     "core.fibonacci_alignment_audit",
     "core.feed_scope_reconciliation",
     "core.h1_confirmation_after_h4_bos_audit",
+    "core.post_10d_calibration_plan",
     "core.market_structure_audit",
     "core.multi_timeframe_data_fetcher",
     "core.multi_timeframe_swing_audit",

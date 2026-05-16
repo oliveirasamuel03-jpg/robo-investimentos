@@ -301,6 +301,17 @@ A FASE 2.5B.2D adiciona uma camada DIAGNOSTIC_ONLY / SHADOW_ONLY para explicar p
 - `should_keep_blocked` permanece verdadeiro, `safe_to_change_strategy_now` permanece falso e `safe_to_change_threshold_now` permanece falso.
 - Nada muda em score real, thresholds, provider, cache/TTL, budget da Twelve Data, broker, posicoes, PnL, historico ou ordens.
 
+### FASE 2.6A - Post-10D Calibration Plan
+
+A FASE 2.6A adiciona uma camada PLANNING_ONLY / DIAGNOSTIC_ONLY / SHADOW_ONLY para consolidar a avaliacao final de 10 dias e propor estudos de microajuste controlado em PAPER.
+
+- O plano consolida classificacao final, saude operacional, feed, provider, confiabilidade do worker, coerencia UI/estado, gargalo dominante e setup dominante.
+- Quando o ciclo fecha como `APROVADO COM RESSALVAS`, a proxima etapa recomendada e `FASE 2.6B - Controlled Micro-Adjustment Study`.
+- Microajustes sao apenas estudos futuros, sempre com `allowed_now=false`, `requires_next_phase=true` e janela de validacao PAPER nova.
+- Acoes como dinheiro real, reducao global de `min_signal_score`, remocao de guards, uso direto de BOS/Fibonacci e aumento de risco entram em `blocked_actions`.
+- `should_continue_paper` permanece verdadeiro, `should_start_real_money` permanece falso, `should_change_threshold_now` permanece falso e `should_change_profile_now` permanece falso.
+- Nada muda em estrategia real, score real, thresholds, broker, provider, cache/TTL, budget da Twelve Data, ordens, posicoes, wallet, PnL ou historico.
+
 ## Instalacao local
 
 ### 1. Criar ambiente virtual

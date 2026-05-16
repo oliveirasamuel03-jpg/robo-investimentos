@@ -8,6 +8,7 @@ import pandas as pd
 from core.bos_confirmation_quality_audit import default_bos_confirmation_quality_audit_state
 from core.h1_confirmation_after_h4_bos_audit import default_h1_confirmation_after_h4_bos_audit_state
 from core.no_setup_eligible_decomposition import default_no_setup_eligible_decomposition_state
+from core.post_10d_calibration_plan import default_post_10d_calibration_plan_state
 from core.reversal_blocker_routing_audit import default_reversal_blocker_routing_audit_state
 from core.setup_blocker_taxonomy_audit import default_setup_blocker_taxonomy_audit_state
 from core.config import (
@@ -616,6 +617,7 @@ DEFAULT_STATE = {
     "setup_blocker_taxonomy_audit": default_setup_blocker_taxonomy_audit_state(),
     "bos_confirmation_quality_audit": default_bos_confirmation_quality_audit_state(),
     "h1_confirmation_after_h4_bos_audit": default_h1_confirmation_after_h4_bos_audit_state(),
+    "post_10d_calibration_plan": default_post_10d_calibration_plan_state(),
     "shadow_decision_simulator": {
         "shadow_decision_simulator_enabled": True,
         "shadow_decision_mode": "SHADOW_ONLY",
@@ -1699,6 +1701,71 @@ def load_bot_state() -> dict:
         if isinstance(item, dict)
     ][:10]
     state["h1_confirmation_after_h4_bos_audit"] = h1_after_h4_state
+    post_10d_plan_state = state.get("post_10d_calibration_plan", {}) or {}
+    post_10d_plan_defaults = default_post_10d_calibration_plan_state()
+    for key, fallback in post_10d_plan_defaults.items():
+        if key not in post_10d_plan_state:
+            post_10d_plan_state[key] = fallback
+    for key, fallback in (
+        ("mode", "PLANNING_ONLY"),
+        ("diagnostic_mode", "DIAGNOSTIC_ONLY"),
+        ("safety_mode", "SHADOW_ONLY"),
+        ("plan_status", "INSUFFICIENT_DATA_FOR_PLAN"),
+        ("generated_at", ""),
+        ("evaluation_model", "10-day final"),
+        ("final_classification", ""),
+        ("operational_status", "UNKNOWN"),
+        ("feed_status", "UNKNOWN"),
+        ("provider_effective", "unknown"),
+        ("worker_reliability_status", "UNKNOWN"),
+        ("ui_state_coherence_status", "UNKNOWN"),
+        ("recommended_next_phase", ""),
+        ("recommended_validation_window", "Novo ciclo PAPER de 10 dias apos estudo 2.6B"),
+        ("dominant_bottleneck", ""),
+        ("dominant_setup", ""),
+        ("recommendation", "insufficient_data"),
+        ("notes", "No post-10D calibration plan data yet."),
+    ):
+        post_10d_plan_state[key] = str(post_10d_plan_state.get(key) or fallback)
+    post_10d_plan_state["enabled"] = bool(post_10d_plan_state.get("enabled", True))
+    post_10d_plan_state["paper_mode_confirmed"] = bool(post_10d_plan_state.get("paper_mode_confirmed", True))
+    post_10d_plan_state["real_trade_allowed"] = False
+    post_10d_plan_state["capital_change_allowed"] = False
+    post_10d_plan_state["threshold_change_allowed_now"] = False
+    post_10d_plan_state["strategy_change_allowed_now"] = False
+    post_10d_plan_state["should_continue_paper"] = True
+    post_10d_plan_state["should_start_real_money"] = False
+    post_10d_plan_state["should_change_threshold_now"] = False
+    post_10d_plan_state["should_change_profile_now"] = False
+    post_10d_plan_state["planning_only"] = True
+    post_10d_plan_state["diagnostic_only"] = True
+    post_10d_plan_state["shadow_only"] = True
+    post_10d_plan_state["should_reset_cycle_before_next_validation"] = bool(
+        post_10d_plan_state.get("should_reset_cycle_before_next_validation", False)
+    )
+    for key in (
+        "dominant_assets",
+        "key_findings",
+        "approved_findings",
+        "caution_findings",
+        "blocked_actions",
+        "allowed_future_studies",
+        "proposed_no_change_items",
+        "required_success_criteria_next_cycle",
+        "rollback_requirements",
+    ):
+        value = post_10d_plan_state.get(key, [])
+        post_10d_plan_state[key] = list(value) if isinstance(value, (list, tuple)) else []
+    post_10d_plan_state["proposed_micro_adjustments"] = [
+        item
+        for item in list(post_10d_plan_state.get("proposed_micro_adjustments", []) or [])
+        if isinstance(item, dict)
+    ][:10]
+    if "start_real_money" not in post_10d_plan_state["blocked_actions"]:
+        post_10d_plan_state["blocked_actions"].append("start_real_money")
+    if "lower_global_min_signal_score_now" not in post_10d_plan_state["blocked_actions"]:
+        post_10d_plan_state["blocked_actions"].append("lower_global_min_signal_score_now")
+    state["post_10d_calibration_plan"] = post_10d_plan_state
     shadow_state = state.get("shadow_decision_simulator", {}) or {}
     shadow_state["shadow_decision_simulator_enabled"] = bool(
         shadow_state.get("shadow_decision_simulator_enabled", True)

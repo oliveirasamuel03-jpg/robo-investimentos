@@ -1225,6 +1225,78 @@ def _log_h1_confirmation_after_h4_bos_audit_summary(validation_report: dict) -> 
     )
 
 
+def _log_post_10d_calibration_plan_summary(validation_report: dict) -> None:
+    plan = dict(validation_report.get("post_10d_calibration_plan", {}) or {})
+    if not plan:
+        return
+    micro_adjustments = [item for item in list(plan.get("proposed_micro_adjustments", []) or []) if isinstance(item, dict)]
+    blocked_actions = [str(item) for item in list(plan.get("blocked_actions", []) or [])]
+    key_findings = [str(item) for item in list(plan.get("key_findings", []) or [])]
+    approved_findings = [str(item) for item in list(plan.get("approved_findings", []) or [])]
+    caution_findings = [str(item) for item in list(plan.get("caution_findings", []) or [])]
+    log_event(
+        "INFO",
+        (
+            "[post_10d_calibration_plan_summary] "
+            f"mode={str(plan.get('mode') or 'PLANNING_ONLY').lower()};"
+            f"safety_mode={str(plan.get('safety_mode') or 'SHADOW_ONLY').lower()};"
+            f"final_classification={str(plan.get('final_classification') or 'none')};"
+            f"plan_status={str(plan.get('plan_status') or 'INSUFFICIENT_DATA_FOR_PLAN')};"
+            f"recommended_next_phase={str(plan.get('recommended_next_phase') or 'none').replace(' ', '_')};"
+            f"should_continue_paper={int(bool(plan.get('should_continue_paper', True)))};"
+            f"should_start_real_money={int(bool(plan.get('should_start_real_money', False)))};"
+            f"should_change_threshold_now={int(bool(plan.get('should_change_threshold_now', False)))};"
+            f"dominant_bottleneck={str(plan.get('dominant_bottleneck') or 'UNKNOWN')};"
+            f"proposed_micro_adjustments_count={len(micro_adjustments)};"
+            f"blocked_actions_count={len(blocked_actions)};"
+            "planning_only=true"
+        ),
+    )
+    log_event(
+        "INFO",
+        (
+            "[post_10d_calibration_plan_findings] "
+            f"key_findings={'|'.join(key_findings[:6]) or 'none'};"
+            f"approved={'|'.join(approved_findings[:6]) or 'none'};"
+            f"caution={'|'.join(caution_findings[:6]) or 'none'};"
+            "planning_only=true"
+        ),
+    )
+    log_event(
+        "INFO",
+        (
+            "[post_10d_calibration_plan_micro_adjustments] "
+            f"count={len(micro_adjustments)};"
+            f"ids={'|'.join(str(item.get('id') or 'unknown') for item in micro_adjustments[:8]) or 'none'};"
+            "allowed_now=false;"
+            "requires_next_phase=true"
+        ),
+    )
+    log_event(
+        "INFO",
+        (
+            "[post_10d_calibration_plan_blocked_actions] "
+            f"count={len(blocked_actions)};"
+            f"actions={'|'.join(blocked_actions[:12]) or 'none'};"
+            "planning_only=true"
+        ),
+    )
+    log_event(
+        "INFO",
+        (
+            "[post_10d_calibration_plan_safety] "
+            "real_trade_allowed=false;"
+            "capital_change_allowed=false;"
+            "threshold_change_allowed_now=false;"
+            "strategy_change_allowed_now=false;"
+            "paper_required=true;"
+            "shadow_only=true;"
+            "diagnostic_only=true;"
+            "planning_only=true"
+        ),
+    )
+
+
 def _log_shadow_decision_simulator_summary(validation_report: dict) -> None:
     simulator = dict(validation_report.get("shadow_decision_simulator", {}) or {})
     if not simulator:
@@ -1808,6 +1880,7 @@ def worker_loop() -> None:
             _log_setup_blocker_taxonomy_audit_summary(validation_report)
             _log_bos_confirmation_quality_audit_summary(validation_report)
             _log_h1_confirmation_after_h4_bos_audit_summary(validation_report)
+            _log_post_10d_calibration_plan_summary(validation_report)
             _log_shadow_decision_simulator_summary(validation_report)
             _log_phase2_fine_tune_summary(validation_report)
             _log_phase2_1_fine_tune_summary(validation_report)
