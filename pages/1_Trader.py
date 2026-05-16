@@ -1363,6 +1363,12 @@ post_10d_calibration_plan = dict(
     or state.get("post_10d_calibration_plan", {})
     or {}
 )
+controlled_micro_adjustment_study = dict(
+    validation_last_report.get("controlled_micro_adjustment_study")
+    or current_audit_state.get("controlled_micro_adjustment_study", {})
+    or state.get("controlled_micro_adjustment_study", {})
+    or {}
+)
 shadow_decision_simulator = dict(
     validation_last_report.get("shadow_decision_simulator")
     or current_audit_state.get("shadow_decision_simulator", {})
@@ -2698,6 +2704,77 @@ if multi_timeframe_swing_audit:
         if success_rows:
             st.dataframe(pd.DataFrame(success_rows), hide_index=True, use_container_width=True)
         st.caption(post_10d_calibration_plan.get("notes") or "Planejamento sem autoridade operacional.")
+    if controlled_micro_adjustment_study:
+        st.markdown("##### FASE 2.6B - ESTUDO DE MICROAJUSTE CONTROLADO")
+        st.caption(
+            "STUDY ONLY: esta camada estuda microajustes candidatos para uma fase futura. "
+            "Nao aplica ajuste, nao aprova trade, nao altera score, nao muda broker, nao muda "
+            "thresholds, nao altera perfil e preserva PAPER TRADING."
+        )
+        c26_c1, c26_c2, c26_c3, c26_c4 = st.columns(4)
+        c26_c1.metric("Status do estudo", controlled_micro_adjustment_study.get("study_status") or "INSUFFICIENT_DATA")
+        c26_c2.metric("Contexto mercado", controlled_micro_adjustment_study.get("market_context_status") or "UNKNOWN")
+        c26_c3.metric(
+            "Contexto permite ajuste agora?",
+            "Sim" if bool(controlled_micro_adjustment_study.get("context_allows_adjustment_now", False)) else "Nao",
+        )
+        c26_c4.metric("Gargalo dominante", controlled_micro_adjustment_study.get("dominant_bottleneck") or "-")
+        c26_d1, c26_d2, c26_d3, c26_d4 = st.columns(4)
+        c26_d1.metric("Setup dominante", controlled_micro_adjustment_study.get("dominant_setup") or "-")
+        c26_d2.metric("Quase aprovados", int(controlled_micro_adjustment_study.get("near_approved_count", 0) or 0))
+        c26_d3.metric("Melhor score visto", controlled_micro_adjustment_study.get("best_seen_score") if controlled_micro_adjustment_study.get("best_seen_score") is not None else "-")
+        c26_d4.metric("Score minimo atual", controlled_micro_adjustment_study.get("current_min_score") if controlled_micro_adjustment_study.get("current_min_score") is not None else "-")
+        c26_e1, c26_e2, c26_e3, c26_e4 = st.columns(4)
+        c26_e1.metric("Microajuste candidato", controlled_micro_adjustment_study.get("selected_candidate_adjustment") or "-")
+        c26_e2.metric("Risco candidato", controlled_micro_adjustment_study.get("selected_candidate_risk_level") or "BLOCKED")
+        c26_e3.metric("Pode aplicar agora?", "Sim" if bool(controlled_micro_adjustment_study.get("selected_candidate_allowed_now", False)) else "Nao")
+        c26_e4.metric("Requer proxima fase?", "Sim" if bool(controlled_micro_adjustment_study.get("selected_candidate_requires_next_phase", True)) else "Nao")
+        c26_f1, c26_f2, c26_f3, c26_f4 = st.columns(4)
+        c26_f1.metric("Proxima fase", controlled_micro_adjustment_study.get("recommended_next_phase") or "-")
+        c26_f2.metric("Operar dinheiro real?", "Sim" if bool(controlled_micro_adjustment_study.get("should_start_real_money", False)) else "Nao")
+        c26_f3.metric("Alterar threshold agora?", "Sim" if bool(controlled_micro_adjustment_study.get("should_change_threshold_now", False)) else "Nao")
+        c26_f4.metric("Alterar perfil agora?", "Sim" if bool(controlled_micro_adjustment_study.get("should_change_profile_now", False)) else "Nao")
+        c26_g1, c26_g2 = st.columns(2)
+        c26_g1.metric("Continuar PAPER?", "Sim" if bool(controlled_micro_adjustment_study.get("should_continue_paper", True)) else "Nao")
+        c26_g2.metric("Recomendacao", controlled_micro_adjustment_study.get("recommendation") or "insufficient_data")
+        candidate_rows = [
+            {
+                "id": row.get("id"),
+                "target": row.get("target"),
+                "risk_level": row.get("risk_level"),
+                "allowed_now": row.get("allowed_now"),
+                "requires_next_phase": row.get("requires_next_phase"),
+                "can_change_threshold": row.get("can_change_threshold"),
+                "can_change_profile": row.get("can_change_profile"),
+                "can_affect_real_trade": row.get("can_affect_real_trade"),
+                "reason_to_block_now": row.get("reason_to_block_now"),
+                "suggested_next_phase": row.get("suggested_next_phase"),
+            }
+            for row in list(controlled_micro_adjustment_study.get("candidate_adjustments", []) or [])[:10]
+            if isinstance(row, dict)
+        ]
+        blocked_action_rows = [
+            {"acoes_bloqueadas": item}
+            for item in list(controlled_micro_adjustment_study.get("blocked_actions", []) or [])
+        ]
+        conditions_rows = [
+            {"condicoes_para_2_6c": item}
+            for item in list(controlled_micro_adjustment_study.get("required_conditions_for_2_6c", []) or [])
+        ]
+        impact_rows = [
+            {"nota": row.get("note"), "detalhe": row.get("detail")}
+            for row in list(controlled_micro_adjustment_study.get("theoretical_impact_notes", []) or [])
+            if isinstance(row, dict)
+        ]
+        if candidate_rows:
+            st.dataframe(pd.DataFrame(candidate_rows), hide_index=True, use_container_width=True)
+        if blocked_action_rows:
+            st.dataframe(pd.DataFrame(blocked_action_rows), hide_index=True, use_container_width=True)
+        if conditions_rows:
+            st.dataframe(pd.DataFrame(conditions_rows), hide_index=True, use_container_width=True)
+        if impact_rows:
+            st.dataframe(pd.DataFrame(impact_rows), hide_index=True, use_container_width=True)
+        st.caption(controlled_micro_adjustment_study.get("notes") or "Estudo sem autoridade operacional.")
     mtf_rows = [
         {
             "symbol": row.get("symbol"),

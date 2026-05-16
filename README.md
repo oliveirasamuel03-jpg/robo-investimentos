@@ -312,6 +312,17 @@ A FASE 2.6A adiciona uma camada PLANNING_ONLY / DIAGNOSTIC_ONLY / SHADOW_ONLY pa
 - `should_continue_paper` permanece verdadeiro, `should_start_real_money` permanece falso, `should_change_threshold_now` permanece falso e `should_change_profile_now` permanece falso.
 - Nada muda em estrategia real, score real, thresholds, broker, provider, cache/TTL, budget da Twelve Data, ordens, posicoes, wallet, PnL ou historico.
 
+### FASE 2.6B - Controlled Micro-Adjustment Study
+
+A FASE 2.6B adiciona uma camada STUDY_ONLY / DIAGNOSTIC_ONLY / SHADOW_ONLY para comparar microajustes candidatos depois do ciclo 10D aprovado com ressalvas.
+
+- O estudo ranqueia candidatos como `real_rule_mapping_study`, `h1_after_h4_bos_mapping_study`, `secondary_confirmation_micro_adjustment_study`, `breakout_confirmation_quality_study`, `pullback_quality_study` e `clean_cycle_reset_study`.
+- Todos os candidatos permanecem com `allowed_now=false`, `requires_next_phase=true`, `can_change_threshold=false`, `can_change_profile=false` e `can_affect_real_trade=false`.
+- Contexto desfavoravel ou critico bloqueia qualquer aplicacao imediata e mantem a recomendacao em observacao/estudo.
+- `blocked_actions` inclui dinheiro real, reducao global de score minimo, mudanca de perfil agressivo, aplicacao imediata de microajuste, bypass de guards e uso direto de BOS/Fibonacci/H1/H4 como gatilho.
+- `should_continue_paper` permanece verdadeiro, `should_start_real_money` permanece falso, `should_change_threshold_now` permanece falso e `should_apply_micro_adjustment_now` permanece falso.
+- Nada muda em estrategia real, score real, thresholds, broker, provider, cache/TTL, budget da Twelve Data, ordens, posicoes, wallet, PnL ou historico.
+
 ## Instalacao local
 
 ### 1. Criar ambiente virtual

@@ -522,6 +522,24 @@ def _post_10d_calibration_plan_summary(validation_report: dict[str, Any]) -> str
     )
 
 
+def _controlled_micro_adjustment_study_summary(validation_report: dict[str, Any]) -> str:
+    study = dict(validation_report.get("controlled_micro_adjustment_study", {}) or {})
+    if not study:
+        return "Controlled micro-adjustment study: no study sample yet. Study only; no trade decision changed."
+    if not bool(study.get("enabled", True)):
+        return "Controlled micro-adjustment study: disabled. Study only; no trade decision changed."
+    return (
+        "Controlled micro-adjustment study: "
+        f"status={_safe_text(study.get('study_status'), fallback='INSUFFICIENT_DATA_FOR_MICRO_ADJUSTMENT')}; "
+        f"selected={_safe_text(study.get('selected_candidate_adjustment'), fallback='none')}; "
+        f"allowed_now={str(bool(study.get('selected_candidate_allowed_now', False))).lower()}; "
+        f"next={_safe_text(study.get('recommended_next_phase'), fallback='none')}; "
+        f"real_money={str(bool(study.get('should_start_real_money', False))).lower()}; "
+        f"threshold_change_now={str(bool(study.get('should_change_threshold_now', False))).lower()}. "
+        "Study only; no trade decision changed."
+    )
+
+
 def _calibration_preview_summary(validation_report: dict[str, Any]) -> str:
     preview = dict(validation_report.get("calibration_preview", {}) or {})
     if not preview:
@@ -790,6 +808,7 @@ def _build_daily_email_body(state: dict[str, Any], validation_report: dict[str, 
     bos_confirmation_quality_audit_summary = _bos_confirmation_quality_audit_summary(validation_report)
     h1_confirmation_after_h4_bos_audit_summary = _h1_confirmation_after_h4_bos_audit_summary(validation_report)
     post_10d_calibration_plan_summary = _post_10d_calibration_plan_summary(validation_report)
+    controlled_micro_adjustment_study_summary = _controlled_micro_adjustment_study_summary(validation_report)
     calibration_preview_summary = _calibration_preview_summary(validation_report)
     strategy_bottleneck_summary = _strategy_bottleneck_summary(validation_report)
     strategy_structure_audit_summary = _strategy_structure_audit_summary(validation_report)
@@ -834,6 +853,7 @@ def _build_daily_email_body(state: dict[str, Any], validation_report: dict[str, 
         bos_confirmation_quality_audit_summary,
         h1_confirmation_after_h4_bos_audit_summary,
         post_10d_calibration_plan_summary,
+        controlled_micro_adjustment_study_summary,
         "",
         "Signal pipeline:",
         *_signal_pipeline_lines(validation_report),

@@ -1297,6 +1297,82 @@ def _log_post_10d_calibration_plan_summary(validation_report: dict) -> None:
     )
 
 
+def _log_controlled_micro_adjustment_study_summary(validation_report: dict) -> None:
+    study = dict(validation_report.get("controlled_micro_adjustment_study", {}) or {})
+    if not study:
+        return
+    candidates = [item for item in list(study.get("candidate_adjustments", []) or []) if isinstance(item, dict)]
+    blocked_actions = [str(item) for item in list(study.get("blocked_actions", []) or [])]
+    log_event(
+        "INFO",
+        (
+            "[controlled_micro_adjustment_study_summary] "
+            f"mode={str(study.get('mode') or 'STUDY_ONLY').lower()};"
+            f"safety_mode={str(study.get('safety_mode') or 'SHADOW_ONLY').lower()};"
+            f"study_status={str(study.get('study_status') or 'INSUFFICIENT_DATA_FOR_MICRO_ADJUSTMENT')};"
+            f"market_context_status={str(study.get('market_context_status') or 'UNKNOWN')};"
+            f"context_allows_adjustment_now={int(bool(study.get('context_allows_adjustment_now', False)))};"
+            f"selected_candidate={str(study.get('selected_candidate_adjustment') or 'none')};"
+            f"selected_risk={str(study.get('selected_candidate_risk_level') or 'BLOCKED')};"
+            f"selected_allowed_now={int(bool(study.get('selected_candidate_allowed_now', False)))};"
+            f"recommendation={str(study.get('recommendation') or 'insufficient_data')};"
+            f"should_continue_paper={int(bool(study.get('should_continue_paper', True)))};"
+            f"should_start_real_money={int(bool(study.get('should_start_real_money', False)))};"
+            f"should_change_threshold_now={int(bool(study.get('should_change_threshold_now', False)))};"
+            f"should_apply_micro_adjustment_now={int(bool(study.get('should_apply_micro_adjustment_now', False)))};"
+            "study_only=true"
+        ),
+    )
+    log_event(
+        "INFO",
+        (
+            "[controlled_micro_adjustment_study_candidates] "
+            f"count={len(candidates)};"
+            f"ids={'|'.join(str(item.get('id') or 'unknown') for item in candidates[:8]) or 'none'};"
+            "allowed_now=false;"
+            "requires_next_phase=true"
+        ),
+    )
+    log_event(
+        "INFO",
+        (
+            "[controlled_micro_adjustment_study_selected] "
+            f"selected={str(study.get('selected_candidate_adjustment') or 'none')};"
+            f"risk={str(study.get('selected_candidate_risk_level') or 'BLOCKED')};"
+            f"allowed_now={int(bool(study.get('selected_candidate_allowed_now', False)))};"
+            f"requires_next_phase={int(bool(study.get('selected_candidate_requires_next_phase', True)))};"
+            f"next={str(study.get('recommended_next_phase') or 'none')};"
+            "study_only=true"
+        ),
+    )
+    log_event(
+        "INFO",
+        (
+            "[controlled_micro_adjustment_study_blocked_actions] "
+            f"count={len(blocked_actions)};"
+            f"actions={'|'.join(blocked_actions[:14]) or 'none'};"
+            "study_only=true"
+        ),
+    )
+    log_event(
+        "INFO",
+        (
+            "[controlled_micro_adjustment_study_safety] "
+            "should_continue_paper=true;"
+            "should_start_real_money=false;"
+            "should_change_threshold_now=false;"
+            "should_change_profile_now=false;"
+            "should_apply_micro_adjustment_now=false;"
+            "trade_authority=false;"
+            "score_authority=false;"
+            "broker_authority=false;"
+            "threshold_authority=false;"
+            "paper_required=true;"
+            "shadow_only=true"
+        ),
+    )
+
+
 def _log_shadow_decision_simulator_summary(validation_report: dict) -> None:
     simulator = dict(validation_report.get("shadow_decision_simulator", {}) or {})
     if not simulator:
@@ -1881,6 +1957,7 @@ def worker_loop() -> None:
             _log_bos_confirmation_quality_audit_summary(validation_report)
             _log_h1_confirmation_after_h4_bos_audit_summary(validation_report)
             _log_post_10d_calibration_plan_summary(validation_report)
+            _log_controlled_micro_adjustment_study_summary(validation_report)
             _log_shadow_decision_simulator_summary(validation_report)
             _log_phase2_fine_tune_summary(validation_report)
             _log_phase2_1_fine_tune_summary(validation_report)
