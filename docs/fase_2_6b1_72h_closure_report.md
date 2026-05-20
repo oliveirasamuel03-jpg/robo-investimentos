@@ -151,7 +151,26 @@ Conclusao estrutural:
 
 Mesmo com estrutura e aderencia fortes, a ausencia de BOS objetivo mantem o diagnostico em **SHADOW_ONLY**. Fibonacci, BOS, pivo, candle, 4H, 1H ou qualquer leitura estrutural continuam sem autoridade operacional.
 
-## 9. Decisao final
+## 9. Campos de fechamento da FASE 2.6B
+
+Os campos abaixo sao registro documental do fechamento e nao autorizam nenhuma mudanca operacional:
+
+- Status da FASE 2.6B: CONTEXT_NOT_SAFE_FOR_ADJUSTMENT;
+- Microajuste candidato: breakout_confirmation_quality_study;
+- Risco candidato: LOW;
+- Pode aplicar agora: Nao;
+- Requer proxima fase: Sim;
+- Operar dinheiro real: Nao;
+- Alterar threshold agora: Nao;
+- Alterar perfil agora: Nao;
+- Continuar PAPER: Sim;
+- `allowed_now=false`;
+- `real_money=false`;
+- `threshold_change_now=false`;
+- `profile_change_now=false`;
+- `should_continue_paper=true`.
+
+## 10. Decisao final
 
 **ESTAVEL COM OBSERVACAO IMPORTANTE**.
 
@@ -159,7 +178,7 @@ A FASE 2.6B.1 cumpriu o objetivo de observabilidade sem alterar comportamento op
 
 A observacao importante e o esgotamento de cota da Twelve Data, com Yahoo mantendo o worker operacional e fallback visual sintetico causando risco de leitura no Trader/grafico.
 
-## 10. Itens explicitamente proibidos apos o fechamento
+## 11. Itens explicitamente proibidos apos o fechamento
 
 Permanece proibido:
 
@@ -180,7 +199,7 @@ Permanece proibido:
 - transformar candle em gatilho;
 - transformar diagnostico shadow em decisao operacional.
 
-## 11. Proxima recomendacao
+## 12. Proxima recomendacao
 
 Considerar uma futura **FASE 2.6B.2 - Provider Budget & Visual Fallback Clarity**.
 
