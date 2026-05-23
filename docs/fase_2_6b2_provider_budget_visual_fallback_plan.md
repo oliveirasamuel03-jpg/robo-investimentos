@@ -27,6 +27,13 @@ O sistema permaneceu seguro, mas a operacao evidenciou pontos de clareza que pre
 
 O risco principal nao e operacional imediato, pois o sistema manteve PAPER, bloqueios e ausencia de ordem real. O risco e de interpretacao: confundir fallback visual ou provider alternativo com confirmacao estrategica.
 
+A FASE 2.6B.2 deve distinguir explicitamente dois casos:
+
+- fallback operacional do worker, quando o ciclo do worker depende de dado sintetico; nesse caso, a leitura estrategica deve ser considerada nao confiavel;
+- fallback visual do grafico/Trader, quando apenas a camada visual cai em fallback; nesse caso, o alerta deve ser destacado sem confundir com o feed operacional do worker.
+
+Esses casos devem ser exibidos separadamente na UI/relatorio. Nenhum deles autoriza trade, microajuste, mudanca de threshold, score, broker, provider ou avanco para FASE 2.6C.
+
 ## 3. Evidencias da FASE 2.6B.1
 
 Evidencias registradas no fechamento 72h+:
