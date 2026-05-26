@@ -46,6 +46,7 @@ from core.market_structure_audit import build_market_structure_audit
 from core.multi_timeframe_data_fetcher import build_intraday_symbol_priority, fetch_multi_timeframe_intraday_data
 from core.multi_timeframe_swing_audit import build_multi_timeframe_swing_audit
 from core.no_setup_eligible_decomposition import build_no_setup_eligible_decomposition
+from core.provider_budget_visual_fallback import build_provider_budget_visual_fallback_audit
 from core.reversal_blocker_routing_audit import build_reversal_blocker_routing_audit
 from core.setup_blocker_taxonomy_audit import build_setup_blocker_taxonomy_audit
 from core.shadow_decision_simulator import build_shadow_decision_simulator
@@ -1433,6 +1434,11 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[s
         shadow_decision_simulator=shadow_decision_simulator,
         signals=signals,
     )
+    provider_budget_visual_fallback = build_provider_budget_visual_fallback_audit(
+        market_data_status=market_data_status,
+        visual_chart_status=dict(market_data_contexts.get("trader_chart", {}) or {}),
+        feed_scope_reconciliation=feed_scope_reconciliation,
+    )
     strategy_decision_bridge_trace = build_strategy_decision_bridge_trace(
         signals=signals,
         shadow_decision_simulator=shadow_decision_simulator,
@@ -1518,6 +1524,7 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[s
     cycle_validation["shadow_decision_simulator"] = shadow_decision_simulator
     cycle_validation["strategy_decision_bridge_trace"] = strategy_decision_bridge_trace
     cycle_validation["feed_scope_reconciliation"] = feed_scope_reconciliation
+    cycle_validation["provider_budget_visual_fallback"] = provider_budget_visual_fallback
     cycle_validation["no_setup_eligible_decomposition"] = no_setup_eligible_decomposition
     cycle_validation["reversal_blocker_routing_audit"] = reversal_blocker_routing_audit
     cycle_validation["setup_blocker_taxonomy_audit"] = setup_blocker_taxonomy_audit
@@ -1624,6 +1631,7 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[s
     state["shadow_decision_simulator"] = shadow_decision_simulator
     state["strategy_decision_bridge_trace"] = strategy_decision_bridge_trace
     state["feed_scope_reconciliation"] = feed_scope_reconciliation
+    state["provider_budget_visual_fallback"] = provider_budget_visual_fallback
     state["no_setup_eligible_decomposition"] = no_setup_eligible_decomposition
     state["reversal_blocker_routing_audit"] = reversal_blocker_routing_audit
     state["setup_blocker_taxonomy_audit"] = setup_blocker_taxonomy_audit
@@ -1682,6 +1690,7 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[s
         "shadow_decision_simulator": shadow_decision_simulator,
         "strategy_decision_bridge_trace": strategy_decision_bridge_trace,
         "feed_scope_reconciliation": feed_scope_reconciliation,
+        "provider_budget_visual_fallback": provider_budget_visual_fallback,
         "no_setup_eligible_decomposition": no_setup_eligible_decomposition,
         "reversal_blocker_routing_audit": reversal_blocker_routing_audit,
         "setup_blocker_taxonomy_audit": setup_blocker_taxonomy_audit,

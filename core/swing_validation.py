@@ -39,6 +39,10 @@ from core.post_10d_calibration_plan import (
     build_post_10d_calibration_plan,
     default_post_10d_calibration_plan_state,
 )
+from core.provider_budget_visual_fallback import (
+    build_provider_budget_visual_fallback_audit,
+    default_provider_budget_visual_fallback_state,
+)
 from core.reversal_blocker_routing_audit import default_reversal_blocker_routing_audit_state
 from core.setup_blocker_taxonomy_audit import default_setup_blocker_taxonomy_audit_state
 from core.shadow_decision_simulator import default_shadow_decision_state
@@ -945,6 +949,9 @@ def _build_operational_consistency(
     feed_scope_reconciliation = dict(
         state.get("feed_scope_reconciliation", {}) or default_feed_scope_reconciliation_state()
     )
+    provider_budget_visual_fallback = dict(
+        state.get("provider_budget_visual_fallback", {}) or default_provider_budget_visual_fallback_state()
+    )
     no_setup_eligible_decomposition = dict(
         state.get("no_setup_eligible_decomposition", {}) or default_no_setup_eligible_decomposition_state()
     )
@@ -1077,6 +1084,19 @@ def _build_operational_consistency(
         ),
         "feed_scope_blocker_scope": str(feed_scope_reconciliation.get("fallback_blocker_scope") or "UNKNOWN"),
         "feed_scope_current_feed_is_clean": bool(feed_scope_reconciliation.get("current_feed_is_clean", False)),
+        "provider_budget_mode": provider_budget_visual_fallback.get("mode", "OBSERVABILITY_ONLY"),
+        "provider_budget_status": str(
+            provider_budget_visual_fallback.get("provider_budget_status") or "UNKNOWN"
+        ),
+        "provider_budget_worker_feed_status": str(
+            provider_budget_visual_fallback.get("worker_feed_status") or "UNKNOWN"
+        ),
+        "provider_budget_visual_feed_status": str(
+            provider_budget_visual_fallback.get("visual_feed_status") or "UNKNOWN"
+        ),
+        "provider_budget_recommendation": str(
+            provider_budget_visual_fallback.get("recommendation") or "insufficient_data"
+        ),
         "no_setup_decomposition_mode": no_setup_eligible_decomposition.get("mode", "DIAGNOSTIC_ONLY"),
         "no_setup_decomposition_top_symbol": str(no_setup_eligible_decomposition.get("top_symbol") or ""),
         "no_setup_decomposition_top_bucket": str(
@@ -1343,6 +1363,9 @@ def build_swing_validation_report(state: dict | None = None, now: datetime | Non
         "feed_scope_reconciliation": dict(
             payload.get("feed_scope_reconciliation", {}) or default_feed_scope_reconciliation_state()
         ),
+        "provider_budget_visual_fallback": dict(
+            payload.get("provider_budget_visual_fallback", {}) or default_provider_budget_visual_fallback_state()
+        ),
         "no_setup_eligible_decomposition": dict(
             payload.get("no_setup_eligible_decomposition", {}) or default_no_setup_eligible_decomposition_state()
         ),
@@ -1398,6 +1421,11 @@ def build_swing_validation_report(state: dict | None = None, now: datetime | Non
     report["post_10d_calibration_plan"] = build_post_10d_calibration_plan(
         state=payload,
         validation_report=report,
+    )
+    report["provider_budget_visual_fallback"] = build_provider_budget_visual_fallback_audit(
+        market_data_status=dict(payload.get("market_data", {}) or {}),
+        visual_chart_status=dict(((payload.get("market_data", {}) or {}).get("contexts", {}) or {}).get("trader_chart", {}) or {}),
+        feed_scope_reconciliation=dict(report.get("feed_scope_reconciliation", {}) or {}),
     )
     report["controlled_micro_adjustment_study"] = build_controlled_micro_adjustment_study(
         state=payload,
@@ -1493,6 +1521,12 @@ def refresh_swing_validation_cycle(
             or (cycle_result.get("validation_cycle", {}) or {}).get("feed_scope_reconciliation", {})
             or state.get("feed_scope_reconciliation", {})
             or default_feed_scope_reconciliation_state()
+        )
+        state["provider_budget_visual_fallback"] = dict(
+            cycle_result.get("provider_budget_visual_fallback")
+            or (cycle_result.get("validation_cycle", {}) or {}).get("provider_budget_visual_fallback", {})
+            or state.get("provider_budget_visual_fallback", {})
+            or default_provider_budget_visual_fallback_state()
         )
         state["no_setup_eligible_decomposition"] = dict(
             cycle_result.get("no_setup_eligible_decomposition")
@@ -1687,6 +1721,11 @@ def refresh_swing_validation_cycle(
         sanitized_report.get("feed_scope_reconciliation")
         or updated_state.get("feed_scope_reconciliation", {})
         or default_feed_scope_reconciliation_state()
+    )
+    updated_state["provider_budget_visual_fallback"] = dict(
+        sanitized_report.get("provider_budget_visual_fallback")
+        or updated_state.get("provider_budget_visual_fallback", {})
+        or default_provider_budget_visual_fallback_state()
     )
     updated_state["no_setup_eligible_decomposition"] = dict(
         sanitized_report.get("no_setup_eligible_decomposition")

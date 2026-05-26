@@ -791,6 +791,12 @@ def _status_from_frames(
     requested_by: str,
     last_error: str = "",
     provider_diagnostics: dict[str, Any] | None = None,
+    cache_hits: int = 0,
+    cache_misses: int = 0,
+    stale_cache_hits: int = 0,
+    provider_calls_attempted: int = 0,
+    provider_calls_skipped: int = 0,
+    estimated_provider_calls: int = 0,
 ) -> dict[str, Any]:
     source_breakdown = {"market": 0, "cached": 0, "fallback": 0, "unknown": 0}
     provider_breakdown = {"twelvedata": 0, "yahoo": 0, "synthetic": 0, "mixed": 0, "unknown": 0}
@@ -889,6 +895,13 @@ def _status_from_frames(
         "response_received": bool(twelvedata_diag.get("response_received")),
         "response_status_code": response_status_code,
         "last_stage": str(twelvedata_diag.get("last_stage") or ""),
+        "cache_hits": int(cache_hits or 0),
+        "cache_misses": int(cache_misses or 0),
+        "stale_cache_hits": int(stale_cache_hits or 0),
+        "provider_calls_attempted": int(provider_calls_attempted or 0),
+        "provider_calls_skipped": int(provider_calls_skipped or 0),
+        "estimated_provider_calls": int(estimated_provider_calls or provider_calls_attempted or 0),
+        "duplicate_call_guard_note": "observability_only_existing_cache_ttl_preserved",
     }
 
 
@@ -910,11 +923,17 @@ def fetch_market_data_map(
     frames: dict[str, pd.DataFrame] = {}
     error_messages: list[str] = []
     provider_diagnostics: dict[str, Any] = {}
+    cache_hits = 0
+    cache_misses = 0
+    stale_cache_hits = 0
+    provider_calls_attempted = 0
+    provider_calls_skipped = 0
 
     for provider_name in active_provider_chain:
         remaining = [symbol for symbol in normalized_symbols if symbol not in frames]
         if not remaining:
             break
+        remaining_before_cache = len(remaining)
 
         fresh_cache = _cached_frames(
             remaining,
@@ -926,10 +945,13 @@ def fetch_market_data_map(
         )
         for symbol, frame in fresh_cache.items():
             frames[symbol] = frame
+        cache_hits += len(fresh_cache)
+        cache_misses += max(0, remaining_before_cache - len(fresh_cache))
 
         remaining = [symbol for symbol in normalized_symbols if symbol not in frames]
         if not remaining:
             continue
+        provider_calls_attempted += len(remaining) if provider_name == "twelvedata" else 1
 
         live_frames, provider_errors, provider_debug = _fetch_provider_frames(
             provider_name,
@@ -968,6 +990,7 @@ def fetch_market_data_map(
             )
             for symbol, frame in stale_frames.items():
                 frames[symbol] = frame
+            stale_cache_hits += len(stale_frames)
 
     for symbol in normalized_symbols:
         if symbol not in frames:
@@ -986,6 +1009,12 @@ def fetch_market_data_map(
             requested_by=requested_by,
             last_error=last_error,
             provider_diagnostics=provider_diagnostics,
+            cache_hits=cache_hits,
+            cache_misses=cache_misses,
+            stale_cache_hits=stale_cache_hits,
+            provider_calls_attempted=provider_calls_attempted,
+            provider_calls_skipped=provider_calls_skipped,
+            estimated_provider_calls=provider_calls_attempted,
         ),
     )
 

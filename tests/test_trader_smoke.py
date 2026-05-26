@@ -558,6 +558,21 @@ def test_twelvedata_uses_provider_specific_fresh_cache_window(isolated_storage, 
     assert "BTC-USD" in fresh
     assert market_data._effective_cache_ttl_seconds("twelvedata") >= 900
 
+    result = market_data.fetch_market_data_map(
+        ["BTC-USD"],
+        period="6mo",
+        interval="1h",
+        history_limit=50,
+        provider="twelvedata",
+        requested_by="worker_cycle",
+    )
+
+    assert result.status["cache_hits"] == 1
+    assert result.status["cache_misses"] == 0
+    assert result.status["provider_calls_attempted"] == 0
+    assert result.status["estimated_provider_calls"] == 0
+    assert result.status["duplicate_call_guard_note"] == "observability_only_existing_cache_ttl_preserved"
+
 
 def test_fetch_market_data_map_falls_back_to_yahoo_when_twelvedata_fails(isolated_storage, monkeypatch):
     market_data = load_module("core.market_data")

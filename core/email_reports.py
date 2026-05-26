@@ -416,6 +416,27 @@ def _feed_scope_reconciliation_summary(validation_report: dict[str, Any]) -> str
     )
 
 
+def _provider_budget_visual_fallback_summary(validation_report: dict[str, Any]) -> str:
+    audit = dict(validation_report.get("provider_budget_visual_fallback", {}) or {})
+    if not audit:
+        return "Provider budget & visual fallback: no observability sample yet. Observability only; no trade decision changed."
+    if not bool(audit.get("enabled", True)):
+        return "Provider budget & visual fallback: disabled. Observability only; no trade decision changed."
+    return (
+        "Provider budget & visual fallback: "
+        f"worker_feed={_safe_text(audit.get('worker_feed_status'), fallback='UNKNOWN')}; "
+        f"visual_feed={_safe_text(audit.get('visual_feed_status'), fallback='UNKNOWN')}; "
+        f"worker_provider={_safe_text(audit.get('provider_effective_worker'), fallback='unknown')}; "
+        f"visual_provider={_safe_text(audit.get('provider_effective_visual'), fallback='unknown')}; "
+        f"daily_budget={_safe_text(audit.get('daily_budget_status'), fallback='UNKNOWN')}; "
+        f"minute_limit={_safe_text(audit.get('minute_limit_status'), fallback='UNKNOWN')}; "
+        f"worker_fallback={str(bool(audit.get('worker_fallback_operational', False))).lower()}; "
+        f"visual_only_fallback={str(bool(audit.get('visual_only_fallback', False))).lower()}; "
+        f"recommendation={_safe_text(audit.get('recommendation'), fallback='insufficient_data')}. "
+        "Observability only; no trade decision changed."
+    )
+
+
 def _no_setup_eligible_decomposition_summary(validation_report: dict[str, Any]) -> str:
     decomposition = dict(validation_report.get("no_setup_eligible_decomposition", {}) or {})
     if not decomposition:
@@ -802,6 +823,7 @@ def _build_daily_email_body(state: dict[str, Any], validation_report: dict[str, 
     bos_pivot_trace_summary = _bos_pivot_trace_audit_summary(validation_report)
     strategy_decision_bridge_summary = _strategy_decision_bridge_trace_summary(validation_report)
     feed_scope_reconciliation_summary = _feed_scope_reconciliation_summary(validation_report)
+    provider_budget_visual_fallback_summary = _provider_budget_visual_fallback_summary(validation_report)
     no_setup_eligible_decomposition_summary = _no_setup_eligible_decomposition_summary(validation_report)
     reversal_blocker_routing_audit_summary = _reversal_blocker_routing_audit_summary(validation_report)
     setup_blocker_taxonomy_audit_summary = _setup_blocker_taxonomy_audit_summary(validation_report)
@@ -847,6 +869,7 @@ def _build_daily_email_body(state: dict[str, Any], validation_report: dict[str, 
         f"BOS/Pivot trace: {bos_pivot_trace_summary}",
         strategy_decision_bridge_summary,
         feed_scope_reconciliation_summary,
+        provider_budget_visual_fallback_summary,
         no_setup_eligible_decomposition_summary,
         reversal_blocker_routing_audit_summary,
         setup_blocker_taxonomy_audit_summary,
