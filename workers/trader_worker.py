@@ -18,6 +18,7 @@ from core.controlled_micro_adjustment_observability import build_controlled_micr
 from core.email_reports import final_report_path_reachable, process_report_email_delivery
 from core.market_data import build_feed_quality_snapshot
 from core.production_monitor import evaluate_production_health
+from core.provider_budget_visual_fallback import build_provider_budget_visual_fallback_log_lines
 from core.retention import run_retention_job, should_run_retention_job
 from core.state_store import (
     load_bot_state,
@@ -1322,6 +1323,19 @@ def _log_controlled_micro_adjustment_study_summary(validation_report: dict) -> N
         )
 
 
+def _log_provider_budget_visual_fallback_summary(validation_report: dict) -> None:
+    try:
+        audit = dict(validation_report.get("provider_budget_visual_fallback", {}) or {})
+        for message in build_provider_budget_visual_fallback_log_lines(audit):
+            emit_worker_observability_log(message)
+    except Exception as exc:
+        emit_worker_observability_log(
+            "[provider_budget_visual_fallback_observability_warning] "
+            f"phase=\"2.6B.2\";mode=OBSERVABILITY_ONLY;shadow_only=true;paper_required=true;"
+            f"error={str(exc or 'unknown')}"
+        )
+
+
 def _log_shadow_decision_simulator_summary(validation_report: dict) -> None:
     simulator = dict(validation_report.get("shadow_decision_simulator", {}) or {})
     if not simulator:
@@ -1899,6 +1913,7 @@ def worker_loop() -> None:
             _log_bos_pivot_trace_audit_summary(validation_report)
             _log_multi_timeframe_swing_audit_summary(validation_report)
             _log_feed_scope_reconciliation_summary(validation_report)
+            _log_provider_budget_visual_fallback_summary(validation_report)
             _log_strategy_decision_bridge_trace_summary(validation_report)
             _log_no_setup_eligible_decomposition_summary(validation_report)
             _log_reversal_blocker_routing_audit_summary(validation_report)

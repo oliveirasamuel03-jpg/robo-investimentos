@@ -10,6 +10,7 @@ from core.controlled_micro_adjustment_study import default_controlled_micro_adju
 from core.h1_confirmation_after_h4_bos_audit import default_h1_confirmation_after_h4_bos_audit_state
 from core.no_setup_eligible_decomposition import default_no_setup_eligible_decomposition_state
 from core.post_10d_calibration_plan import default_post_10d_calibration_plan_state
+from core.provider_budget_visual_fallback import default_provider_budget_visual_fallback_state
 from core.reversal_blocker_routing_audit import default_reversal_blocker_routing_audit_state
 from core.setup_blocker_taxonomy_audit import default_setup_blocker_taxonomy_audit_state
 from core.config import (
@@ -202,6 +203,19 @@ def _normalize_market_data_state(state: dict) -> dict:
         normalized["response_received"] = bool(normalized.get("response_received", False))
         normalized["response_status_code"] = normalized.get("response_status_code")
         normalized["last_stage"] = str(normalized.get("last_stage") or "")
+        for budget_key in (
+            "cache_hits",
+            "cache_misses",
+            "stale_cache_hits",
+            "provider_calls_attempted",
+            "provider_calls_skipped",
+            "estimated_provider_calls",
+        ):
+            try:
+                normalized[budget_key] = int(normalized.get(budget_key, 0) or 0)
+            except (TypeError, ValueError):
+                normalized[budget_key] = 0
+        normalized["duplicate_call_guard_note"] = str(normalized.get("duplicate_call_guard_note") or "")
         normalized["requested_symbols"] = [str(item).upper() for item in (normalized.get("requested_symbols") or []) if str(item)]
         normalized["requested_interval"] = str(normalized.get("requested_interval") or "")
         normalized["effective_interval"] = str(normalized.get("effective_interval") or "")
@@ -292,6 +306,13 @@ DEFAULT_STATE = {
         "response_received": False,
         "response_status_code": None,
         "last_stage": "",
+        "cache_hits": 0,
+        "cache_misses": 0,
+        "stale_cache_hits": 0,
+        "provider_calls_attempted": 0,
+        "provider_calls_skipped": 0,
+        "estimated_provider_calls": 0,
+        "duplicate_call_guard_note": "",
         "state_writer": "",
         "state_written_at": "",
         "state_build_sha": "",
@@ -620,6 +641,7 @@ DEFAULT_STATE = {
     "h1_confirmation_after_h4_bos_audit": default_h1_confirmation_after_h4_bos_audit_state(),
     "post_10d_calibration_plan": default_post_10d_calibration_plan_state(),
     "controlled_micro_adjustment_study": default_controlled_micro_adjustment_study_state(),
+    "provider_budget_visual_fallback": default_provider_budget_visual_fallback_state(),
     "shadow_decision_simulator": {
         "shadow_decision_simulator_enabled": True,
         "shadow_decision_mode": "SHADOW_ONLY",
@@ -1430,6 +1452,110 @@ def load_bot_state() -> dict:
     feed_scope_state["current_feed_is_clean"] = bool(feed_scope_state.get("current_feed_is_clean", False))
     feed_scope_state["candidate_fallback_flags"] = dict(feed_scope_state.get("candidate_fallback_flags", {}) or {})
     state["feed_scope_reconciliation"] = feed_scope_state
+    provider_budget_state = state.get("provider_budget_visual_fallback", {}) or {}
+    provider_budget_defaults = default_provider_budget_visual_fallback_state()
+    for key, fallback in provider_budget_defaults.items():
+        if key not in provider_budget_state:
+            provider_budget_state[key] = fallback
+    for key, fallback in (
+        ("phase", "2.6B.2"),
+        ("mode", "OBSERVABILITY_ONLY"),
+        ("diagnostic_mode", "DIAGNOSTIC_ONLY"),
+        ("safety_mode", "SHADOW_ONLY"),
+        ("generated_at", ""),
+        ("provider_configured", "unknown"),
+        ("provider_effective_worker", "unknown"),
+        ("provider_effective_visual", "unknown"),
+        ("worker_feed_status", "UNKNOWN"),
+        ("visual_feed_status", "UNKNOWN"),
+        ("fallback_scope", "UNKNOWN"),
+        ("fallback_scope_status", "UNKNOWN"),
+        ("fallback_blocker_scope", "UNKNOWN"),
+        ("daily_budget_status", "UNKNOWN"),
+        ("minute_limit_status", "UNKNOWN"),
+        ("cache_status", "UNKNOWN"),
+        ("budget_block_reason", "none"),
+        ("provider_budget_status", "UNKNOWN"),
+        ("recommendation", "insufficient_data"),
+        ("notes", "No provider budget visual fallback data yet."),
+    ):
+        provider_budget_state[key] = str(provider_budget_state.get(key) or fallback)
+    for key in (
+        "worker_fallback_operational",
+        "visual_fallback_active",
+        "visual_only_fallback",
+        "minute_burst_risk",
+        "risk_429",
+    ):
+        provider_budget_state[key] = bool(provider_budget_state.get(key, False))
+    provider_budget_state["worker_strategy_reading_reliable"] = bool(
+        provider_budget_state.get("worker_strategy_reading_reliable", True)
+    )
+    for key in (
+        "daily_credit_limit_estimate",
+        "daily_credits_used_estimate",
+        "daily_credit_usage_pct",
+        "minute_limit_estimate",
+        "minutely_average",
+        "minutely_maximum",
+    ):
+        value = provider_budget_state.get(key)
+        try:
+            provider_budget_state[key] = None if value in (None, "") else float(value)
+        except (TypeError, ValueError):
+            provider_budget_state[key] = None
+    for key in (
+        "cache_hits",
+        "cache_misses",
+        "stale_cache_hits",
+        "estimated_provider_calls",
+        "provider_calls_attempted",
+        "provider_calls_skipped",
+    ):
+        try:
+            provider_budget_state[key] = int(provider_budget_state.get(key, 0) or 0)
+        except (TypeError, ValueError):
+            provider_budget_state[key] = 0
+    provider_budget_state["ui_alerts"] = [
+        item
+        for item in list(provider_budget_state.get("ui_alerts", []) or [])
+        if isinstance(item, dict)
+    ][:10]
+    blocked_actions = list(provider_budget_state.get("blocked_actions", []) or [])
+    for required_action in provider_budget_defaults.get("blocked_actions", []):
+        if required_action not in blocked_actions:
+            blocked_actions.append(required_action)
+    provider_budget_state["blocked_actions"] = blocked_actions
+    provider_budget_state["enabled"] = bool(provider_budget_state.get("enabled", True))
+    provider_budget_state["paper_required"] = True
+    provider_budget_state["observability_only"] = True
+    provider_budget_state["diagnostic_only"] = True
+    provider_budget_state["shadow_only"] = True
+    provider_budget_state["should_continue_paper"] = True
+    for key in (
+        "should_start_real_money",
+        "should_change_threshold_now",
+        "should_change_score_now",
+        "should_change_broker_now",
+        "should_change_provider_now",
+        "should_change_profile_now",
+        "should_apply_micro_adjustment_now",
+        "should_advance_2_6c_now",
+        "trade_authority",
+        "score_authority",
+        "broker_authority",
+        "provider_authority",
+        "threshold_authority",
+        "execution_authority",
+        "can_approve_trade",
+        "can_change_provider",
+        "can_change_threshold",
+        "can_change_score",
+        "can_change_broker",
+        "can_advance_2_6c",
+    ):
+        provider_budget_state[key] = False
+    state["provider_budget_visual_fallback"] = provider_budget_state
     no_setup_state = state.get("no_setup_eligible_decomposition", {}) or {}
     no_setup_defaults = default_no_setup_eligible_decomposition_state()
     for key, fallback in no_setup_defaults.items():

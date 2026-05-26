@@ -629,6 +629,11 @@ feed_scope_reconciliation = dict(
     or state.get("feed_scope_reconciliation", {})
     or {}
 )
+provider_budget_visual_fallback = dict(
+    validation_report.get("provider_budget_visual_fallback")
+    or state.get("provider_budget_visual_fallback", {})
+    or {}
+)
 no_setup_eligible_decomposition = dict(
     validation_report.get("no_setup_eligible_decomposition")
     or state.get("no_setup_eligible_decomposition", {})
@@ -1146,6 +1151,58 @@ if multi_timeframe_swing_audit:
         if bool(feed_scope_reconciliation.get("current_feed_is_clean", False)) and int(feed_scope_reconciliation.get("accumulated_fallback_count", 0) or 0) > 0:
             st.info("O fallback exibido e acumulado/historico, nao do ciclo atual.")
         st.caption(feed_scope_reconciliation.get("notes") or "Sem nota de reconciliacao de feed.")
+    if provider_budget_visual_fallback:
+        st.markdown("##### FASE 2.6B.2 - PROVIDER BUDGET & VISUAL FALLBACK CLARITY")
+        st.caption(
+            "OBSERVABILITY ONLY: esta camada separa orcamento de provider, cache, risco de 429, "
+            "fallback operacional do worker e fallback visual do grafico. Nao aprova trade, nao altera "
+            "score, nao muda broker, nao muda provider, nao muda thresholds e preserva PAPER TRADING."
+        )
+        pb_c1, pb_c2, pb_c3, pb_c4 = st.columns(4)
+        pb_c1.metric("Feed worker", provider_budget_visual_fallback.get("worker_feed_status") or "UNKNOWN")
+        pb_c2.metric("Feed visual", provider_budget_visual_fallback.get("visual_feed_status") or "UNKNOWN")
+        pb_c3.metric("Provider worker", provider_budget_visual_fallback.get("provider_effective_worker") or "unknown")
+        pb_c4.metric("Provider visual", provider_budget_visual_fallback.get("provider_effective_visual") or "unknown")
+        pb_d1, pb_d2, pb_d3, pb_d4 = st.columns(4)
+        daily_used = provider_budget_visual_fallback.get("daily_credits_used_estimate")
+        daily_limit = provider_budget_visual_fallback.get("daily_credit_limit_estimate")
+        daily_label = "-"
+        if daily_used is not None and daily_limit is not None:
+            daily_label = f"{float(daily_used):.0f}/{float(daily_limit):.0f}"
+        pb_d1.metric("Cota diaria", provider_budget_visual_fallback.get("daily_budget_status") or "UNKNOWN")
+        pb_d2.metric("Uso diario estimado", daily_label)
+        pb_d3.metric("Risco minuto", provider_budget_visual_fallback.get("minute_limit_status") or "UNKNOWN")
+        pb_d4.metric("Risco 429", "Sim" if bool(provider_budget_visual_fallback.get("risk_429", False)) else "Nao")
+        pb_e1, pb_e2, pb_e3, pb_e4 = st.columns(4)
+        pb_e1.metric("Cache hits", int(provider_budget_visual_fallback.get("cache_hits", 0) or 0))
+        pb_e2.metric("Cache misses", int(provider_budget_visual_fallback.get("cache_misses", 0) or 0))
+        pb_e3.metric("Calls estimadas", int(provider_budget_visual_fallback.get("estimated_provider_calls", 0) or 0))
+        pb_e4.metric("Cache status", provider_budget_visual_fallback.get("cache_status") or "UNKNOWN")
+        pb_f1, pb_f2, pb_f3, pb_f4 = st.columns(4)
+        pb_f1.metric("Fallback worker?", "Sim" if bool(provider_budget_visual_fallback.get("worker_fallback_operational", False)) else "Nao")
+        pb_f2.metric("Fallback apenas visual?", "Sim" if bool(provider_budget_visual_fallback.get("visual_only_fallback", False)) else "Nao")
+        pb_f3.metric(
+            "Leitura estrategica confiavel?",
+            "Sim" if bool(provider_budget_visual_fallback.get("worker_strategy_reading_reliable", True)) else "Nao",
+        )
+        pb_f4.metric("Recomendacao", provider_budget_visual_fallback.get("recommendation") or "insufficient_data")
+        if bool(provider_budget_visual_fallback.get("worker_fallback_operational", False)):
+            st.error("Worker em fallback operacional: leitura estrategica nao confiavel neste ciclo.")
+        if bool(provider_budget_visual_fallback.get("visual_only_fallback", False)):
+            st.warning("Fallback apenas visual: grafico/Trader em fallback; feed operacional do worker esta separado.")
+        alert_rows = [
+            {
+                "id": row.get("id"),
+                "severity": row.get("severity"),
+                "message": row.get("message"),
+                "operational_authority": row.get("operational_authority"),
+            }
+            for row in list(provider_budget_visual_fallback.get("ui_alerts", []) or [])[:10]
+            if isinstance(row, dict)
+        ]
+        if alert_rows:
+            st.dataframe(pd.DataFrame(alert_rows), hide_index=True, use_container_width=True)
+        st.caption(provider_budget_visual_fallback.get("notes") or "Observabilidade sem autoridade operacional.")
     if no_setup_eligible_decomposition:
         st.markdown("##### FASE 2.5B.2 - DECOMPOSICAO NO_SETUP_ELIGIBLE")
         st.caption(

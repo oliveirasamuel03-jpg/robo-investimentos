@@ -132,6 +132,12 @@ def test_state_store_bootstraps_files_and_defaults(isolated_storage):
     assert state["controlled_micro_adjustment_study"]["should_apply_micro_adjustment_now"] is False
     assert state["controlled_micro_adjustment_study"]["recommendation"] == "insufficient_data"
     assert "apply_micro_adjustment_now" in state["controlled_micro_adjustment_study"]["blocked_actions"]
+    assert state["provider_budget_visual_fallback"]["mode"] == "OBSERVABILITY_ONLY"
+    assert state["provider_budget_visual_fallback"]["diagnostic_mode"] == "DIAGNOSTIC_ONLY"
+    assert state["provider_budget_visual_fallback"]["safety_mode"] == "SHADOW_ONLY"
+    assert state["provider_budget_visual_fallback"]["paper_required"] is True
+    assert state["provider_budget_visual_fallback"]["trade_authority"] is False
+    assert state["provider_budget_visual_fallback"]["provider_authority"] is False
     assert state["shadow_decision_simulator"]["shadow_decision_simulator_enabled"] is True
     assert state["shadow_decision_simulator"]["shadow_decision_mode"] == "SHADOW_ONLY"
     assert state["shadow_decision_simulator"]["shadow_recent_candidates"] == []
@@ -282,6 +288,10 @@ def test_state_store_backfills_strategy_structure_audit_for_old_state(isolated_s
     assert state["controlled_micro_adjustment_study"]["should_change_threshold_now"] is False
     assert state["controlled_micro_adjustment_study"]["should_apply_micro_adjustment_now"] is False
     assert "apply_micro_adjustment_now" in state["controlled_micro_adjustment_study"]["blocked_actions"]
+    assert state["provider_budget_visual_fallback"]["mode"] == "OBSERVABILITY_ONLY"
+    assert state["provider_budget_visual_fallback"]["paper_required"] is True
+    assert state["provider_budget_visual_fallback"]["trade_authority"] is False
+    assert state["provider_budget_visual_fallback"]["threshold_authority"] is False
 
 
 def test_update_market_data_status_tracks_last_success_and_error(isolated_storage):
