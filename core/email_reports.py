@@ -428,11 +428,15 @@ def _provider_budget_visual_fallback_summary(validation_report: dict[str, Any]) 
         f"visual_feed={_safe_text(audit.get('visual_feed_status'), fallback='UNKNOWN')}; "
         f"worker_provider={_safe_text(audit.get('provider_effective_worker'), fallback='unknown')}; "
         f"visual_provider={_safe_text(audit.get('provider_effective_visual'), fallback='unknown')}; "
+        f"daily_limit={_safe_text(audit.get('daily_budget_limit') or audit.get('daily_credit_limit_estimate'), fallback='unknown')}; "
+        f"daily_source={_safe_text(audit.get('daily_budget_source'), fallback='unknown')}; "
         f"daily_budget={_safe_text(audit.get('daily_budget_status'), fallback='UNKNOWN')}; "
-        f"minute_limit={_safe_text(audit.get('minute_limit_status'), fallback='UNKNOWN')}; "
+        f"minute_limit={_safe_text(audit.get('minute_limit') or audit.get('minute_limit_estimate'), fallback='unknown')}; "
+        f"minute_source={_safe_text(audit.get('minute_limit_source'), fallback='unknown')}; "
+        f"minute_status={_safe_text(audit.get('minute_limit_status'), fallback='UNKNOWN')}; "
         f"worker_fallback={str(bool(audit.get('worker_fallback_operational', False))).lower()}; "
         f"visual_only_fallback={str(bool(audit.get('visual_only_fallback', False))).lower()}; "
-        f"recommendation={_safe_text(audit.get('recommendation'), fallback='insufficient_data')}. "
+        f"recommendation={_safe_text(audit.get('provider_budget_recommendation') or audit.get('recommendation'), fallback='insufficient_data')}. "
         "Observability only; no trade decision changed."
     )
 

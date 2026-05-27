@@ -10,9 +10,21 @@ A FASE 2.6B.2 adiciona uma camada defensiva de observabilidade para provider bud
 - Separa feed operacional do worker e feed visual do grafico/Trader.
 - Distingue fallback sintetico operacional do worker de fallback apenas visual.
 - Exibe status de cota diaria estimada, risco de limite por minuto, 429 observado, cache hits/misses e chamadas estimadas.
+- Exibe `daily_budget_limit`, `minute_limit`, `daily_budget_source` e `minute_limit_source`.
+- Usa defaults conservadores de observabilidade para Twelve Data (`800` creditos/dia e `8` chamadas/min) quando nao houver medicao real no runtime.
+- Marca limites sem consumo real como `configured` ou `estimated`, nunca como medicao real.
 - Adiciona logs auditaveis `provider_budget_visual_fallback_*` no worker.
 - Adiciona leitura curta no relatorio diario por email.
 - Adiciona blocos visuais no Trader e Controle do Bot.
+
+## Fontes de budget
+
+- `measured`: valor observado no runtime ou diagnostico do provider.
+- `configured`: valor recebido por configuracao/runtime, sem alterar variavel de ambiente nesta fase.
+- `estimated`: default defensivo usado apenas para clareza quando o provider efetivo e Twelve Data e nao ha medicao real.
+- `unknown`: sem base suficiente para exibir limite ou consumo.
+
+Essas fontes sao somente informativas. Elas nao reduzem threshold, nao mudam score, nao trocam provider, nao alteram broker e nao autorizam trade.
 
 ## Garantias de seguranca
 

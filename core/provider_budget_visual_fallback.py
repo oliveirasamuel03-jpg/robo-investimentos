@@ -7,6 +7,7 @@ orders, PnL, or official paper-trading execution.
 
 from __future__ import annotations
 
+import os
 from datetime import datetime, timezone
 from typing import Any, Mapping
 
@@ -15,8 +16,18 @@ PHASE = "2.6B.2"
 MODE = "OBSERVABILITY_ONLY"
 DIAGNOSTIC_MODE = "DIAGNOSTIC_ONLY"
 SAFETY_MODE = "SHADOW_ONLY"
-TWELVEDATA_DAILY_CREDIT_LIMIT_ESTIMATE = 800
-TWELVEDATA_MINUTE_LIMIT_ESTIMATE = 8
+
+
+def _env_float(name: str, default: float) -> float:
+    try:
+        raw = str(os.getenv(name, "") or "").strip()
+        return float(raw) if raw else float(default)
+    except (TypeError, ValueError):
+        return float(default)
+
+
+TWELVEDATA_DAILY_CREDIT_LIMIT_ESTIMATE = _env_float("TWELVEDATA_DAILY_CREDIT_LIMIT", 800)
+TWELVEDATA_MINUTE_LIMIT_ESTIMATE = _env_float("TWELVEDATA_MINUTE_LIMIT", 8)
 
 PROVIDER_BUDGET_VISUAL_FALLBACK_MARKERS = (
     "[provider_budget_visual_fallback_summary]",
@@ -107,6 +118,19 @@ def _first_number(*values: Any) -> float | None:
     return None
 
 
+def _first_number_with_source(*items: tuple[Any, str]) -> tuple[float | None, str]:
+    for value, source in items:
+        parsed = _safe_float(value, None)
+        if parsed is not None:
+            return parsed, source
+    return None, "unknown"
+
+
+def _is_twelvedata_provider(*providers: Any) -> bool:
+    aliases = {"twelvedata", "twelve_data", "twelve-data"}
+    return any(_safe_text(provider, "").lower() in aliases for provider in providers)
+
+
 def _feed_status(value: Any) -> str:
     raw = _safe_text(value, "UNKNOWN").upper()
     if raw in {"LIVE", "DELAYED", "FALLBACK", "UNKNOWN"}:
@@ -180,10 +204,12 @@ def _minute_status(
     *,
     minute_average: float | None,
     minute_maximum: float | None,
-    minute_limit: float,
+    minute_limit: float | None,
     estimated_calls: int,
 ) -> tuple[str, bool]:
-    limit = max(float(minute_limit or TWELVEDATA_MINUTE_LIMIT_ESTIMATE), 1.0)
+    if minute_limit is None:
+        return "UNKNOWN", False
+    limit = max(float(minute_limit), 1.0)
     if minute_maximum is not None and float(minute_maximum) >= limit:
         return "MINUTE_BURST_RISK", True
     if estimated_calls >= limit:
@@ -234,9 +260,9 @@ def _alerts(
     minute_status: str,
     has_429: bool,
     daily_used: float | None,
-    daily_limit: float,
+    daily_limit: float | None,
     minute_maximum: float | None,
-    minute_limit: float,
+    minute_limit: float | None,
 ) -> list[dict[str, Any]]:
     alerts: list[dict[str, Any]] = []
     if has_429:
@@ -250,21 +276,23 @@ def _alerts(
         )
     if daily_status in {"DAILY_BUDGET_WATCH", "DAILY_BUDGET_HIGH", "DAILY_BUDGET_CRITICAL", "LIMIT_EXCEEDED_OR_429"}:
         used_label = "unknown" if daily_used is None else f"{float(daily_used):.0f}"
+        limit_label = "unknown" if daily_limit is None else f"{float(daily_limit):.0f}"
         alerts.append(
             {
                 "id": "daily_budget_pressure",
                 "severity": "HIGH" if daily_status in {"DAILY_BUDGET_CRITICAL", "LIMIT_EXCEEDED_OR_429"} else "MEDIUM",
-                "message": f"Cota diaria Twelve Data em atencao: {used_label}/{float(daily_limit):.0f} creditos estimados.",
+                "message": f"Cota diaria Twelve Data em atencao: {used_label}/{limit_label} creditos estimados.",
                 "operational_authority": False,
             }
         )
     if minute_status == "MINUTE_BURST_RISK":
         max_label = "unknown" if minute_maximum is None else f"{float(minute_maximum):.0f}"
+        limit_label = "unknown" if minute_limit is None else f"{float(minute_limit):.0f}"
         alerts.append(
             {
                 "id": "minute_burst_risk",
                 "severity": "MEDIUM",
-                "message": f"Limite por minuto pressionado: max={max_label}/{float(minute_limit):.0f}. Risco de rajada, nao falha confirmada.",
+                "message": f"Limite por minuto pressionado: max={max_label}/{limit_label}. Risco de rajada, nao falha confirmada.",
                 "operational_authority": False,
             }
         )
@@ -311,10 +339,14 @@ def default_provider_budget_visual_fallback_state(
         "fallback_scope": "UNKNOWN",
         "fallback_scope_status": "UNKNOWN",
         "fallback_blocker_scope": "UNKNOWN",
+        "daily_budget_limit": None,
+        "daily_budget_source": "unknown",
         "daily_credit_limit_estimate": TWELVEDATA_DAILY_CREDIT_LIMIT_ESTIMATE,
         "daily_credits_used_estimate": None,
         "daily_credit_usage_pct": None,
         "daily_budget_status": "UNKNOWN",
+        "minute_limit": None,
+        "minute_limit_source": "unknown",
         "minute_limit_estimate": TWELVEDATA_MINUTE_LIMIT_ESTIMATE,
         "minutely_average": None,
         "minutely_maximum": None,
@@ -335,6 +367,7 @@ def default_provider_budget_visual_fallback_state(
         "ui_alerts": [],
         "blocked_actions": list(BLOCKED_ACTIONS),
         "recommendation": "insufficient_data",
+        "provider_budget_recommendation": "insufficient_data",
         "notes": reason,
         "paper_required": True,
         "observability_only": True,
@@ -392,15 +425,18 @@ def build_provider_budget_visual_fallback_audit(
     configured_provider = _safe_text(worker_status.get("configured_provider"), "unknown").lower()
     worker_provider = _provider(worker_status)
     visual_provider = _provider(visual_status) if visual_status else "unknown"
+    twelvedata_worker = _is_twelvedata_provider(worker_provider, configured_provider)
     has_429 = _has_429(worker_status, td_diag)
 
-    daily_limit = _first_number(
-        worker_status.get("twelvedata_daily_credit_limit"),
-        worker_status.get("daily_credit_limit"),
-        td_diag.get("daily_credit_limit"),
-        td_diag.get("credit_limit"),
-        TWELVEDATA_DAILY_CREDIT_LIMIT_ESTIMATE,
+    daily_limit, daily_limit_source = _first_number_with_source(
+        (worker_status.get("twelvedata_daily_credit_limit"), "configured"),
+        (worker_status.get("daily_credit_limit"), "configured"),
+        (td_diag.get("daily_credit_limit"), "configured"),
+        (td_diag.get("credit_limit"), "configured"),
     ) or float(TWELVEDATA_DAILY_CREDIT_LIMIT_ESTIMATE)
+    if daily_limit is None and twelvedata_worker:
+        daily_limit = float(TWELVEDATA_DAILY_CREDIT_LIMIT_ESTIMATE)
+        daily_limit_source = "estimated"
     daily_used = _first_number(
         worker_status.get("twelvedata_daily_credits_used"),
         worker_status.get("daily_credits_used"),
@@ -410,14 +446,19 @@ def build_provider_budget_visual_fallback_audit(
         td_diag.get("api_credits_used"),
     )
     daily_status, daily_usage_pct = _budget_status(daily_used, daily_limit, has_429)
+    daily_budget_source = "measured" if daily_used is not None else daily_limit_source
+    if daily_status == "UNKNOWN" and twelvedata_worker and daily_limit is not None:
+        daily_status = "DAILY_BUDGET_CONFIGURED_ONLY"
 
-    minute_limit = _first_number(
-        worker_status.get("twelvedata_minutely_limit"),
-        worker_status.get("minutely_limit"),
-        td_diag.get("minutely_limit"),
-        td_diag.get("minute_limit"),
-        TWELVEDATA_MINUTE_LIMIT_ESTIMATE,
+    minute_limit, minute_limit_source = _first_number_with_source(
+        (worker_status.get("twelvedata_minutely_limit"), "configured"),
+        (worker_status.get("minutely_limit"), "configured"),
+        (td_diag.get("minutely_limit"), "configured"),
+        (td_diag.get("minute_limit"), "configured"),
     ) or float(TWELVEDATA_MINUTE_LIMIT_ESTIMATE)
+    if minute_limit is None and twelvedata_worker:
+        minute_limit = float(TWELVEDATA_MINUTE_LIMIT_ESTIMATE)
+        minute_limit_source = "estimated"
     minute_average = _first_number(
         worker_status.get("twelvedata_minutely_average"),
         worker_status.get("minutely_average"),
@@ -440,6 +481,9 @@ def build_provider_budget_visual_fallback_audit(
         minute_limit=minute_limit,
         estimated_calls=estimated_provider_calls or provider_calls_attempted,
     )
+    minute_limit_source = "measured" if minute_average is not None or minute_maximum is not None else minute_limit_source
+    if minute_status == "UNKNOWN" and twelvedata_worker and minute_limit is not None:
+        minute_status = "MINUTE_LIMIT_CONFIGURED_ONLY"
 
     cache_hits = _safe_int(worker_status.get("cache_hits"))
     cache_misses = _safe_int(worker_status.get("cache_misses"))
@@ -470,6 +514,9 @@ def build_provider_budget_visual_fallback_audit(
     elif visual_only_fallback:
         budget_block_reason = "visual_only_fallback"
         provider_budget_status = "VISUAL_FALLBACK_ONLY"
+    elif not twelvedata_worker and daily_status == "UNKNOWN" and minute_status == "UNKNOWN":
+        budget_block_reason = "insufficient_provider_budget_data"
+        provider_budget_status = "UNKNOWN_PROVIDER_BUDGET"
     else:
         budget_block_reason = "none"
         provider_budget_status = "OK"
@@ -482,6 +529,8 @@ def build_provider_budget_visual_fallback_audit(
         has_429=has_429,
     )
     if recommendation not in SAFE_RECOMMENDATIONS:
+        recommendation = "insufficient_data"
+    if provider_budget_status == "UNKNOWN_PROVIDER_BUDGET":
         recommendation = "insufficient_data"
 
     alerts = _alerts(
@@ -525,10 +574,14 @@ def build_provider_budget_visual_fallback_audit(
         "fallback_scope": fallback_scope,
         "fallback_scope_status": fallback_scope,
         "fallback_blocker_scope": fallback_scope,
+        "daily_budget_limit": daily_limit,
+        "daily_budget_source": daily_budget_source,
         "daily_credit_limit_estimate": daily_limit,
         "daily_credits_used_estimate": daily_used,
         "daily_credit_usage_pct": daily_usage_pct,
         "daily_budget_status": daily_status,
+        "minute_limit": minute_limit,
+        "minute_limit_source": minute_limit_source,
         "minute_limit_estimate": minute_limit,
         "minutely_average": minute_average,
         "minutely_maximum": minute_maximum,
@@ -549,6 +602,7 @@ def build_provider_budget_visual_fallback_audit(
         "ui_alerts": alerts,
         "blocked_actions": list(BLOCKED_ACTIONS),
         "recommendation": recommendation,
+        "provider_budget_recommendation": recommendation,
         "notes": notes,
         "paper_required": True,
         "observability_only": True,
@@ -609,10 +663,13 @@ def build_provider_budget_visual_fallback_log_lines(audit_payload: Mapping[str, 
             f"{base};"
             f"daily_used={_log_text(audit.get('daily_credits_used_estimate'), 'unknown')};"
             f"daily_limit={_log_text(audit.get('daily_credit_limit_estimate'), str(TWELVEDATA_DAILY_CREDIT_LIMIT_ESTIMATE))};"
+            f"daily_budget_limit={_log_text(audit.get('daily_budget_limit'), str(TWELVEDATA_DAILY_CREDIT_LIMIT_ESTIMATE))};"
+            f"daily_budget_source={_log_text(audit.get('daily_budget_source'), 'unknown')};"
             f"daily_status={_log_text(audit.get('daily_budget_status'), 'UNKNOWN')};"
             f"minute_avg={_log_text(audit.get('minutely_average'), 'unknown')};"
             f"minute_max={_log_text(audit.get('minutely_maximum'), 'unknown')};"
-            f"minute_limit={_log_text(audit.get('minute_limit_estimate'), str(TWELVEDATA_MINUTE_LIMIT_ESTIMATE))};"
+            f"minute_limit={_log_text(audit.get('minute_limit'), str(TWELVEDATA_MINUTE_LIMIT_ESTIMATE))};"
+            f"minute_limit_source={_log_text(audit.get('minute_limit_source'), 'unknown')};"
             f"minute_status={_log_text(audit.get('minute_limit_status'), 'UNKNOWN')};"
             f"risk_429={str(bool(audit.get('risk_429', False))).lower()}"
         ),
