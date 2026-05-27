@@ -1165,7 +1165,14 @@ if multi_timeframe_swing_audit:
         pb_c4.metric("Provider visual", provider_budget_visual_fallback.get("provider_effective_visual") or "unknown")
         pb_d1, pb_d2, pb_d3, pb_d4 = st.columns(4)
         daily_used = provider_budget_visual_fallback.get("daily_credits_used_estimate")
-        daily_limit = provider_budget_visual_fallback.get("daily_credit_limit_estimate")
+        daily_limit = (
+            provider_budget_visual_fallback.get("daily_budget_limit")
+            or provider_budget_visual_fallback.get("daily_credit_limit_estimate")
+        )
+        minute_limit = (
+            provider_budget_visual_fallback.get("minute_limit")
+            or provider_budget_visual_fallback.get("minute_limit_estimate")
+        )
         daily_label = "-"
         if daily_used is not None and daily_limit is not None:
             daily_label = f"{float(daily_used):.0f}/{float(daily_limit):.0f}"
@@ -1173,6 +1180,12 @@ if multi_timeframe_swing_audit:
         pb_d2.metric("Uso diario estimado", daily_label)
         pb_d3.metric("Risco minuto", provider_budget_visual_fallback.get("minute_limit_status") or "UNKNOWN")
         pb_d4.metric("Risco 429", "Sim" if bool(provider_budget_visual_fallback.get("risk_429", False)) else "Nao")
+        pb_src1, pb_src2, pb_src3, pb_src4 = st.columns(4)
+        pb_src1.metric("Limite diario", "-" if daily_limit is None else f"{float(daily_limit):.0f}")
+        pb_src2.metric("Fonte cota", provider_budget_visual_fallback.get("daily_budget_source") or "unknown")
+        pb_src3.metric("Limite minuto", "-" if minute_limit is None else f"{float(minute_limit):.0f}/min")
+        pb_src4.metric("Fonte minuto", provider_budget_visual_fallback.get("minute_limit_source") or "unknown")
+        st.caption("Fonte: measured = medido no runtime; configured/estimated = limite informativo sem autoridade operacional; unknown = sem dado confiavel.")
         pb_e1, pb_e2, pb_e3, pb_e4 = st.columns(4)
         pb_e1.metric("Cache hits", int(provider_budget_visual_fallback.get("cache_hits", 0) or 0))
         pb_e2.metric("Cache misses", int(provider_budget_visual_fallback.get("cache_misses", 0) or 0))

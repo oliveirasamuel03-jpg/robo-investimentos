@@ -98,6 +98,46 @@ def test_visual_only_fallback_is_separated_from_worker_feed(isolated_storage):
     assert result["provider_authority"] is False
 
 
+def test_twelvedata_defaults_are_estimated_when_runtime_usage_is_missing(isolated_storage):
+    result = _build()
+
+    assert result["provider_effective_worker"] == "twelvedata"
+    assert result["daily_budget_limit"] == 800
+    assert result["minute_limit"] == 8
+    assert result["daily_budget_source"] == "estimated"
+    assert result["minute_limit_source"] == "estimated"
+    assert result["daily_budget_status"] == "DAILY_BUDGET_CONFIGURED_ONLY"
+    assert result["minute_limit_status"] == "MINUTE_LIMIT_CONFIGURED_ONLY"
+    assert result["trade_authority"] is False
+    assert result["provider_authority"] is False
+
+
+def test_unknown_provider_keeps_budget_unknown_without_twelvedata_defaults(isolated_storage):
+    result = _build(
+        worker=_worker_status(
+            provider="yahoo",
+            provider_effective="yahoo",
+            configured_provider="auto",
+            provider_diagnostics={},
+            estimated_provider_calls=0,
+            provider_calls_attempted=0,
+        ),
+        visual=_visual_status(provider="yahoo", provider_effective="yahoo"),
+    )
+
+    assert result["provider_effective_worker"] == "yahoo"
+    assert result["daily_budget_limit"] is None
+    assert result["minute_limit"] is None
+    assert result["daily_budget_source"] == "unknown"
+    assert result["minute_limit_source"] == "unknown"
+    assert result["daily_budget_status"] == "UNKNOWN"
+    assert result["minute_limit_status"] == "UNKNOWN"
+    assert result["provider_budget_status"] == "UNKNOWN_PROVIDER_BUDGET"
+    assert result["provider_budget_recommendation"] == "insufficient_data"
+    assert result["trade_authority"] is False
+    assert result["threshold_authority"] is False
+
+
 def test_minutely_maximum_at_limit_is_burst_risk_not_trade_authority(isolated_storage):
     result = _build(
         worker=_worker_status(
@@ -175,6 +215,12 @@ def test_log_lines_include_markers_and_safety_payload(isolated_storage):
 
     for marker in module.PROVIDER_BUDGET_VISUAL_FALLBACK_MARKERS:
         assert any(marker in line for line in lines)
+
+    budget = next(line for line in lines if "[provider_budget_visual_fallback_budget]" in line)
+    assert "daily_budget_limit=800" in budget or "daily_budget_limit=800.0" in budget
+    assert "daily_budget_source=estimated" in budget
+    assert "minute_limit=8" in budget or "minute_limit=8.0" in budget
+    assert "minute_limit_source=estimated" in budget
 
     safety = next(line for line in lines if "[provider_budget_visual_fallback_safety]" in line)
     assert "should_continue_paper=true" in safety
