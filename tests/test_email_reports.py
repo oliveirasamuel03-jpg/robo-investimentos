@@ -143,6 +143,10 @@ def test_daily_report_email_sends_once_only_per_day(isolated_storage, monkeypatc
     assert not second["sent"]
     assert captured[0][0] == "[PAPER] Daily Trading Report - 2026-04-23"
     assert captured[0][1].startswith("[PAPER MODE]")
+    assert "Decisão Atlas do Dia" in captured[0][1]
+    assert "O que está proibido hoje" in captured[0][1]
+    assert "Pré-condições para próxima fase" in captured[0][1]
+    assert "Resumo de Provider Budget" in captured[0][1]
     assert "Feed/rejection consistency:" in captured[0][1]
     assert "Gargalo atual parece estrategico" in captured[0][1]
     assert "Preview only; no operational threshold was changed." in captured[0][1]
