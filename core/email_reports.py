@@ -29,6 +29,7 @@ from core.config import (
     REPORT_EMAIL_USE_TLS,
     REPORT_EMAIL_WEEKLY_ENABLED,
 )
+from core.daily_report_diagnostic_clarity import build_atlas_daily_decision, format_atlas_daily_decision_block
 from core.market_data import build_feed_quality_snapshot
 from core.retention import load_weekly_summary, read_weekly_report_rows
 from core.signal_rejection_analysis import rejection_reason_label
@@ -844,6 +845,9 @@ def _build_daily_email_body(state: dict[str, Any], validation_report: dict[str, 
     phase2_fine_tune_summary = _phase2_fine_tune_summary(validation_report)
     phase2_1_fine_tune_summary = _phase2_1_fine_tune_summary(validation_report)
     short_audit_summary = _short_audit_summary(state, validation_report)
+    atlas_daily_decision_block = format_atlas_daily_decision_block(
+        build_atlas_daily_decision(validation_report, state=state)
+    )
     feed_rejection_diag = dict(validation_report.get("feed_rejection_consistency", {}) or {})
     feed_rejection_note = _safe_text(
         feed_rejection_diag.get("diagnostic_note"),
@@ -852,6 +856,8 @@ def _build_daily_email_body(state: dict[str, Any], validation_report: dict[str, 
 
     lines = [
         "[PAPER MODE] Nenhuma ordem real foi enviada.",
+        "",
+        atlas_daily_decision_block,
         "",
         f"Date: {_date_key(now)} (UTC)",
         f"Worker status: {_safe_text(state.get('worker_status'), fallback='offline')}",

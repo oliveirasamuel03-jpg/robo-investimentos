@@ -21,6 +21,7 @@ MODULES_TO_CLEAR = [
     "core.production_monitor",
     "core.alerts",
     "core.daily_risk",
+    "core.daily_report_diagnostic_clarity",
     "core.retention",
     "core.calibration_preview",
     "core.bos_confirmation_quality_audit",
