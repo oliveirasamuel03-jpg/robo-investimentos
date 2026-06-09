@@ -238,16 +238,19 @@ def _table_namespace(file_path: Path | str) -> str:
     return f"table:{Path(file_path).name.lower()}"
 
 
-def read_table(file_path: Path | str, columns: list[str] | None = None) -> pd.DataFrame:
+def read_table(file_path: Path | str, columns: list[str] | None = None, limit: int | None = None) -> pd.DataFrame:
     path = Path(file_path)
+    safe_limit = int(limit) if limit is not None else None
 
     if not database_enabled():
         try:
             df = pd.read_csv(path)
         except Exception:
             df = pd.DataFrame(columns=columns or [])
+        if safe_limit is not None and not df.empty:
+            df = df.tail(safe_limit).reset_index(drop=True)
     else:
-        rows = load_json_rows(_table_namespace(path), path.with_suffix(path.suffix + ".json"))
+        rows = load_json_rows(_table_namespace(path), path.with_suffix(path.suffix + ".json"), limit=safe_limit)
         df = pd.DataFrame(rows)
 
     if columns:

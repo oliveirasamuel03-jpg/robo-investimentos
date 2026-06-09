@@ -4,6 +4,7 @@ import json
 import smtplib
 from datetime import datetime, timedelta, timezone
 from email.message import EmailMessage
+from time import perf_counter
 from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
@@ -43,6 +44,14 @@ REPORT_TYPE_WEEKLY = "weekly"
 REPORT_TYPE_10DAY = "10day"
 REPORT_TYPE_FINAL = "final_30day"
 
+MAX_REPORT_ROWS = 500
+MAX_FINAL_REPORT_ROWS = 1000
+MAX_EMAIL_SECTION_CHARS = 6000
+MAX_EMAIL_BODY_CHARS = 65000
+MAX_DIAGNOSTIC_TEXT_CHARS = 1200
+MAX_RECENT_ITEMS_FOR_EMAIL = 10
+TRUNCATION_MARKER = "[TRUNCATED_FOR_MEMORY_GUARD]"
+
 FINAL_CLASSIFICATION_LABELS = {
     "REPROVADO_ESTRATEGIA": "REPROVADO",
     "REPROVADO_INSTABILIDADE": "REPROVADO",
@@ -66,6 +75,129 @@ def _utc_now(now: datetime | None = None) -> datetime:
 def _safe_text(value: object, *, fallback: str = "Sem leitura consolidada") -> str:
     text = str(value or "").strip()
     return text or fallback
+
+
+def _new_report_memory_guard(report_type: str) -> dict[str, Any]:
+    return {
+        "report_type": report_type,
+        "started_at": perf_counter(),
+        "rows_loaded": 0,
+        "rows_used": 0,
+        "report_chars": 0,
+        "sections_truncated": 0,
+        "truncated_sections": [],
+        "failed": False,
+    }
+
+
+def _mark_report_truncated(guard: dict[str, Any] | None, section: str) -> None:
+    if guard is None:
+        return
+    guard["sections_truncated"] = int(guard.get("sections_truncated", 0) or 0) + 1
+    truncated_sections = list(guard.get("truncated_sections", []) or [])
+    if section and section not in truncated_sections:
+        truncated_sections.append(section)
+    guard["truncated_sections"] = truncated_sections[:MAX_RECENT_ITEMS_FOR_EMAIL]
+
+
+def _truncate_report_text(
+    value: object,
+    *,
+    max_chars: int = MAX_DIAGNOSTIC_TEXT_CHARS,
+    guard: dict[str, Any] | None = None,
+    section: str = "diagnostic_text",
+) -> str:
+    text = _safe_text(value, fallback="")
+    if len(text) <= max_chars:
+        return text
+    _mark_report_truncated(guard, section)
+    return f"{text[:max_chars]}... {TRUNCATION_MARKER} original_chars={len(text)} limit={max_chars}"
+
+
+def _guard_report_lines(lines: list[str], guard: dict[str, Any] | None = None) -> list[str]:
+    guarded: list[str] = []
+    for index, line in enumerate(lines):
+        guarded.append(
+            _truncate_report_text(
+                line,
+                max_chars=MAX_EMAIL_SECTION_CHARS,
+                guard=guard,
+                section=f"line_{index}",
+            )
+        )
+    return guarded
+
+
+def _guard_report_body(body: str, guard: dict[str, Any] | None = None) -> str:
+    if len(body) <= MAX_EMAIL_BODY_CHARS:
+        return body
+    _mark_report_truncated(guard, "email_body")
+    return (
+        f"{body[:MAX_EMAIL_BODY_CHARS]}\n"
+        f"{TRUNCATION_MARKER} email_body original_chars={len(body)} limit={MAX_EMAIL_BODY_CHARS}"
+    )
+
+
+def _finalize_report_body(lines: list[str], guard: dict[str, Any] | None = None) -> str:
+    body = "\n".join(_guard_report_lines(lines, guard))
+    body = _guard_report_body(body, guard)
+    if guard is not None:
+        guard["report_chars"] = len(body)
+    return body
+
+
+def _log_report_memory_guard(guard: dict[str, Any]) -> None:
+    duration_ms = int((perf_counter() - float(guard.get("started_at", perf_counter()))) * 1000)
+    try:
+        log_event(
+            "INFO",
+            "[daily_report_memory_guard] "
+            f"report_type={_safe_text(guard.get('report_type'), fallback='unknown')};"
+            f"rows_loaded={int(guard.get('rows_loaded', 0) or 0)};"
+            f"rows_used={int(guard.get('rows_used', 0) or 0)};"
+            f"report_chars={int(guard.get('report_chars', 0) or 0)};"
+            f"sections_truncated={int(guard.get('sections_truncated', 0) or 0)};"
+            f"duration_ms={duration_ms};"
+            f"failed={str(bool(guard.get('failed', False))).lower()};"
+            "mode=REPORT_ONLY;"
+            "paper_required=true;"
+            "trade_authority=false;"
+            "score_authority=false;"
+            "threshold_authority=false;"
+            "execution_authority=false",
+        )
+    except Exception:
+        # Logging is best-effort only; report delivery must not depend on it.
+        return
+
+
+def _fallback_report_body(report_type: str, exc: Exception, now: datetime, guard: dict[str, Any]) -> str:
+    guard["failed"] = True
+    lines = [
+        "[PAPER MODE] Nenhuma ordem real foi enviada.",
+        "",
+        "Report memory guard fallback:",
+        f"- Report type: {report_type}",
+        f"- Generated at: {_utc_now(now).isoformat()}",
+        "- Mode: REPORT_ONLY / OBSERVABILITY_ONLY / DIAGNOSTIC_ONLY",
+        "- PAPER TRADING obrigatorio permanece preservado.",
+        "- Nenhuma ordem real foi enviada.",
+        "- FASE 2.6C continua bloqueada.",
+        "- trade_authority=false; score_authority=false; threshold_authority=false; execution_authority=false.",
+        f"- Assembly error: {_truncate_report_text(exc, guard=guard, section='assembly_error')}",
+    ]
+    return _finalize_report_body(lines, guard)
+
+
+def _build_report_body_safely(report_type: str, builder: Any, now: datetime) -> str:
+    guard = _new_report_memory_guard(report_type)
+    try:
+        body = builder(guard)
+    except Exception as exc:
+        body = _fallback_report_body(report_type, exc, now, guard)
+    guard["report_chars"] = len(body)
+    _log_report_memory_guard(guard)
+    return body
 
 
 def _format_money(value: Any) -> str:
@@ -799,14 +931,24 @@ def _ui_coherence_summary(state: dict[str, Any]) -> str:
     return "Snapshot compartilhado ainda sem prova completa no estado atual."
 
 
-def _build_daily_email_body(state: dict[str, Any], validation_report: dict[str, Any], now: datetime) -> str:
+def _build_daily_email_body(
+    state: dict[str, Any],
+    validation_report: dict[str, Any],
+    now: datetime,
+    memory_guard: dict[str, Any] | None = None,
+) -> str:
     market_state = dict(state.get("market_data", {}) or {})
     production = dict(state.get("production", {}) or {})
     consistency = dict(validation_report.get("consistency", {}) or {})
     metrics = dict(validation_report.get("metrics", {}) or {})
     rejection_quality = dict(validation_report.get("rejection_quality", {}) or {})
     start_at, end_at = _day_bounds(now)
-    daily_reports = _filter_reports_between(read_trade_reports(), start_at, end_at)
+    source_reports = read_trade_reports(limit=MAX_REPORT_ROWS)
+    if memory_guard is not None:
+        memory_guard["rows_loaded"] = len(source_reports)
+    daily_reports = _filter_reports_between(source_reports, start_at, end_at)
+    if memory_guard is not None:
+        memory_guard["rows_used"] = len(daily_reports)
     daily_metrics = calculate_trade_report_metrics(daily_reports)
     daily_profit_factor = _profit_factor_from_reports(daily_reports)
     feed_quality = build_feed_quality_snapshot(market_state)
@@ -821,8 +963,16 @@ def _build_daily_email_body(state: dict[str, Any], validation_report: dict[str, 
     fallback_count = int(feed_quality.get("fallback_count") or 0)
     last_success_text = _safe_text(feed_quality.get("last_success_at"))
     health_level_text = _safe_text(production.get("health_level"), fallback="healthy")
-    health_message_text = _safe_text(production.get("health_message"), fallback="Sem mensagem")
-    validation_reading_text = _safe_text(consistency.get("validation_reading_message"))
+    health_message_text = _truncate_report_text(
+        _safe_text(production.get("health_message"), fallback="Sem mensagem"),
+        guard=memory_guard,
+        section="production.health_message",
+    )
+    validation_reading_text = _truncate_report_text(
+        _safe_text(consistency.get("validation_reading_message")),
+        guard=memory_guard,
+        section="consistency.validation_reading_message",
+    )
     composite_summary = _composite_summary(validation_report, daily_reports)
     multi_timeframe_summary = _multi_timeframe_summary(validation_report)
     bos_pivot_trace_summary = _bos_pivot_trace_audit_summary(validation_report)
@@ -849,9 +999,13 @@ def _build_daily_email_body(state: dict[str, Any], validation_report: dict[str, 
         build_atlas_daily_decision(validation_report, state=state)
     )
     feed_rejection_diag = dict(validation_report.get("feed_rejection_consistency", {}) or {})
-    feed_rejection_note = _safe_text(
-        feed_rejection_diag.get("diagnostic_note"),
-        fallback="Sem diagnostico feed x rejeicao consolidado.",
+    feed_rejection_note = _truncate_report_text(
+        _safe_text(
+            feed_rejection_diag.get("diagnostic_note"),
+            fallback="Sem diagnostico feed x rejeicao consolidado.",
+        ),
+        guard=memory_guard,
+        section="feed_rejection_consistency.diagnostic_note",
     )
 
     lines = [
@@ -905,7 +1059,7 @@ def _build_daily_email_body(state: dict[str, Any], validation_report: dict[str, 
         f"- Operational health: {health_level_text} | {health_message_text}",
         f"- Validation reading: {validation_reading_text}",
     ]
-    return "\n".join(lines)
+    return _finalize_report_body(lines, memory_guard)
 
 
 def _current_weekly_entry(state: dict[str, Any], now: datetime) -> dict[str, Any] | None:
@@ -920,10 +1074,22 @@ def _current_weekly_entry(state: dict[str, Any], now: datetime) -> dict[str, Any
     return dict(weekly_index[0]) if weekly_index else None
 
 
-def _build_weekly_email_body(state: dict[str, Any], validation_report: dict[str, Any], now: datetime) -> str:
+def _build_weekly_email_body(
+    state: dict[str, Any],
+    validation_report: dict[str, Any],
+    now: datetime,
+    memory_guard: dict[str, Any] | None = None,
+) -> str:
     entry = _current_weekly_entry(state, now)
     weekly_summary = load_weekly_summary(entry) if entry else {}
     weekly_rows = read_weekly_report_rows(entry) if entry else pd.DataFrame()
+    if memory_guard is not None:
+        memory_guard["rows_loaded"] = len(weekly_rows)
+    if len(weekly_rows) > MAX_REPORT_ROWS:
+        _mark_report_truncated(memory_guard, "weekly_rows")
+        weekly_rows = weekly_rows.tail(MAX_REPORT_ROWS).reset_index(drop=True)
+    if memory_guard is not None:
+        memory_guard["rows_used"] = len(weekly_rows)
     weekly_profit_factor = _profit_factor_from_reports(weekly_rows)
     rejection_quality = dict(validation_report.get("rejection_quality", {}) or {})
     dominant_strategy = _safe_text(rejection_quality.get("top_strategy"))
@@ -955,7 +1121,7 @@ def _build_weekly_email_body(state: dict[str, Any], validation_report: dict[str,
         f"Weekly recommendation: {recommendation}",
         f"Suggestion highlight: {suggestion_text}",
     ]
-    return "\n".join(lines)
+    return _finalize_report_body(lines, memory_guard)
 
 
 def _current_block_number(day_number: int) -> int:
@@ -980,7 +1146,12 @@ def _block_status_message(validation_report: dict[str, Any], block_number: int) 
     return "MANTER COLETA CONTROLADA"
 
 
-def _build_10day_email_body(state: dict[str, Any], validation_report: dict[str, Any], now: datetime) -> str:
+def _build_10day_email_body(
+    state: dict[str, Any],
+    validation_report: dict[str, Any],
+    now: datetime,
+    memory_guard: dict[str, Any] | None = None,
+) -> str:
     day_number = int(validation_report.get("validation_day_number", 1) or 1)
     block_number = _current_block_number(day_number)
     current_status = _safe_text(validation_report.get("phase_conclusion"))
@@ -1014,12 +1185,12 @@ def _build_10day_email_body(state: dict[str, Any], validation_report: dict[str, 
         "Strengths:",
     ]
     if strengths:
-        lines.extend(f"- {item}" for item in strengths[:4])
+        lines.extend(f"- {item}" for item in strengths[:MAX_RECENT_ITEMS_FOR_EMAIL])
     else:
         lines.append("- Sem forcas consolidadas suficientes ate aqui.")
     lines.append("Risks:")
     if risks:
-        lines.extend(f"- {item}" for item in risks[:4])
+        lines.extend(f"- {item}" for item in risks[:MAX_RECENT_ITEMS_FOR_EMAIL])
     else:
         lines.append("- Sem riscos dominantes fora do baseline atual.")
     lines.extend(
@@ -1028,7 +1199,7 @@ def _build_10day_email_body(state: dict[str, Any], validation_report: dict[str, 
             f"Audit summary: {audit_summary}",
         ]
     )
-    return "\n".join(lines)
+    return _finalize_report_body(lines, memory_guard)
 
 
 def _final_classification(validation_report: dict[str, Any], state: dict[str, Any]) -> str:
@@ -1085,7 +1256,12 @@ def _final_report_subject() -> str:
     return "[PAPER] Final 30-Day Phase Report"
 
 
-def _build_final_email_body(state: dict[str, Any], validation_report: dict[str, Any], now: datetime) -> str:
+def _build_final_email_body(
+    state: dict[str, Any],
+    validation_report: dict[str, Any],
+    now: datetime,
+    memory_guard: dict[str, Any] | None = None,
+) -> str:
     metrics = dict(validation_report.get("metrics", {}) or {})
     consistency = dict(validation_report.get("consistency", {}) or {})
     market_state = dict(state.get("market_data", {}) or {})
@@ -1098,7 +1274,10 @@ def _build_final_email_body(state: dict[str, Any], validation_report: dict[str, 
     decision_quality_summary = _safe_text(consistency.get("signal_quality_message"))
     consistency_summary = _safe_text(consistency.get("validation_reading_message"))
     drawdown_text = _format_pct(metrics.get("max_drawdown_pct"))
-    full_reports = read_trade_reports()
+    full_reports = read_trade_reports(limit=MAX_FINAL_REPORT_ROWS)
+    if memory_guard is not None:
+        memory_guard["rows_loaded"] = len(full_reports)
+        memory_guard["rows_used"] = len(full_reports)
     profit_factor_value = _profit_factor_from_reports(full_reports)
     profit_factor_text = _format_ratio(profit_factor_value)
     feed_status_text = _safe_text(market_state.get("feed_status"), fallback="UNKNOWN")
@@ -1127,7 +1306,7 @@ def _build_final_email_body(state: dict[str, Any], validation_report: dict[str, 
         "Main risks:",
     ]
     if main_risks:
-        lines.extend(f"- {item}" for item in main_risks[:5])
+        lines.extend(f"- {item}" for item in main_risks[:MAX_RECENT_ITEMS_FOR_EMAIL])
     else:
         lines.append("- Sem riscos dominantes adicionais no fechamento.")
     lines.extend(
@@ -1135,7 +1314,7 @@ def _build_final_email_body(state: dict[str, Any], validation_report: dict[str, 
             f"Recommended next steps: {next_steps}",
         ]
     )
-    return "\n".join(lines)
+    return _finalize_report_body(lines, memory_guard)
 
 
 def _daily_report_due(email_state: dict[str, Any], now: datetime) -> bool:
@@ -1253,10 +1432,15 @@ def process_report_email_delivery(
 
     if _daily_report_due(email_state, current_time):
         subject = f"[PAPER] Daily Trading Report - {_date_key(current_time)}"
+        body = _build_report_body_safely(
+            REPORT_TYPE_DAILY,
+            lambda guard: _build_daily_email_body(payload, report, current_time, guard),
+            current_time,
+        )
         result = _send_due_report(
             report_type=REPORT_TYPE_DAILY,
             subject=subject,
-            body=_build_daily_email_body(payload, report, current_time),
+            body=body,
             marker=_date_key(current_time),
             now=current_time,
         )
@@ -1264,10 +1448,15 @@ def process_report_email_delivery(
 
     if _weekly_report_due(email_state, current_time):
         subject = f"[PAPER] Weekly Trading Report - {_week_key(current_time)}"
+        body = _build_report_body_safely(
+            REPORT_TYPE_WEEKLY,
+            lambda guard: _build_weekly_email_body(payload, report, current_time, guard),
+            current_time,
+        )
         result = _send_due_report(
             report_type=REPORT_TYPE_WEEKLY,
             subject=subject,
-            body=_build_weekly_email_body(payload, report, current_time),
+            body=body,
             marker=_week_key(current_time),
             now=current_time,
         )
@@ -1277,10 +1466,15 @@ def process_report_email_delivery(
         block_number = _current_block_number(int(report.get("validation_day_number", 1) or 1))
         trigger_day = _block_trigger_day(block_number)
         subject = f"[PAPER] Evaluation Block {block_number} Report - Day {trigger_day}"
+        body = _build_report_body_safely(
+            REPORT_TYPE_10DAY,
+            lambda guard: _build_10day_email_body(payload, report, current_time, guard),
+            current_time,
+        )
         result = _send_due_report(
             report_type=REPORT_TYPE_10DAY,
             subject=subject,
-            body=_build_10day_email_body(payload, report, current_time),
+            body=body,
             marker=str(block_number),
             now=current_time,
         )
@@ -1288,10 +1482,15 @@ def process_report_email_delivery(
 
     if _final_report_due(email_state, report):
         subject = _final_report_subject()
+        body = _build_report_body_safely(
+            REPORT_TYPE_FINAL,
+            lambda guard: _build_final_email_body(payload, report, current_time, guard),
+            current_time,
+        )
         result = _send_due_report(
             report_type=REPORT_TYPE_FINAL,
             subject=subject,
-            body=_build_final_email_body(payload, report, current_time),
+            body=body,
             marker="final",
             now=current_time,
         )

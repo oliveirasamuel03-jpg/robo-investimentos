@@ -77,3 +77,25 @@ def test_calculate_equity_curve_metrics_reports_drawdown(isolated_storage):
     assert metrics["peak_equity"] == 1050.0
     assert metrics["max_drawdown_brl"] == 60.0
     assert round(float(metrics["max_drawdown_pct"] or 0.0), 6) == round(60.0 / 1050.0, 6)
+
+
+def test_read_trade_reports_passes_limit_to_storage_reader(isolated_storage, monkeypatch):
+    reports = load_module("core.trader_reports")
+    captured_limits: list[int | None] = []
+
+    def fake_read_table(file_path, columns=None, limit=None):
+        captured_limits.append(limit)
+        return pd.DataFrame(
+            [
+                {"closed_at": "2026-04-21T00:00:00+00:00", "realized_pnl": 1.0},
+                {"closed_at": "2026-04-22T00:00:00+00:00", "realized_pnl": 2.0},
+                {"closed_at": "2026-04-23T00:00:00+00:00", "realized_pnl": 3.0},
+            ]
+        )
+
+    monkeypatch.setattr(reports, "read_table", fake_read_table)
+
+    reports_df = reports.read_trade_reports(limit=2)
+
+    assert captured_limits == [2]
+    assert len(reports_df) == 2

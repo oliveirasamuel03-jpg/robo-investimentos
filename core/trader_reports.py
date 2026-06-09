@@ -112,7 +112,7 @@ def normalize_trade_reports_frame(df: pd.DataFrame | None) -> pd.DataFrame:
 
 
 def read_trade_reports(limit: int | None = None) -> pd.DataFrame:
-    df = read_table(TRADER_REPORTS_FILE, columns=TRADER_REPORTS_COLUMNS)
+    df = read_table(TRADER_REPORTS_FILE, columns=TRADER_REPORTS_COLUMNS, limit=limit)
     df = normalize_trade_reports_frame(df)
     if limit is not None and not df.empty:
         return df.tail(int(limit)).reset_index(drop=True)

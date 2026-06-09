@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+from copy import deepcopy
 from datetime import datetime, timezone
 
+import pandas as pd
 import pytest
 
 from tests.conftest import load_module
@@ -298,3 +300,118 @@ def test_email_reporting_status_supports_old_state_shape(isolated_storage, monke
     assert status["destination"] == "ops@example.com"
     assert status["last_delivery_status"] == ""
     assert status["enabled"] is True
+
+
+def test_daily_report_memory_guard_limits_history_and_logs_marker(isolated_storage, monkeypatch):
+    _configure_report_email_env(monkeypatch, daily=True, weekly=False, ten_day=False, final=False)
+    email_reports = load_module("core.email_reports")
+
+    now = datetime(2026, 4, 23, 12, 0, tzinfo=timezone.utc)
+    captured_limits: list[int | None] = []
+    captured_emails: list[str] = []
+    captured_logs: list[str] = []
+
+    def fake_read_trade_reports(limit=None):
+        captured_limits.append(limit)
+        return pd.DataFrame(
+            [
+                {"closed_at": "2026-04-23T08:00:00+00:00", "realized_pnl": 10.0, "entry_score": 0.82},
+                {"closed_at": "2026-04-23T09:00:00+00:00", "realized_pnl": -2.0, "entry_score": 0.76},
+            ]
+        )
+
+    monkeypatch.setattr(email_reports, "read_trade_reports", fake_read_trade_reports)
+    monkeypatch.setattr(email_reports, "log_event", lambda level, message: captured_logs.append(message))
+    monkeypatch.setattr(
+        email_reports,
+        "_send_report_email",
+        lambda subject, body: captured_emails.append(body) or {"sent": True, "reason": "sent", "provider": "smtp"},
+    )
+
+    result = email_reports.process_report_email_delivery(validation_report=_sample_validation_report(4), now=now)
+
+    assert result["sent"]
+    assert captured_limits == [email_reports.MAX_REPORT_ROWS]
+    assert "Decisão Atlas do Dia" in captured_emails[0]
+    assert "Resumo de Provider Budget" in captured_emails[0]
+    memory_logs = [item for item in captured_logs if "[daily_report_memory_guard]" in item]
+    assert memory_logs
+    assert "rows_loaded=2" in memory_logs[0]
+    assert "rows_used=2" in memory_logs[0]
+    assert "sections_truncated=0" in memory_logs[0]
+    assert "mode=REPORT_ONLY" in memory_logs[0]
+    assert "paper_required=true" in memory_logs[0]
+    assert "trade_authority=false" in memory_logs[0]
+
+
+def test_report_memory_guard_truncates_long_sections_and_preserves_safety(isolated_storage):
+    email_reports = load_module("core.email_reports")
+    guard = email_reports._new_report_memory_guard(email_reports.REPORT_TYPE_DAILY)
+    long_line = "diagnostic=" + ("x" * (email_reports.MAX_EMAIL_SECTION_CHARS + 50))
+
+    body = email_reports._finalize_report_body(
+        [
+            "[PAPER MODE] Nenhuma ordem real foi enviada.",
+            "Decisão Atlas do Dia",
+            "Resumo de Provider Budget",
+            long_line,
+        ],
+        guard,
+    )
+
+    assert "[PAPER MODE] Nenhuma ordem real foi enviada." in body
+    assert "Decisão Atlas do Dia" in body
+    assert "Resumo de Provider Budget" in body
+    assert email_reports.TRUNCATION_MARKER in body
+    assert guard["sections_truncated"] == 1
+
+
+def test_report_memory_guard_fallback_does_not_raise_and_preserves_authorities(isolated_storage, monkeypatch):
+    email_reports = load_module("core.email_reports")
+    now = datetime(2026, 4, 23, 12, 0, tzinfo=timezone.utc)
+    captured_logs: list[str] = []
+    monkeypatch.setattr(email_reports, "log_event", lambda level, message: captured_logs.append(message))
+
+    def failing_builder(guard):
+        raise RuntimeError("synthetic report assembly failure")
+
+    body = email_reports._build_report_body_safely(email_reports.REPORT_TYPE_DAILY, failing_builder, now)
+
+    assert "[PAPER MODE] Nenhuma ordem real foi enviada." in body
+    assert "PAPER TRADING obrigatorio permanece preservado." in body
+    assert "FASE 2.6C continua bloqueada." in body
+    assert "trade_authority=false" in body
+    assert "score_authority=false" in body
+    assert "threshold_authority=false" in body
+    assert "execution_authority=false" in body
+    assert any("[daily_report_memory_guard]" in item and "failed=true" in item for item in captured_logs)
+
+
+def test_report_memory_hotfix_does_not_mutate_operational_payloads(isolated_storage, monkeypatch):
+    email_reports = load_module("core.email_reports")
+    now = datetime(2026, 4, 23, 12, 0, tzinfo=timezone.utc)
+    state = {
+        "worker_status": "online",
+        "worker_heartbeat": now.isoformat(),
+        "market_data": {"feed_status": "LIVE", "provider_effective": "twelvedata"},
+        "market_context": {"market_context_status": "CRITICO"},
+        "production": {"health_level": "healthy", "health_message": "ok"},
+    }
+    report = _sample_validation_report(4)
+    state_before = deepcopy(state)
+    report_before = deepcopy(report)
+
+    monkeypatch.setattr(email_reports, "read_trade_reports", lambda limit=None: pd.DataFrame())
+
+    body = email_reports._build_daily_email_body(
+        state,
+        report,
+        now,
+        email_reports._new_report_memory_guard(email_reports.REPORT_TYPE_DAILY),
+    )
+
+    assert state == state_before
+    assert report == report_before
+    assert "Decisão Atlas do Dia" in body
+    assert "Resumo de Provider Budget" in body
+    assert "Nenhuma ordem real foi enviada" in body
