@@ -78,3 +78,18 @@ def load_module(name: str):
     if name in sys.modules:
         return importlib.reload(sys.modules[name])
     return importlib.import_module(name)
+
+
+def fake_market_result(frames, requested_by="worker_cycle"):
+    """Current feed contract, with source metadata derived from fixture frames."""
+    counts = {"market": 0, "cached": 0, "fallback": 0, "unknown": 0}
+    for frame in frames.values():
+        source = str(frame.iloc[-1].get("data_source", "unknown"))
+        counts[source if source in counts else "unknown"] += 1
+    source = max(counts, key=counts.get)
+    return {"frames": frames, "status": {
+        "provider": "fixture", "status": "healthy" if source == "market" else "degraded",
+        "last_sync_at": "2026-01-01T00:00:00+00:00", "last_source": source,
+        "source_breakdown": counts, "symbols": list(frames),
+        "requested_by": requested_by, "last_error": "",
+    }}

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from copy import deepcopy
 
-from conftest import load_module
+from tests.conftest import load_module
 
 
 SAFE_RECOMMENDATIONS = {

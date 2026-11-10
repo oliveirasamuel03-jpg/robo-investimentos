@@ -5,7 +5,7 @@ import streamlit as st
 from core.auth.guards import switch_to_page
 from core.auth.security import verify_password
 from core.auth.session import auth_required, has_active_session, login_user
-from core.auth.users_store import create_user, ensure_bootstrap_admin, get_user, list_users
+from core.auth.users_store import ensure_bootstrap_admin, get_user, list_users
 
 
 st.set_page_config(page_title="Login", layout="centered")
@@ -35,24 +35,9 @@ if not auth_is_required:
 st.markdown("---")
 
 if not existing_users:
-    st.warning("Nenhum usuario encontrado. Crie o administrador inicial para proteger o app.")
-    with st.form("bootstrap_admin_form"):
-        bootstrap_username = st.text_input("Usuario admin")
-        bootstrap_password = st.text_input("Senha admin", type="password")
-        bootstrap_password_confirm = st.text_input("Confirmar senha", type="password")
-        bootstrap_submit = st.form_submit_button("Criar admin inicial", use_container_width=True)
-
-    if bootstrap_submit:
-        if bootstrap_password != bootstrap_password_confirm:
-            st.error("As senhas nao conferem.")
-        else:
-            try:
-                user = create_user(bootstrap_username, bootstrap_password, "admin")
-                login_user(user)
-                st.success("Administrador criado com sucesso.")
-                go_to_app()
-            except Exception as exc:
-                st.error(f"Nao foi possivel criar o administrador: {exc}")
+    st.error("Acesso indisponivel: administrador inicial ainda nao configurado.")
+    st.info("O responsavel deve configurar o bootstrap administrativo pelo ambiente protegido do servidor.")
+    st.stop()
 else:
     with st.form("login_form"):
         username = st.text_input("Usuario")

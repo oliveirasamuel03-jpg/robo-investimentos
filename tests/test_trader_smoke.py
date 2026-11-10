@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 import yfinance as yf
 
-from tests.conftest import load_module
+from tests.conftest import load_module, fake_market_result
 
 
 class _FakeUrlopenResponse:
@@ -53,8 +53,9 @@ def test_run_trader_cycle_smoke_with_synthetic_prices(isolated_storage, monkeypa
 
     monkeypatch.setattr(
         paper_engine,
-        "load_market_data_map",
-        lambda symbols, config: {str(symbol).upper(): _fake_prices() for symbol in symbols},
+        "load_market_data_result",
+        lambda symbols, config, requested_by="worker_cycle": fake_market_result(
+            {str(symbol).upper(): _fake_prices() for symbol in symbols}, requested_by),
     )
     monkeypatch.setattr(
         paper_engine,
@@ -138,8 +139,9 @@ def test_run_paper_cycle_skips_new_entries_when_prices_are_fallback(isolated_sto
 
     monkeypatch.setattr(
         paper_engine,
-        "load_market_data_map",
-        lambda symbols, config: {str(symbol).upper(): fallback_prices() for symbol in symbols},
+        "load_market_data_result",
+        lambda symbols, config, requested_by="worker_cycle": fake_market_result(
+            {str(symbol).upper(): fallback_prices() for symbol in symbols}, requested_by),
     )
     monkeypatch.setattr(
         paper_engine,
@@ -178,8 +180,9 @@ def test_run_paper_cycle_blocks_new_entries_when_daily_loss_guard_is_active(isol
 
     monkeypatch.setattr(
         paper_engine,
-        "load_market_data_map",
-        lambda symbols, config: {str(symbol).upper(): _fake_prices() for symbol in symbols},
+        "load_market_data_result",
+        lambda symbols, config, requested_by="worker_cycle": fake_market_result(
+            {str(symbol).upper(): _fake_prices() for symbol in symbols}, requested_by),
     )
     monkeypatch.setattr(
         paper_engine,
@@ -226,8 +229,9 @@ def test_run_paper_cycle_does_not_close_open_position_when_market_data_is_not_li
 
     monkeypatch.setattr(
         paper_engine,
-        "load_market_data_map",
-        lambda symbols, config: {str(symbol).upper(): cached_prices() for symbol in symbols},
+        "load_market_data_result",
+        lambda symbols, config, requested_by="worker_cycle": fake_market_result(
+            {str(symbol).upper(): cached_prices() for symbol in symbols}, requested_by),
     )
     monkeypatch.setattr(paper_engine, "_should_sell", lambda position, latest, holding_minutes, config: (True, "stop loss"))
 

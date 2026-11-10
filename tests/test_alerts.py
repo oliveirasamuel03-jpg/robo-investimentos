@@ -15,7 +15,12 @@ def test_should_send_alert_respects_disabled_mode(isolated_storage):
     assert result["allowed"] is False
 
 
-def test_should_send_alert_respects_cooldown(isolated_storage):
+def test_should_send_alert_respects_cooldown(isolated_storage, monkeypatch):
+    monkeypatch.setenv("PRODUCTION_MODE", "true")
+    monkeypatch.setenv("ALERT_EMAIL_ENABLED", "true")
+    monkeypatch.setenv("ALERT_EMAIL_PROVIDER", "resend")
+    monkeypatch.setenv("RESEND_API_KEY", "fixture-key")
+    monkeypatch.setenv("ALERT_EMAIL_FROM", "fixture@example.invalid")
     state_store = load_module("core.state_store")
     alerts = load_module("core.alerts")
 

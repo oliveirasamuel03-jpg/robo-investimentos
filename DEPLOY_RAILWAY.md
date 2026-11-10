@@ -1,5 +1,9 @@
 # Deploy no Railway
 
+> INFRA-1 (2026-11-10): roteiro historico abaixo, NAO executar nesta fase.
+> Nao criar recursos, habilitar worker, fazer merge ou deploy.
+> Consulte [o relatorio de retomada](docs/retomada/ATLAS_RELATORIO_RETOMADA_SEGURA.md).
+
 Este projeto deve ser publicado com tres componentes no mesmo projeto Railway:
 
 - `web`: interface Streamlit

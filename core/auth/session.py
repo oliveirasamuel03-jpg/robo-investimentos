@@ -28,10 +28,6 @@ def _parse_iso(value: str | None) -> datetime | None:
     return parsed.astimezone(timezone.utc)
 
 
-def _truthy(value: str | None) -> bool:
-    return str(value or "").strip().lower() in {"1", "true", "yes", "y", "on"}
-
-
 def session_timeout_minutes() -> int:
     raw = str(os.getenv("AUTH_SESSION_TIMEOUT_MINUTES", SESSION_TIMEOUT_MINUTES) or "").strip()
     try:
@@ -42,20 +38,11 @@ def session_timeout_minutes() -> int:
 
 
 def auth_required() -> bool:
-    explicit = os.getenv("AUTH_REQUIRED")
-    if explicit not in (None, ""):
-        return _truthy(explicit)
+    """Authentication is mandatory, including local demos (INFRA-1).
 
-    for key in ("APP_ENV", "ENVIRONMENT", "STREAMLIT_ENV"):
-        if str(os.getenv(key, "")).strip().lower() in {"prod", "production"}:
-            return True
-
-    if str(os.getenv("RAILWAY_ENVIRONMENT", "")).strip():
-        return True
-    if str(os.getenv("RAILWAY_PROJECT_ID", "")).strip():
-        return True
-
-    return False
+    Legacy AUTH_REQUIRED=false must never grant anonymous administrator access.
+    """
+    return True
 
 
 def _sanitize_user(user: dict | None) -> dict | None:
@@ -67,15 +54,6 @@ def _sanitize_user(user: dict | None) -> dict | None:
         "role": str(user.get("role", "user")).strip().lower() or "user",
         "disabled": bool(user.get("disabled", False)),
         "auth_mode": str(user.get("auth_mode", "session")).strip() or "session",
-    }
-
-
-def _dev_user() -> dict:
-    return {
-        "username": "local-dev",
-        "role": "admin",
-        "disabled": False,
-        "auth_mode": "dev-bypass",
     }
 
 
@@ -108,7 +86,9 @@ def logout_user() -> None:
 
 def has_active_session() -> bool:
     session_user = _sanitize_user(st.session_state.get(SESSION_USER_KEY))
-    if not session_user:
+    if (not session_user or not session_user["username"] or session_user["disabled"]
+            or session_user["auth_mode"] != "session"):
+        logout_user()
         return False
 
     if _session_timed_out():
@@ -132,17 +112,14 @@ def get_current_user() -> dict | None:
 
             if not persisted_user or persisted_user.get("disabled", False):
                 logout_user()
-                return None if auth_required() else _dev_user()
+                return None
 
             session_user["role"] = str(persisted_user.get("role", session_user["role"])).lower()
             st.session_state[SESSION_USER_KEY] = session_user
 
         return session_user
 
-    if auth_required():
-        return None
-
-    return _dev_user()
+    return None
 
 
 def is_authenticated() -> bool:

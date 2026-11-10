@@ -318,6 +318,12 @@ def test_update_market_data_status_tracks_last_success_and_error(isolated_storag
     assert root_after_success["feed_status"] == "LIVE"
     assert root_after_success["provider_diagnostics"]["twelvedata"]["api_key_present"] is True
 
+    # Each context owns its success timestamp; a chart must not borrow the worker's.
+    state_store.update_market_data_status({
+        "provider": "yahoo", "status": "healthy", "last_source": "market",
+        "last_sync_at": "2026-04-20T00:59:00+00:00",
+        "source_breakdown": {"market": 2}, "requested_by": "trader_chart",
+    })
     degraded = state_store.update_market_data_status(
         {
             "provider": "yahoo",
@@ -332,7 +338,8 @@ def test_update_market_data_status_tracks_last_success_and_error(isolated_storag
         }
     )
     root_after_chart = state_store.load_bot_state()["market_data"]
-    assert degraded["last_success_at"] == "2026-04-20T01:00:00+00:00"
+    assert degraded["last_success_at"] == "2026-04-20T00:59:00+00:00"
+    assert root_after_chart["last_success_at"] == "2026-04-20T01:00:00+00:00"
     assert degraded["last_error"] == "rate limit"
     assert root_after_chart["requested_by"] == "worker_cycle"
     assert root_after_chart["status"] == "healthy"

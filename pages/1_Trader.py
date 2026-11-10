@@ -3494,8 +3494,11 @@ if admin_mode:
                 "Desabilitar real mode" if real_mode_enabled else "Habilitar real mode",
                 use_container_width=True,
                 key="toggle_real_mode",
+                disabled=not real_mode_enabled,
             ):
                 try:
+                    if not real_mode_enabled:
+                        raise ValueError("PAPER_ONLY: habilitar real mode esta bloqueado nesta fase.")
                     stored_user = get_user(current_user["username"])
                     if not stored_user:
                         raise ValueError("Faça login com uma conta admin persistida para alterar o real mode.")

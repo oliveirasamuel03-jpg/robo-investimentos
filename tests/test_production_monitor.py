@@ -11,6 +11,7 @@ def test_evaluate_production_health_marks_healthy_with_recent_heartbeat(isolated
     state["worker_status"] = "online"
     state["worker_heartbeat"] = "2026-04-20T03:00:00+00:00"
     state["market_data"]["status"] = "healthy"
+    state["market_data"]["feed_status"] = "LIVE"
     state["market_data"]["last_source"] = "market"
     state["broker"]["status"] = "paper"
     state["production"]["last_success_at"] = "2026-04-20T03:00:00+00:00"
@@ -35,6 +36,7 @@ def test_evaluate_production_health_marks_critical_after_consecutive_errors(isol
     state["worker_status"] = "error"
     state["worker_heartbeat"] = "2026-04-20T03:00:00+00:00"
     state["market_data"]["status"] = "error"
+    state["market_data"]["feed_status"] = "FALLBACK"
     state["market_data"]["last_source"] = "fallback"
     state["market_data"]["fallback_since_at"] = "2026-04-20T02:30:00+00:00"
     state["production"]["consecutive_errors"] = 3

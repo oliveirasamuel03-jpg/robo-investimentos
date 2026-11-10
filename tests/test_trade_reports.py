@@ -3,7 +3,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from tests.conftest import load_module
+from tests.conftest import load_module, fake_market_result
 
 
 def _fake_prices(rows: int = 120) -> pd.DataFrame:
@@ -17,6 +17,7 @@ def _fake_prices(rows: int = 120) -> pd.DataFrame:
             "low": close - 0.6,
             "close": close,
             "volume": 1000 + idx * 5,
+            "data_source": "market",
         }
     )
 
@@ -27,8 +28,14 @@ def test_closed_trade_report_is_generated_after_position_exit(isolated_storage, 
     trader_engine = load_module("engines.trader_engine")
     reports = load_module("core.trader_reports")
 
-    monkeypatch.setattr(paper_engine, "load_prices", lambda symbol, config: _fake_prices())
-    monkeypatch.setattr(paper_engine, "_should_buy", lambda latest, config: (True, 0.91))
+    monkeypatch.setattr(paper_engine, "load_market_data_result",
+                        lambda symbols, config, requested_by="worker_cycle": fake_market_result(
+                            {symbol: _fake_prices() for symbol in symbols}, requested_by))
+    monkeypatch.setattr(paper_engine, "_evaluate_buy_signal", lambda latest, config: {
+        "buy": True, "score": 0.91, "rejection_reasons": [],
+        "trend_ok": True, "score_ok": True, "rsi_ok": True, "atr_ok": True,
+        "structure_ok": True, "momentum_ok": True, "trend_alignment": "aligned",
+    })
     monkeypatch.setattr(paper_engine, "_should_sell", lambda position, latest, holding_minutes, config: (False, ""))
 
     state = state_store.load_bot_state()
@@ -38,6 +45,7 @@ def test_closed_trade_report_is_generated_after_position_exit(isolated_storage, 
     state_store.save_bot_state(state)
 
     trader_engine.run_trader_cycle()
+    assert "AAPL" in paper_engine.load_paper_state()["positions"]
 
     state = state_store.load_bot_state()
     state["bot_status"] = "PAUSED"

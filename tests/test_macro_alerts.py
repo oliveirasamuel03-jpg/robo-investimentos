@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
-from conftest import load_module
+from tests.conftest import load_module
 
 
 def _load_macro(monkeypatch, enabled: bool = True):
