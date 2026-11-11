@@ -109,7 +109,7 @@ def render_stop_status(*, ui, state: dict) -> None:
             "Esse registro não comprova que o processo ainda esteja ativo; "
             "a confirmação de parada é apresentada separadamente."
         )
-    if status == "ACKNOWLEDGED" and control.get("acknowledged") and control.get("stopped"):
+    if operational_status_label(state) == "Parada confirmada":
         if ui.session_state.get(PENDING_INTENT_KEY, {}).get("action") == "Parar robô":
             ui.session_state.pop(PENDING_INTENT_KEY, None)
         ui.success(
@@ -145,3 +145,20 @@ def classify_cycle_feedback(result: dict) -> str:
     if committed is False or result.get("status") == "STOPPED":
         return "NOT_COMMITTED"
     return "UNKNOWN"
+
+
+def operational_status_label(state: dict) -> str:
+    """Describe recorded control evidence without treating STOPPED as an ACK."""
+    status = str(state.get("bot_status") or "").upper()
+    if status == "RUNNING":
+        return "Ligado"
+    if status == "PAUSED":
+        return "Pausado"
+    if status == "STOPPED":
+        control = state.get("stop_control", {}) or {}
+        if (isinstance(control, dict) and control.get("status") == "ACKNOWLEDGED"
+                and isinstance(control.get("request_id"), str) and control["request_id"].strip()
+                and isinstance(control.get("acknowledged_at"), str) and control["acknowledged_at"].strip()):
+            return "Parada confirmada"
+        return "Parada pendente de confirmação"
+    return "Estado desconhecido"

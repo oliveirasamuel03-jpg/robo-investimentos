@@ -10,7 +10,7 @@ import streamlit as st
 from core.stop_control import start_robot
 from core.ui_mutations import (
     render_pending_intent, render_stop_status, request_stop_from_ui, run_ui_mutation,
-    visible_control_snapshot, classify_cycle_feedback,
+    visible_control_snapshot, classify_cycle_feedback, operational_status_label,
 )
 from core.auth.guards import is_admin, render_auth_toolbar, require_auth
 from core.auth.security import verify_password
@@ -593,8 +593,12 @@ def build_robot_log(signal_text: str, robot_label: str, last_action_text: str, o
         logs.append("Robô ativo e monitorando o mercado.")
     elif robot_label == "Pausado":
         logs.append("Robô pausado. Não fará novas entradas.")
+    elif robot_label == "Parada confirmada":
+        logs.append("Parada confirmada pelo protocolo do worker.")
+    elif robot_label == "Parada pendente de confirmação":
+        logs.append("Parada pendente de confirmação do worker.")
     else:
-        logs.append("Robô desligado.")
+        logs.append("Estado operacional ainda sem confirmação.")
 
     logs.append(signal_text)
 
@@ -744,8 +748,8 @@ def build_trader_snapshot(
     signal_color = signal_badge_color(signal_text)
 
     robot_status = state.get("bot_status", "PAUSED")
-    robot_label = "Ligado" if robot_status == "RUNNING" else "Pausado" if robot_status == "PAUSED" else "Desligado"
-    robot_class = "metric-good" if robot_label == "Ligado" else "metric-bad" if robot_label == "Desligado" else "metric-neutral"
+    robot_label = operational_status_label(state)
+    robot_class = "metric-good" if robot_label == "Ligado" else "metric-bad" if robot_label == "Parada confirmada" else "metric-neutral"
 
     last_action = resolve_last_action(state, paper_trades, open_positions)
     last_execution = resolve_last_execution(state, paper_state)
@@ -1231,8 +1235,8 @@ signal_text = simple_signal_text(chart_df)
 signal_color = signal_badge_color(signal_text)
 
 robot_status = state.get("bot_status", "PAUSED")
-robot_label = "Ligado" if robot_status == "RUNNING" else "Pausado" if robot_status == "PAUSED" else "Desligado"
-robot_class = "metric-good" if robot_label == "Ligado" else "metric-bad" if robot_label == "Desligado" else "metric-neutral"
+robot_label = operational_status_label(state)
+robot_class = "metric-good" if robot_label == "Ligado" else "metric-bad" if robot_label == "Parada confirmada" else "metric-neutral"
 
 # Reaplica o snapshot unificado mais recente para manter os cards principais e o painel vivo
 # lendo a mesma base de estado durante esta renderizacao.

@@ -271,3 +271,52 @@ def test_actual_cycle_feedback_preserves_commit_before_stop(
     assert any("Ciclo PAPER confirmado antes" in item.value for item in at.warning)
     assert any("não cancela esse commit retroativamente" in item.value for item in at.warning)
     assert not any("nenhuma nova entrada" in item.value for item in at.info)
+
+
+@pytest.mark.parametrize("state,expected", [
+    ({"bot_status": "RUNNING"}, "Ligado"),
+    ({"bot_status": "PAUSED"}, "Pausado"),
+    ({"bot_status": "STOPPED"}, "Parada pendente de confirmação"),
+    ({"bot_status": "STOPPED", "stop_control": {"status": "PERSISTED", "request_id": "fixture"}},
+     "Parada pendente de confirmação"),
+    ({"bot_status": "STOPPED", "stop_control": {"status": "ACKNOWLEDGED", "request_id": "fixture"}},
+     "Parada pendente de confirmação"),
+    ({"bot_status": "STOPPED", "stop_control": {"status": "ACKNOWLEDGED", "acknowledged_at": "2026-11-11"}},
+     "Parada pendente de confirmação"),
+    ({"bot_status": "STOPPED", "stop_control": {
+        "status": "ACKNOWLEDGED", "request_id": "fixture", "acknowledged_at": "2026-11-11T00:00:00+00:00"}},
+     "Parada confirmada"),
+    ({"bot_status": "UNKNOWN"}, "Estado desconhecido"),
+])
+def test_every_stop_badge_requires_acknowledgement_evidence(isolated_storage, state, expected):
+    helper = load_module("core.ui_mutations")
+    assert helper.operational_status_label(state) == expected
+
+
+@pytest.mark.parametrize("page", ["pages/1_Trader.py", "pages/4_Controle_do_Bot.py"])
+@pytest.mark.parametrize("acknowledged", [False, True])
+def test_actual_status_badges_distinguish_pending_from_confirmed_stop(
+    isolated_storage, monkeypatch, page, acknowledged
+):
+    monkeypatch.setenv("AUTH_REQUIRED", "true")
+    users = load_module("core.auth.users_store")
+    user = users.create_user("fixture-badge-admin", "fixture-password", "admin")
+    control = load_module("core.stop_control")
+    receipt = control.request_stop(requested_by="fixture-badge-admin")
+    assert receipt.persisted
+    if acknowledged:
+        assert control.acknowledge_stop(worker_id="fixture-worker").acknowledged
+    at = AppTest.from_file(str(ROOT / page), default_timeout=30)
+    at.session_state["auth_user"] = {**user, "auth_mode": "session"}
+    at.session_state["auth_last_activity"] = datetime.now(timezone.utc).isoformat()
+    at.run()
+    assert not at.exception
+    rendered = "\n".join(str(item.value) for element in (
+        at.metric, at.markdown, at.caption, at.info, at.warning, at.success
+    ) for item in element)
+    expected = "Parada confirmada" if acknowledged else "Parada pendente de confirmação"
+    assert expected in rendered
+    assert "Desligado" not in rendered and "Robô desligado" not in rendered
+    assert not any(item.value == "Parado" for item in at.metric)
+    if not acknowledged:
+        assert "Parada confirmada" not in rendered

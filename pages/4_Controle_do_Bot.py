@@ -10,7 +10,7 @@ import streamlit as st
 from core.stop_control import start_robot
 from core.ui_mutations import (
     render_pending_intent, render_stop_status, request_stop_from_ui, run_ui_mutation,
-    visible_control_snapshot, classify_cycle_feedback,
+    visible_control_snapshot, classify_cycle_feedback, operational_status_label,
 )
 from core.alerts import send_email_alert
 from core.auth.guards import render_auth_toolbar, require_admin
@@ -141,7 +141,7 @@ def bot_status_label(raw_status: str | None) -> str:
     labels = {
         "RUNNING": "Ligado",
         "PAUSED": "Pausado",
-        "STOPPED": "Parado",
+        "STOPPED": "Solicitar parada",
     }
     return labels.get(str(raw_status or "").upper(), str(raw_status or "Desconhecido"))
 
@@ -2037,7 +2037,7 @@ else:
     st.info("Status do feed ainda nao determinado.")
 
 info_c1, info_c2, info_c3, info_c4, info_c5 = st.columns(5)
-info_c1.metric("Status do bot", bot_status_label(state.get("bot_status")))
+info_c1.metric("Status do bot", operational_status_label(state))
 info_c2.metric("Provider de dados", market_data_provider_label(operational_market_state))
 info_c3.metric("Status do feed", feed_status_label)
 info_c4.metric("Fonte atual", market_data_source_label(operational_market_state))
