@@ -1,5 +1,9 @@
 # ATLAS — Retomada segura INFRA-1
 
+> Preparação solicitada de [banco novo com histórico do zero](ATLAS_BANCO_NOVO.md):
+> SQL validado somente em cluster local; 349 testes offline e 21 verificações PG.
+> Nenhum banco remoto provisionado, histórico antigo preservado.
+
 > Atualização de 11/11/2026: [acesso, recuperação e financeiro](ATLAS_ACESSO_RECUPERACAO_FINANCEIRO.md).
 > Painel antigo autenticado: serviços offline e nenhum backup listado no volume.
 > PostgreSQL 18 na configuração; financeiro novo ainda sem acesso na sessão.

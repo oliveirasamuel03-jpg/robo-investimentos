@@ -84,6 +84,20 @@ def main():
                       == ("127.0.0.1" if args.transport == "loopback" else ""))
                 empty_audit = inventory(conn)
                 check("read_only_audit_does_not_create_schema", all(not t["present"] for t in empty_audit["tables"].values()))
+                schema = (ROOT / "scripts/sql/new_history_schema.sql").read_text()
+                conn.execute(schema)
+                check("new_history_schema_starts_empty", all(
+                    conn.execute(f"SELECT count(*) FROM {table}").fetchone()[0] == 0
+                    for table in ("app_state", "app_rows")))
+                conn.execute("INSERT INTO app_state(namespace,payload_json) VALUES ('preserve_fixture','{}')")
+                try:
+                    conn.execute(schema)
+                except psycopg.errors.RaiseException:
+                    conn.execute("ROLLBACK")
+                else:
+                    raise AssertionError("New history initialization must refuse existing schema")
+                check("new_history_refuses_existing_schema_without_data_loss",
+                      conn.execute("SELECT payload_json FROM app_state WHERE namespace='preserve_fixture'").fetchone()[0] == "{}")
                 p.save_json_state("fixture", {"mode": "paper"}, missing_local)
                 check("json_state_roundtrip", p.load_json_state("fixture", dict, missing_local) == {"mode": "paper"})
                 p.replace_json_rows("history", [{"id": 1}, {"id": 2}], missing_local)
