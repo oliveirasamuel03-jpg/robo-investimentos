@@ -1,0 +1,25 @@
+{"server_version": "16.15", "image": ["postgres@sha256:aa6cb33cf4c19c765cefcf48d96176258800870a9a1e930ad126200f9d825139"], "scope": "LOCAL_SYNTHETIC_ONLY", "broker_mode": "paper", "broker_provider": "paper", "listener": "127.0.0.1"}
+..............................................                           [100%]
+=============================== warnings summary ===============================
+tests/test_infra12_postgres.py: 1 warning
+tests/test_infra121_postgres.py: 11 warnings
+  /workspace/robo-investimentos/core/multi_timeframe_swing_audit.py:182: FutureWarning: 'H' is deprecated and will be removed in a future version, please use 'h' instead.
+    resampled = data.resample(rule).agg(agg).dropna(subset=["open", "high", "low", "close"])
+
+tests/test_infra121_postgres.py::test_stop_and_heartbeat_preserve_each_other
+  /workspace/robo-investimentos/core/state_store.py:2260: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    state["worker_heartbeat"] = datetime.utcnow().isoformat()
+
+tests/test_infra121_postgres.py::test_failure_after_trade_then_explicit_retry_does_not_duplicate
+tests/test_infra121_postgres.py::test_repeated_successful_cycles_do_not_duplicate_open_trade_or_report
+tests/test_infra121_postgres.py::test_repeated_successful_cycles_do_not_duplicate_open_trade_or_report
+tests/test_infra121_postgres.py::test_failure_after_closed_report_rolls_back_sell_and_retry_is_not_duplicated
+tests/test_infra121_postgres.py::test_failure_after_closed_report_rolls_back_sell_and_retry_is_not_duplicated
+tests/test_infra121_postgres.py::test_failure_after_closed_report_rolls_back_sell_and_retry_is_not_duplicated
+  /workspace/robo-investimentos/core/state_store.py:2327: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    state_written_at = datetime.utcnow().isoformat()
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+- generated xml file: /workspace/robo-investimentos/docs/retomada/evidencias/infra121-postgres16.xml -
+46 passed, 19 warnings in 45.33s
+Disposable local PostgreSQL container and own volumes removed.

@@ -1,0 +1,962 @@
+{
+  "base_commit": "5d7165217e42ff5121b5444f956d45a877118734",
+  "broker_mode": "paper",
+  "broker_provider": "paper",
+  "compared_fields": [
+    "signals",
+    "trades_executed",
+    "trades",
+    "financial_state",
+    "report_count"
+  ],
+  "comparison_equal": true,
+  "comparisons": [
+    "actual_strategy_synthetic_feed",
+    "controlled_buy_allocation",
+    "same_position_repeated",
+    "controlled_sell_accounting",
+    "closed_position_repeated"
+  ],
+  "limitation": "Synthetic outcomes only; controlled BUY/SELL fixes signal outcome to isolate allocation/accounting. No proof across all market conditions.",
+  "results": {
+    "current": {
+      "network_process_attempts_blocked": 30,
+      "observations": [
+        {
+          "financial_state": {
+            "asset_cooldowns": {},
+            "cash": 1000.0,
+            "equity": 1000.0,
+            "history": [
+              {
+                "cash": 1000.0,
+                "equity": 1000.0,
+                "open_positions": 0,
+                "timestamp": "2026-04-20T12:00:00+00:00",
+                "total_return": 0.0
+              }
+            ],
+            "initial_capital": 1000.0,
+            "last_prices": {
+              "AAPL": 104.158139
+            },
+            "positions": {},
+            "realized_pnl": 0.0,
+            "run_count": 1
+          },
+          "label": "actual_strategy_synthetic_feed",
+          "report_count": 0,
+          "signals": [
+            {
+              "asset": "AAPL",
+              "atr_ok": true,
+              "atr_pct": 0.0115,
+              "base_min_signal_score": 0.62,
+              "breakout_20": -0.027905,
+              "breakout_ok": true,
+              "buy": false,
+              "context_impact": "Sem ajuste de contexto para este ativo.",
+              "context_status": "NEUTRO",
+              "data_source": "market",
+              "effective_min_signal_score": 0.62,
+              "fine_tune_after": "breakout_20 >= breakout_min - 0.005, apenas com score minimo preservado e guards seguros",
+              "fine_tune_applied": false,
+              "fine_tune_before": "breakout_20 >= breakout_min",
+              "fine_tune_guard_reason": "",
+              "fine_tune_reason": "Relaxamento conservador de confirmacao secundaria marginal em PAPER.",
+              "fine_tune_target": "trend_pullback_breakout_secondary_breakout_confirmation",
+              "ma20": 105.813237,
+              "ma50": 104.734562,
+              "macro_alert_active": false,
+              "macro_alert_level": "LOW",
+              "macro_alert_penalty": 0.0,
+              "macro_alert_reason": "Nenhum alerta macro ativo.",
+              "macro_alert_window_status": "INACTIVE",
+              "macro_setup_family": "REVERSAL_V_PATTERN",
+              "momentum": -0.004276,
+              "momentum_8": -0.02154,
+              "momentum_medium_ok": false,
+              "momentum_ok": false,
+              "momentum_short_ok": true,
+              "phase2_1_fine_tune_allowed_reasons": [
+                "confidence_too_low",
+                "score_below_minimum"
+              ],
+              "phase2_1_fine_tune_applied": false,
+              "phase2_1_fine_tune_blocked_reasons": [
+                "reversal_not_eligible",
+                "trend_not_confirmed"
+              ],
+              "phase2_1_fine_tune_decision": "blocked",
+              "phase2_1_fine_tune_guard": "primary_or_critical_rejection_present",
+              "phase2_1_fine_tune_reason": "Relaxamento conservador de multiplas falhas pequenas de momentum/confirmacao secundaria em PAPER.",
+              "phase2_1_fine_tune_score_gap": 0.3638,
+              "phase2_1_fine_tune_target": "trend_pullback_breakout_multi_minor_confirmation",
+              "price": 104.158139,
+              "provider_effective": "unknown",
+              "pullback_ok": true,
+              "pullback_to_ma20": -0.0156,
+              "raw_score": 0.2562,
+              "rejection_reasons": [
+                "trend_not_confirmed",
+                "score_below_minimum",
+                "reversal_not_eligible",
+                "confidence_too_low"
+              ],
+              "rsi": 8.56,
+              "rsi_ok": false,
+              "score": 0.2562,
+              "score_ok": false,
+              "signal_key": "AAPL|2025-01-05T23:00:00|market",
+              "signal_timestamp": "2025-01-05T23:00:00",
+              "strategy_name": "trend_pullback_breakout",
+              "structure_ok": true,
+              "timestamp": "2026-04-20T12:00:00+00:00",
+              "trend_alignment": "countertrend",
+              "trend_ok": false
+            }
+          ],
+          "trades": [],
+          "trades_executed": 0
+        },
+        {
+          "financial_state": {
+            "asset_cooldowns": {},
+            "cash": 900.0,
+            "equity": 1000.0,
+            "history": [
+              {
+                "cash": 900.0,
+                "equity": 1000.0,
+                "open_positions": 1,
+                "timestamp": "2026-04-20T12:00:00+00:00",
+                "total_return": 0.0
+              }
+            ],
+            "initial_capital": 1000.0,
+            "last_prices": {
+              "AAPL": 104.158139
+            },
+            "positions": {
+              "AAPL": {
+                "atr_pct": 0.0115,
+                "atr_pct_entry": 0.0115,
+                "avg_price": 104.158139,
+                "entry_data_source": "market",
+                "entry_price": 104.158139,
+                "entry_score": 0.95,
+                "entry_signal_key": "AAPL|2025-01-05T23:00:00|market",
+                "entry_trend_alignment": "aligned",
+                "gross_entry_value": 100.0,
+                "holding_minutes_limit": 60,
+                "last_price": 104.158139,
+                "ma20_entry": 105.813237,
+                "ma50_entry": 104.734562,
+                "opened_at": "2026-04-20T12:00:00+00:00",
+                "peak_price": 104.158139,
+                "profile": "Equilibrado",
+                "quantity": 0.960079,
+                "rsi_entry": 8.56,
+                "trade_id": "AAPL-synthetic-fixed-id",
+                "trailing_stop": 101.283374,
+                "updated_at": "2026-04-20T12:00:00+00:00"
+              }
+            },
+            "realized_pnl": 0.0,
+            "run_count": 1
+          },
+          "label": "controlled_buy_allocation",
+          "report_count": 0,
+          "signals": [
+            {
+              "asset": "AAPL",
+              "atr_ok": true,
+              "atr_pct": 0.0115,
+              "base_min_signal_score": 0.62,
+              "breakout_20": -0.027905,
+              "breakout_ok": true,
+              "buy": true,
+              "context_impact": "Sem ajuste de contexto para este ativo.",
+              "context_status": "NEUTRO",
+              "data_source": "market",
+              "effective_min_signal_score": 0.62,
+              "fine_tune_after": "breakout_20 >= breakout_min - 0.005, apenas com score minimo preservado e guards seguros",
+              "fine_tune_applied": false,
+              "fine_tune_before": "breakout_20 >= breakout_min",
+              "fine_tune_guard_reason": "",
+              "fine_tune_reason": "Relaxamento conservador de confirmacao secundaria marginal em PAPER.",
+              "fine_tune_target": "trend_pullback_breakout_secondary_breakout_confirmation",
+              "ma20": 105.813237,
+              "ma50": 104.734562,
+              "macro_alert_active": false,
+              "macro_alert_level": "LOW",
+              "macro_alert_penalty": 0.0,
+              "macro_alert_reason": "Nenhum alerta macro ativo.",
+              "macro_alert_window_status": "INACTIVE",
+              "macro_setup_family": "TREND_FOLLOWING_SWING",
+              "momentum": -0.004276,
+              "momentum_8": -0.02154,
+              "momentum_medium_ok": true,
+              "momentum_ok": true,
+              "momentum_short_ok": true,
+              "phase2_1_fine_tune_allowed_reasons": [],
+              "phase2_1_fine_tune_applied": false,
+              "phase2_1_fine_tune_blocked_reasons": [],
+              "phase2_1_fine_tune_decision": "not_evaluated",
+              "phase2_1_fine_tune_guard": "",
+              "phase2_1_fine_tune_reason": "Relaxamento conservador de multiplas falhas pequenas de momentum/confirmacao secundaria em PAPER.",
+              "phase2_1_fine_tune_score_gap": null,
+              "phase2_1_fine_tune_target": "trend_pullback_breakout_multi_minor_confirmation",
+              "price": 104.158139,
+              "provider_effective": "unknown",
+              "pullback_ok": true,
+              "pullback_to_ma20": -0.0156,
+              "raw_score": 0.95,
+              "rejection_reasons": [],
+              "rsi": 8.56,
+              "rsi_ok": true,
+              "score": 0.95,
+              "score_ok": true,
+              "signal_key": "AAPL|2025-01-05T23:00:00|market",
+              "signal_timestamp": "2025-01-05T23:00:00",
+              "strategy_name": "trend_pullback_breakout",
+              "structure_ok": true,
+              "timestamp": "2026-04-20T12:00:00+00:00",
+              "trend_alignment": "aligned",
+              "trend_ok": true
+            }
+          ],
+          "trades": [
+            {
+              "asset": "AAPL",
+              "cash_after": 900.0,
+              "cost": 0.0,
+              "gross_value": 100.0,
+              "price": 104.158139,
+              "profile": "Equilibrado",
+              "quantity": 0.960079,
+              "realized_pnl": 0.0,
+              "reason": "score 0.95 | rsi 8.6",
+              "side": "BUY",
+              "timestamp": "2026-04-20T12:00:00+00:00",
+              "trade_id": "AAPL-synthetic-fixed-id"
+            }
+          ],
+          "trades_executed": 1
+        },
+        {
+          "financial_state": {
+            "asset_cooldowns": {},
+            "cash": 900.0,
+            "equity": 1000.0,
+            "history": [
+              {
+                "cash": 900.0,
+                "equity": 1000.0,
+                "open_positions": 1,
+                "timestamp": "2026-04-20T12:00:00+00:00",
+                "total_return": 0.0
+              },
+              {
+                "cash": 900.0,
+                "equity": 1000.0,
+                "open_positions": 1,
+                "timestamp": "2026-04-20T12:00:00+00:00",
+                "total_return": 0.0
+              }
+            ],
+            "initial_capital": 1000.0,
+            "last_prices": {
+              "AAPL": 104.158139
+            },
+            "positions": {
+              "AAPL": {
+                "atr_pct": 0.011521,
+                "atr_pct_entry": 0.0115,
+                "avg_price": 104.158139,
+                "entry_data_source": "market",
+                "entry_price": 104.158139,
+                "entry_score": 0.95,
+                "entry_signal_key": "AAPL|2025-01-05T23:00:00|market",
+                "entry_trend_alignment": "aligned",
+                "gross_entry_value": 100.0,
+                "holding_minutes_limit": 60,
+                "last_price": 104.158139,
+                "ma20_entry": 105.813237,
+                "ma50_entry": 104.734562,
+                "opened_at": "2026-04-20T12:00:00+00:00",
+                "peak_price": 104.158139,
+                "profile": "Equilibrado",
+                "quantity": 0.960079,
+                "rsi_entry": 8.56,
+                "trade_id": "AAPL-synthetic-fixed-id",
+                "trailing_stop": 101.283374,
+                "updated_at": "2026-04-20T12:00:00+00:00"
+              }
+            },
+            "realized_pnl": 0.0,
+            "run_count": 2
+          },
+          "label": "same_position_repeated",
+          "report_count": 0,
+          "signals": [],
+          "trades": [
+            {
+              "asset": "AAPL",
+              "cash_after": 900.0,
+              "cost": 0.0,
+              "gross_value": 100.0,
+              "price": 104.158139,
+              "profile": "Equilibrado",
+              "quantity": 0.960079,
+              "realized_pnl": 0.0,
+              "reason": "score 0.95 | rsi 8.6",
+              "side": "BUY",
+              "timestamp": "2026-04-20T12:00:00+00:00",
+              "trade_id": "AAPL-synthetic-fixed-id"
+            }
+          ],
+          "trades_executed": 0
+        },
+        {
+          "financial_state": {
+            "asset_cooldowns": {
+              "AAPL": "2026-04-20T12:00:00+00:00"
+            },
+            "cash": 1000.0,
+            "equity": 1000.0,
+            "history": [
+              {
+                "cash": 900.0,
+                "equity": 1000.0,
+                "open_positions": 1,
+                "timestamp": "2026-04-20T12:00:00+00:00",
+                "total_return": 0.0
+              },
+              {
+                "cash": 900.0,
+                "equity": 1000.0,
+                "open_positions": 1,
+                "timestamp": "2026-04-20T12:00:00+00:00",
+                "total_return": 0.0
+              },
+              {
+                "cash": 1000.0,
+                "equity": 1000.0,
+                "open_positions": 0,
+                "timestamp": "2026-04-20T12:00:00+00:00",
+                "total_return": 0.0
+              }
+            ],
+            "initial_capital": 1000.0,
+            "last_prices": {
+              "AAPL": 104.158139
+            },
+            "positions": {},
+            "realized_pnl": 0.0,
+            "run_count": 3
+          },
+          "label": "controlled_sell_accounting",
+          "report_count": 1,
+          "signals": [],
+          "trades": [
+            {
+              "asset": "AAPL",
+              "cash_after": 900.0,
+              "cost": 0.0,
+              "gross_value": 100.0,
+              "price": 104.158139,
+              "profile": "Equilibrado",
+              "quantity": 0.960079,
+              "realized_pnl": 0.0,
+              "reason": "score 0.95 | rsi 8.6",
+              "side": "BUY",
+              "timestamp": "2026-04-20T12:00:00+00:00",
+              "trade_id": "AAPL-synthetic-fixed-id"
+            },
+            {
+              "asset": "AAPL",
+              "cash_after": 1000.0,
+              "cost": 0.0,
+              "gross_value": 100.0,
+              "price": 104.158139,
+              "profile": "Equilibrado",
+              "quantity": 0.960079,
+              "realized_pnl": -0.0,
+              "reason": "synthetic-close",
+              "side": "SELL",
+              "timestamp": "2026-04-20T12:00:00+00:00",
+              "trade_id": "AAPL-synthetic-fixed-id"
+            }
+          ],
+          "trades_executed": 1
+        },
+        {
+          "financial_state": {
+            "asset_cooldowns": {
+              "AAPL": "2026-04-20T12:00:00+00:00"
+            },
+            "cash": 1000.0,
+            "equity": 1000.0,
+            "history": [
+              {
+                "cash": 900.0,
+                "equity": 1000.0,
+                "open_positions": 1,
+                "timestamp": "2026-04-20T12:00:00+00:00",
+                "total_return": 0.0
+              },
+              {
+                "cash": 900.0,
+                "equity": 1000.0,
+                "open_positions": 1,
+                "timestamp": "2026-04-20T12:00:00+00:00",
+                "total_return": 0.0
+              },
+              {
+                "cash": 1000.0,
+                "equity": 1000.0,
+                "open_positions": 0,
+                "timestamp": "2026-04-20T12:00:00+00:00",
+                "total_return": 0.0
+              },
+              {
+                "cash": 1000.0,
+                "equity": 1000.0,
+                "open_positions": 0,
+                "timestamp": "2026-04-20T12:00:00+00:00",
+                "total_return": 0.0
+              }
+            ],
+            "initial_capital": 1000.0,
+            "last_prices": {
+              "AAPL": 104.158139
+            },
+            "positions": {},
+            "realized_pnl": 0.0,
+            "run_count": 4
+          },
+          "label": "closed_position_repeated",
+          "report_count": 1,
+          "signals": [],
+          "trades": [
+            {
+              "asset": "AAPL",
+              "cash_after": 900.0,
+              "cost": 0.0,
+              "gross_value": 100.0,
+              "price": 104.158139,
+              "profile": "Equilibrado",
+              "quantity": 0.960079,
+              "realized_pnl": 0.0,
+              "reason": "score 0.95 | rsi 8.6",
+              "side": "BUY",
+              "timestamp": "2026-04-20T12:00:00+00:00",
+              "trade_id": "AAPL-synthetic-fixed-id"
+            },
+            {
+              "asset": "AAPL",
+              "cash_after": 1000.0,
+              "cost": 0.0,
+              "gross_value": 100.0,
+              "price": 104.158139,
+              "profile": "Equilibrado",
+              "quantity": 0.960079,
+              "realized_pnl": -0.0,
+              "reason": "synthetic-close",
+              "side": "SELL",
+              "timestamp": "2026-04-20T12:00:00+00:00",
+              "trade_id": "AAPL-synthetic-fixed-id"
+            }
+          ],
+          "trades_executed": 0
+        }
+      ]
+    },
+    "legacy": {
+      "network_process_attempts_blocked": 30,
+      "observations": [
+        {
+          "financial_state": {
+            "asset_cooldowns": {},
+            "cash": 1000.0,
+            "equity": 1000.0,
+            "history": [
+              {
+                "cash": 1000.0,
+                "equity": 1000.0,
+                "open_positions": 0,
+                "timestamp": "2026-04-20T12:00:00+00:00",
+                "total_return": 0.0
+              }
+            ],
+            "initial_capital": 1000.0,
+            "last_prices": {
+              "AAPL": 104.158139
+            },
+            "positions": {},
+            "realized_pnl": 0.0,
+            "run_count": 1
+          },
+          "label": "actual_strategy_synthetic_feed",
+          "report_count": 0,
+          "signals": [
+            {
+              "asset": "AAPL",
+              "atr_ok": true,
+              "atr_pct": 0.0115,
+              "base_min_signal_score": 0.62,
+              "breakout_20": -0.027905,
+              "breakout_ok": true,
+              "buy": false,
+              "context_impact": "Sem ajuste de contexto para este ativo.",
+              "context_status": "NEUTRO",
+              "data_source": "market",
+              "effective_min_signal_score": 0.62,
+              "fine_tune_after": "breakout_20 >= breakout_min - 0.005, apenas com score minimo preservado e guards seguros",
+              "fine_tune_applied": false,
+              "fine_tune_before": "breakout_20 >= breakout_min",
+              "fine_tune_guard_reason": "",
+              "fine_tune_reason": "Relaxamento conservador de confirmacao secundaria marginal em PAPER.",
+              "fine_tune_target": "trend_pullback_breakout_secondary_breakout_confirmation",
+              "ma20": 105.813237,
+              "ma50": 104.734562,
+              "macro_alert_active": false,
+              "macro_alert_level": "LOW",
+              "macro_alert_penalty": 0.0,
+              "macro_alert_reason": "Nenhum alerta macro ativo.",
+              "macro_alert_window_status": "INACTIVE",
+              "macro_setup_family": "REVERSAL_V_PATTERN",
+              "momentum": -0.004276,
+              "momentum_8": -0.02154,
+              "momentum_medium_ok": false,
+              "momentum_ok": false,
+              "momentum_short_ok": true,
+              "phase2_1_fine_tune_allowed_reasons": [
+                "confidence_too_low",
+                "score_below_minimum"
+              ],
+              "phase2_1_fine_tune_applied": false,
+              "phase2_1_fine_tune_blocked_reasons": [
+                "reversal_not_eligible",
+                "trend_not_confirmed"
+              ],
+              "phase2_1_fine_tune_decision": "blocked",
+              "phase2_1_fine_tune_guard": "primary_or_critical_rejection_present",
+              "phase2_1_fine_tune_reason": "Relaxamento conservador de multiplas falhas pequenas de momentum/confirmacao secundaria em PAPER.",
+              "phase2_1_fine_tune_score_gap": 0.3638,
+              "phase2_1_fine_tune_target": "trend_pullback_breakout_multi_minor_confirmation",
+              "price": 104.158139,
+              "provider_effective": "unknown",
+              "pullback_ok": true,
+              "pullback_to_ma20": -0.0156,
+              "raw_score": 0.2562,
+              "rejection_reasons": [
+                "trend_not_confirmed",
+                "score_below_minimum",
+                "reversal_not_eligible",
+                "confidence_too_low"
+              ],
+              "rsi": 8.56,
+              "rsi_ok": false,
+              "score": 0.2562,
+              "score_ok": false,
+              "signal_key": "AAPL|2025-01-05T23:00:00|market",
+              "signal_timestamp": "2025-01-05T23:00:00",
+              "strategy_name": "trend_pullback_breakout",
+              "structure_ok": true,
+              "timestamp": "2026-04-20T12:00:00+00:00",
+              "trend_alignment": "countertrend",
+              "trend_ok": false
+            }
+          ],
+          "trades": [],
+          "trades_executed": 0
+        },
+        {
+          "financial_state": {
+            "asset_cooldowns": {},
+            "cash": 900.0,
+            "equity": 1000.0,
+            "history": [
+              {
+                "cash": 900.0,
+                "equity": 1000.0,
+                "open_positions": 1,
+                "timestamp": "2026-04-20T12:00:00+00:00",
+                "total_return": 0.0
+              }
+            ],
+            "initial_capital": 1000.0,
+            "last_prices": {
+              "AAPL": 104.158139
+            },
+            "positions": {
+              "AAPL": {
+                "atr_pct": 0.0115,
+                "atr_pct_entry": 0.0115,
+                "avg_price": 104.158139,
+                "entry_data_source": "market",
+                "entry_price": 104.158139,
+                "entry_score": 0.95,
+                "entry_signal_key": "AAPL|2025-01-05T23:00:00|market",
+                "entry_trend_alignment": "aligned",
+                "gross_entry_value": 100.0,
+                "holding_minutes_limit": 60,
+                "last_price": 104.158139,
+                "ma20_entry": 105.813237,
+                "ma50_entry": 104.734562,
+                "opened_at": "2026-04-20T12:00:00+00:00",
+                "peak_price": 104.158139,
+                "profile": "Equilibrado",
+                "quantity": 0.960079,
+                "rsi_entry": 8.56,
+                "trade_id": "AAPL-synthetic-fixed-id",
+                "trailing_stop": 101.283374,
+                "updated_at": "2026-04-20T12:00:00+00:00"
+              }
+            },
+            "realized_pnl": 0.0,
+            "run_count": 1
+          },
+          "label": "controlled_buy_allocation",
+          "report_count": 0,
+          "signals": [
+            {
+              "asset": "AAPL",
+              "atr_ok": true,
+              "atr_pct": 0.0115,
+              "base_min_signal_score": 0.62,
+              "breakout_20": -0.027905,
+              "breakout_ok": true,
+              "buy": true,
+              "context_impact": "Sem ajuste de contexto para este ativo.",
+              "context_status": "NEUTRO",
+              "data_source": "market",
+              "effective_min_signal_score": 0.62,
+              "fine_tune_after": "breakout_20 >= breakout_min - 0.005, apenas com score minimo preservado e guards seguros",
+              "fine_tune_applied": false,
+              "fine_tune_before": "breakout_20 >= breakout_min",
+              "fine_tune_guard_reason": "",
+              "fine_tune_reason": "Relaxamento conservador de confirmacao secundaria marginal em PAPER.",
+              "fine_tune_target": "trend_pullback_breakout_secondary_breakout_confirmation",
+              "ma20": 105.813237,
+              "ma50": 104.734562,
+              "macro_alert_active": false,
+              "macro_alert_level": "LOW",
+              "macro_alert_penalty": 0.0,
+              "macro_alert_reason": "Nenhum alerta macro ativo.",
+              "macro_alert_window_status": "INACTIVE",
+              "macro_setup_family": "TREND_FOLLOWING_SWING",
+              "momentum": -0.004276,
+              "momentum_8": -0.02154,
+              "momentum_medium_ok": true,
+              "momentum_ok": true,
+              "momentum_short_ok": true,
+              "phase2_1_fine_tune_allowed_reasons": [],
+              "phase2_1_fine_tune_applied": false,
+              "phase2_1_fine_tune_blocked_reasons": [],
+              "phase2_1_fine_tune_decision": "not_evaluated",
+              "phase2_1_fine_tune_guard": "",
+              "phase2_1_fine_tune_reason": "Relaxamento conservador de multiplas falhas pequenas de momentum/confirmacao secundaria em PAPER.",
+              "phase2_1_fine_tune_score_gap": null,
+              "phase2_1_fine_tune_target": "trend_pullback_breakout_multi_minor_confirmation",
+              "price": 104.158139,
+              "provider_effective": "unknown",
+              "pullback_ok": true,
+              "pullback_to_ma20": -0.0156,
+              "raw_score": 0.95,
+              "rejection_reasons": [],
+              "rsi": 8.56,
+              "rsi_ok": true,
+              "score": 0.95,
+              "score_ok": true,
+              "signal_key": "AAPL|2025-01-05T23:00:00|market",
+              "signal_timestamp": "2025-01-05T23:00:00",
+              "strategy_name": "trend_pullback_breakout",
+              "structure_ok": true,
+              "timestamp": "2026-04-20T12:00:00+00:00",
+              "trend_alignment": "aligned",
+              "trend_ok": true
+            }
+          ],
+          "trades": [
+            {
+              "asset": "AAPL",
+              "cash_after": 900.0,
+              "cost": 0.0,
+              "gross_value": 100.0,
+              "price": 104.158139,
+              "profile": "Equilibrado",
+              "quantity": 0.960079,
+              "realized_pnl": 0.0,
+              "reason": "score 0.95 | rsi 8.6",
+              "side": "BUY",
+              "timestamp": "2026-04-20T12:00:00+00:00",
+              "trade_id": "AAPL-synthetic-fixed-id"
+            }
+          ],
+          "trades_executed": 1
+        },
+        {
+          "financial_state": {
+            "asset_cooldowns": {},
+            "cash": 900.0,
+            "equity": 1000.0,
+            "history": [
+              {
+                "cash": 900.0,
+                "equity": 1000.0,
+                "open_positions": 1,
+                "timestamp": "2026-04-20T12:00:00+00:00",
+                "total_return": 0.0
+              },
+              {
+                "cash": 900.0,
+                "equity": 1000.0,
+                "open_positions": 1,
+                "timestamp": "2026-04-20T12:00:00+00:00",
+                "total_return": 0.0
+              }
+            ],
+            "initial_capital": 1000.0,
+            "last_prices": {
+              "AAPL": 104.158139
+            },
+            "positions": {
+              "AAPL": {
+                "atr_pct": 0.011521,
+                "atr_pct_entry": 0.0115,
+                "avg_price": 104.158139,
+                "entry_data_source": "market",
+                "entry_price": 104.158139,
+                "entry_score": 0.95,
+                "entry_signal_key": "AAPL|2025-01-05T23:00:00|market",
+                "entry_trend_alignment": "aligned",
+                "gross_entry_value": 100.0,
+                "holding_minutes_limit": 60,
+                "last_price": 104.158139,
+                "ma20_entry": 105.813237,
+                "ma50_entry": 104.734562,
+                "opened_at": "2026-04-20T12:00:00+00:00",
+                "peak_price": 104.158139,
+                "profile": "Equilibrado",
+                "quantity": 0.960079,
+                "rsi_entry": 8.56,
+                "trade_id": "AAPL-synthetic-fixed-id",
+                "trailing_stop": 101.283374,
+                "updated_at": "2026-04-20T12:00:00+00:00"
+              }
+            },
+            "realized_pnl": 0.0,
+            "run_count": 2
+          },
+          "label": "same_position_repeated",
+          "report_count": 0,
+          "signals": [],
+          "trades": [
+            {
+              "asset": "AAPL",
+              "cash_after": 900.0,
+              "cost": 0.0,
+              "gross_value": 100.0,
+              "price": 104.158139,
+              "profile": "Equilibrado",
+              "quantity": 0.960079,
+              "realized_pnl": 0.0,
+              "reason": "score 0.95 | rsi 8.6",
+              "side": "BUY",
+              "timestamp": "2026-04-20T12:00:00+00:00",
+              "trade_id": "AAPL-synthetic-fixed-id"
+            }
+          ],
+          "trades_executed": 0
+        },
+        {
+          "financial_state": {
+            "asset_cooldowns": {
+              "AAPL": "2026-04-20T12:00:00+00:00"
+            },
+            "cash": 1000.0,
+            "equity": 1000.0,
+            "history": [
+              {
+                "cash": 900.0,
+                "equity": 1000.0,
+                "open_positions": 1,
+                "timestamp": "2026-04-20T12:00:00+00:00",
+                "total_return": 0.0
+              },
+              {
+                "cash": 900.0,
+                "equity": 1000.0,
+                "open_positions": 1,
+                "timestamp": "2026-04-20T12:00:00+00:00",
+                "total_return": 0.0
+              },
+              {
+                "cash": 1000.0,
+                "equity": 1000.0,
+                "open_positions": 0,
+                "timestamp": "2026-04-20T12:00:00+00:00",
+                "total_return": 0.0
+              }
+            ],
+            "initial_capital": 1000.0,
+            "last_prices": {
+              "AAPL": 104.158139
+            },
+            "positions": {},
+            "realized_pnl": 0.0,
+            "run_count": 3
+          },
+          "label": "controlled_sell_accounting",
+          "report_count": 1,
+          "signals": [],
+          "trades": [
+            {
+              "asset": "AAPL",
+              "cash_after": 900.0,
+              "cost": 0.0,
+              "gross_value": 100.0,
+              "price": 104.158139,
+              "profile": "Equilibrado",
+              "quantity": 0.960079,
+              "realized_pnl": 0.0,
+              "reason": "score 0.95 | rsi 8.6",
+              "side": "BUY",
+              "timestamp": "2026-04-20T12:00:00+00:00",
+              "trade_id": "AAPL-synthetic-fixed-id"
+            },
+            {
+              "asset": "AAPL",
+              "cash_after": 1000.0,
+              "cost": 0.0,
+              "gross_value": 100.0,
+              "price": 104.158139,
+              "profile": "Equilibrado",
+              "quantity": 0.960079,
+              "realized_pnl": -0.0,
+              "reason": "synthetic-close",
+              "side": "SELL",
+              "timestamp": "2026-04-20T12:00:00+00:00",
+              "trade_id": "AAPL-synthetic-fixed-id"
+            }
+          ],
+          "trades_executed": 1
+        },
+        {
+          "financial_state": {
+            "asset_cooldowns": {
+              "AAPL": "2026-04-20T12:00:00+00:00"
+            },
+            "cash": 1000.0,
+            "equity": 1000.0,
+            "history": [
+              {
+                "cash": 900.0,
+                "equity": 1000.0,
+                "open_positions": 1,
+                "timestamp": "2026-04-20T12:00:00+00:00",
+                "total_return": 0.0
+              },
+              {
+                "cash": 900.0,
+                "equity": 1000.0,
+                "open_positions": 1,
+                "timestamp": "2026-04-20T12:00:00+00:00",
+                "total_return": 0.0
+              },
+              {
+                "cash": 1000.0,
+                "equity": 1000.0,
+                "open_positions": 0,
+                "timestamp": "2026-04-20T12:00:00+00:00",
+                "total_return": 0.0
+              },
+              {
+                "cash": 1000.0,
+                "equity": 1000.0,
+                "open_positions": 0,
+                "timestamp": "2026-04-20T12:00:00+00:00",
+                "total_return": 0.0
+              }
+            ],
+            "initial_capital": 1000.0,
+            "last_prices": {
+              "AAPL": 104.158139
+            },
+            "positions": {},
+            "realized_pnl": 0.0,
+            "run_count": 4
+          },
+          "label": "closed_position_repeated",
+          "report_count": 1,
+          "signals": [],
+          "trades": [
+            {
+              "asset": "AAPL",
+              "cash_after": 900.0,
+              "cost": 0.0,
+              "gross_value": 100.0,
+              "price": 104.158139,
+              "profile": "Equilibrado",
+              "quantity": 0.960079,
+              "realized_pnl": 0.0,
+              "reason": "score 0.95 | rsi 8.6",
+              "side": "BUY",
+              "timestamp": "2026-04-20T12:00:00+00:00",
+              "trade_id": "AAPL-synthetic-fixed-id"
+            },
+            {
+              "asset": "AAPL",
+              "cash_after": 1000.0,
+              "cost": 0.0,
+              "gross_value": 100.0,
+              "price": 104.158139,
+              "profile": "Equilibrado",
+              "quantity": 0.960079,
+              "realized_pnl": -0.0,
+              "reason": "synthetic-close",
+              "side": "SELL",
+              "timestamp": "2026-04-20T12:00:00+00:00",
+              "trade_id": "AAPL-synthetic-fixed-id"
+            }
+          ],
+          "trades_executed": 0
+        }
+      ]
+    }
+  },
+  "scope": "LOCAL_SYNTHETIC_ONLY",
+  "warning_output": {
+    "current": [
+      "/workspace/robo-investimentos/core/multi_timeframe_swing_audit.py:182: FutureWarning: 'H' is deprecated and will be removed in a future version, please use 'h' instead.",
+      "  resampled = data.resample(rule).agg(agg).dropna(subset=[\"open\", \"high\", \"low\", \"close\"])",
+      "/workspace/robo-investimentos/core/multi_timeframe_swing_audit.py:182: FutureWarning: 'H' is deprecated and will be removed in a future version, please use 'h' instead.",
+      "  resampled = data.resample(rule).agg(agg).dropna(subset=[\"open\", \"high\", \"low\", \"close\"])",
+      "/workspace/robo-investimentos/core/multi_timeframe_swing_audit.py:182: FutureWarning: 'H' is deprecated and will be removed in a future version, please use 'h' instead.",
+      "  resampled = data.resample(rule).agg(agg).dropna(subset=[\"open\", \"high\", \"low\", \"close\"])",
+      "/workspace/robo-investimentos/core/multi_timeframe_swing_audit.py:182: FutureWarning: 'H' is deprecated and will be removed in a future version, please use 'h' instead.",
+      "  resampled = data.resample(rule).agg(agg).dropna(subset=[\"open\", \"high\", \"low\", \"close\"])",
+      "/workspace/robo-investimentos/core/persistence.py:476: FutureWarning: The behavior of DataFrame concatenation with empty or all-NA entries is deprecated. In a future version, this will no longer exclude empty or all-NA columns when determining the result dtypes. To retain the old behavior, exclude the relevant entries before the concat operation.",
+      "  df = pd.concat([df, pd.DataFrame([row])], ignore_index=True)",
+      "/workspace/robo-investimentos/core/multi_timeframe_swing_audit.py:182: FutureWarning: 'H' is deprecated and will be removed in a future version, please use 'h' instead.",
+      "  resampled = data.resample(rule).agg(agg).dropna(subset=[\"open\", \"high\", \"low\", \"close\"])"
+    ],
+    "legacy": [
+      "/tmp/atlas-infra121-equivalence-kfkxjr_y/legacy/core/multi_timeframe_swing_audit.py:182: FutureWarning: 'H' is deprecated and will be removed in a future version, please use 'h' instead.",
+      "  resampled = data.resample(rule).agg(agg).dropna(subset=[\"open\", \"high\", \"low\", \"close\"])",
+      "/tmp/atlas-infra121-equivalence-kfkxjr_y/legacy/core/multi_timeframe_swing_audit.py:182: FutureWarning: 'H' is deprecated and will be removed in a future version, please use 'h' instead.",
+      "  resampled = data.resample(rule).agg(agg).dropna(subset=[\"open\", \"high\", \"low\", \"close\"])",
+      "/tmp/atlas-infra121-equivalence-kfkxjr_y/legacy/core/multi_timeframe_swing_audit.py:182: FutureWarning: 'H' is deprecated and will be removed in a future version, please use 'h' instead.",
+      "  resampled = data.resample(rule).agg(agg).dropna(subset=[\"open\", \"high\", \"low\", \"close\"])",
+      "/tmp/atlas-infra121-equivalence-kfkxjr_y/legacy/core/persistence.py:476: FutureWarning: The behavior of DataFrame concatenation with empty or all-NA entries is deprecated. In a future version, this will no longer exclude empty or all-NA columns when determining the result dtypes. To retain the old behavior, exclude the relevant entries before the concat operation.",
+      "  df = pd.concat([df, pd.DataFrame([row])], ignore_index=True)",
+      "/tmp/atlas-infra121-equivalence-kfkxjr_y/legacy/core/multi_timeframe_swing_audit.py:182: FutureWarning: 'H' is deprecated and will be removed in a future version, please use 'h' instead.",
+      "  resampled = data.resample(rule).agg(agg).dropna(subset=[\"open\", \"high\", \"low\", \"close\"])",
+      "/tmp/atlas-infra121-equivalence-kfkxjr_y/legacy/core/multi_timeframe_swing_audit.py:182: FutureWarning: 'H' is deprecated and will be removed in a future version, please use 'h' instead.",
+      "  resampled = data.resample(rule).agg(agg).dropna(subset=[\"open\", \"high\", \"low\", \"close\"])"
+    ]
+  }
+}

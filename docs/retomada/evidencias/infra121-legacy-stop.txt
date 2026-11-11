@@ -1,0 +1,16 @@
+{
+  "base_commit": "5d7165217e42ff5121b5444f956d45a877118734",
+  "scope": "LOCAL_SYNTHETIC_ONLY",
+  "server_version": "18.6 (Debian 18.6-1.pgdg13+2)",
+  "listener": "127.0.0.1",
+  "broker_mode": "paper",
+  "broker_provider": "paper",
+  "legacy_modules_loaded_from_git_archive": true,
+  "worker_held_at_market_feed_by_event": true,
+  "stop_failed_with_real_postgres_lock_timeout": true,
+  "stop_was_not_persisted": true,
+  "worker_rolled_back_after_synthetic_feed_failure": true,
+  "synthetic_trades_committed": 0,
+  "synchronization": "threading.Event; STOP result awaited while feed release Event remained unset"
+}
+Own disposable legacy reproduction container removed.
