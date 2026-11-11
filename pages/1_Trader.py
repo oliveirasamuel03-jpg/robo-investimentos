@@ -7,6 +7,11 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
+from core.stop_control import start_robot
+from core.ui_mutations import (
+    render_pending_intent, render_stop_status, request_stop_from_ui, run_ui_mutation,
+    visible_control_snapshot, classify_cycle_feedback,
+)
 from core.auth.guards import is_admin, render_auth_toolbar, require_auth
 from core.auth.security import verify_password
 from core.auth.users_store import (
@@ -1625,36 +1630,59 @@ if validation_consistency.get("watchlist_message"):
 if bool(security_state.get("real_mode_enabled", False)):
     st.warning("Real trading enabled")
 
-b1, b2, b3 = st.columns(3)
+control_expected = visible_control_snapshot(ui=st, state=state, key="trader")
+render_stop_status(ui=st, state=state)
+render_pending_intent(st)
+b1, b2, b3, b4 = st.columns(4)
 
 with b1:
     if st.button("▶ Iniciar robô", use_container_width=True, disabled=not admin_mode):
-        state = load_bot_state()
-        state["bot_status"] = "RUNNING"
-        save_bot_state(state)
-        st.success("Robô ligado.")
-        st.rerun()
+        outcome = run_ui_mutation(
+            lambda: start_robot(control_expected, requested_by=current_user["username"]),
+            ui=st, action="Iniciar robô",
+        )
+        if outcome.confirmed:
+            st.success("Início persistido. O worker ainda precisa executar seu próximo ciclo.")
+            st.rerun()
 
 with b2:
     if st.button("⏸ Pausar robô", use_container_width=True, disabled=not admin_mode):
-        state = load_bot_state()
-        state["bot_status"] = "PAUSED"
-        save_bot_state(state)
-        st.warning("Robô pausado.")
-        st.rerun()
+        def pause_robot():
+            candidate = load_bot_state()
+            candidate["bot_status"] = "PAUSED"
+            save_bot_state(candidate)
+        outcome = run_ui_mutation(pause_robot, ui=st, action="Pausar robô")
+        if outcome.confirmed:
+            st.warning("Pausa de entradas persistida.")
+            st.rerun()
 
 with b3:
+    if st.button("⏹ Parar robô", use_container_width=True, disabled=not admin_mode):
+        request_stop_from_ui(ui=st, requested_by=current_user["username"])
+
+with b4:
     if st.button("🔁 Rodar agora", use_container_width=True, disabled=not admin_mode):
-        try:
-            with st.spinner("Executando ciclo do robô..."):
-                result = run_trader_cycle()
-            st.success(f"Ciclo executado. Trades feitos: {result.get('cycle_result', {}).get('trades_executed', 0)}")
-            st.rerun()
-        except Exception as e:
-            st.error(f"Erro ao rodar ciclo trader: {e}")
+        with st.spinner("Executando ciclo do robô..."):
+            outcome = run_ui_mutation(run_trader_cycle, ui=st, action="Executar ciclo trader")
+        if outcome.confirmed:
+            result = outcome.value
+            feedback = classify_cycle_feedback(result)
+            if feedback == "COMMITTED_BEFORE_STOP":
+                st.warning(
+                    "Ciclo PAPER confirmado antes do registro STOPPED retornado. "
+                    f"Trades feitos: {result.get('cycle_result', {}).get('trades_executed', 0)}. "
+                    "A parada não cancela esse commit retroativamente."
+                )
+            elif feedback == "NOT_COMMITTED":
+                st.info("Ciclo não confirmado: nenhuma nova entrada foi confirmada por esta solicitação.")
+            elif feedback == "COMMITTED":
+                st.success(f"Ciclo executado. Trades feitos: {result.get('cycle_result', {}).get('trades_executed', 0)}")
+                st.rerun()
+            else:
+                st.warning("Resultado sem confirmação verificável de commit. Recarregue e confira o estado persistido.")
 
 if not admin_mode:
-    st.info("Somente administradores podem iniciar, pausar ou executar ciclos do robô.")
+    st.info("Somente administradores podem iniciar, pausar, parar ou executar ciclos do robô.")
 
 if auto_refresh_fragment_supported:
     st.markdown("### Painel ao vivo")
@@ -3304,33 +3332,37 @@ with st.expander("Modo avançado"):
 
     with ac1:
         if st.button("Salvar configuração avançada", use_container_width=True, disabled=not admin_mode):
-            state = load_bot_state()
-            state["trader"]["profile"] = str(selected_profile_name)
-            state["trader"]["ticket_value"] = float(ticket)
-            state["trader"]["holding_minutes"] = int(holding)
-            state["trader"]["max_open_positions"] = int(max_open)
-            state["trader"]["watchlist"] = [x.strip().upper() for x in watchlist_text.split(",") if x.strip()]
-            save_bot_state(state)
-            st.success("Configuração salva.")
-            st.rerun()
+            def save_advanced_config():
+                candidate = load_bot_state()
+                candidate["trader"]["profile"] = str(selected_profile_name)
+                candidate["trader"]["ticket_value"] = float(ticket)
+                candidate["trader"]["holding_minutes"] = int(holding)
+                candidate["trader"]["max_open_positions"] = int(max_open)
+                candidate["trader"]["watchlist"] = [x.strip().upper() for x in watchlist_text.split(",") if x.strip()]
+                save_bot_state(candidate)
+            outcome = run_ui_mutation(save_advanced_config, ui=st, action="Salvar configuração avançada")
+            if outcome.confirmed:
+                st.success("Configuração salva.")
+                st.rerun()
 
     with ac2:
         if st.button("Aplicar watchlist recomendada", use_container_width=True, disabled=not admin_mode):
-            state = load_bot_state()
-            state["trader"]["watchlist"] = list(recommended_watchlist)
-            save_bot_state(state)
-            st.success("Watchlist recomendada aplicada.")
-            st.rerun()
+            def save_recommended_watchlist():
+                candidate = load_bot_state()
+                candidate["trader"]["watchlist"] = list(recommended_watchlist)
+                save_bot_state(candidate)
+            outcome = run_ui_mutation(save_recommended_watchlist, ui=st, action="Aplicar watchlist recomendada")
+            if outcome.confirmed:
+                st.success("Watchlist recomendada aplicada.")
+                st.rerun()
 
     with ac3:
         if st.button("Resetar módulo trader", use_container_width=True, disabled=not admin_mode):
-            try:
-                with st.spinner("Resetando trader..."):
-                    reset_trader_module()
-                st.warning("Trader resetado.")
+            with st.spinner("Resetando trader..."):
+                outcome = run_ui_mutation(reset_trader_module, ui=st, action="Resetar módulo trader")
+            if outcome.confirmed:
+                st.warning("Trader resetado; o estado de parada permanece sob o protocolo de controle.")
                 st.rerun()
-            except Exception as e:
-                st.error(f"Erro ao resetar trader: {e}")
 
     if not admin_mode:
         st.info("A configuração avançada está em modo somente leitura para usuários sem permissão de admin.")
@@ -3426,12 +3458,13 @@ if admin_mode:
                 create_submit = st.form_submit_button("Criar usuário", use_container_width=True)
 
             if create_submit:
-                try:
-                    create_user(new_username, new_password, new_role)
+                outcome = run_ui_mutation(
+                    lambda: create_user(new_username, new_password, new_role),
+                    ui=st, action="Criar usuário",
+                )
+                if outcome.confirmed:
                     st.success("Usuário criado com sucesso.")
                     st.rerun()
-                except Exception as exc:
-                    st.error(f"Não foi possível criar o usuário: {exc}")
 
             users = list_users()
             if users:
@@ -3455,23 +3488,25 @@ if admin_mode:
                             key="admin_selected_role",
                         )
                         if st.button("Salvar perfil", use_container_width=True, key="admin_save_role"):
-                            try:
-                                update_user_role(selected_username, new_user_role)
+                            outcome = run_ui_mutation(
+                                lambda: update_user_role(selected_username, new_user_role),
+                                ui=st, action="Atualizar perfil de usuário",
+                            )
+                            if outcome.confirmed:
                                 st.success("Perfil atualizado.")
                                 st.rerun()
-                            except Exception as exc:
-                                st.error(f"Não foi possível atualizar o perfil: {exc}")
 
                     with disable_col:
                         target_disabled = bool(selected_user.get("disabled", False))
                         action_label = "Reabilitar usuário" if target_disabled else "Desabilitar usuário"
                         if st.button(action_label, use_container_width=True, key="admin_toggle_user"):
-                            try:
-                                set_user_disabled(selected_username, not target_disabled)
+                            outcome = run_ui_mutation(
+                                lambda: set_user_disabled(selected_username, not target_disabled),
+                                ui=st, action="Atualizar bloqueio de usuário",
+                            )
+                            if outcome.confirmed:
                                 st.success("Status do usuário atualizado.")
                                 st.rerun()
-                            except Exception as exc:
-                                st.error(f"Não foi possível atualizar o usuário: {exc}")
             else:
                 st.info("Nenhum usuário encontrado.")
 
@@ -3496,7 +3531,7 @@ if admin_mode:
                 key="toggle_real_mode",
                 disabled=not real_mode_enabled,
             ):
-                try:
+                def disable_real_mode():
                     if not real_mode_enabled:
                         raise ValueError("PAPER_ONLY: habilitar real mode esta bloqueado nesta fase.")
                     stored_user = get_user(current_user["username"])
@@ -3507,13 +3542,13 @@ if admin_mode:
                     if not verify_password(confirm_password, str(stored_user.get("password_hash", ""))):
                         raise ValueError("Confirmação de senha inválida.")
 
-                    latest_state = load_bot_state()
-                    latest_state.setdefault("security", {})
-                    latest_state["security"]["real_mode_enabled"] = not real_mode_enabled
-                    latest_state["security"]["real_mode_enabled_by"] = current_user["username"]
-                    latest_state["security"]["real_mode_enabled_at"] = datetime.now(timezone.utc).isoformat()
-                    save_bot_state(latest_state)
+                    candidate = load_bot_state()
+                    candidate.setdefault("security", {})
+                    candidate["security"]["real_mode_enabled"] = not real_mode_enabled
+                    candidate["security"]["real_mode_enabled_by"] = current_user["username"]
+                    candidate["security"]["real_mode_enabled_at"] = datetime.now(timezone.utc).isoformat()
+                    save_bot_state(candidate)
+                outcome = run_ui_mutation(disable_real_mode, ui=st, action="Desabilitar real mode")
+                if outcome.confirmed:
                     st.success("Real mode atualizado com sucesso.")
                     st.rerun()
-                except Exception as exc:
-                    st.error(f"Não foi possível alterar o real mode: {exc}")

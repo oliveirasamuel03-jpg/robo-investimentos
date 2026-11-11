@@ -100,6 +100,7 @@ from core.persistence import (
     update_json_state,
 )
 from core.trader_profiles import DEFAULT_TRADER_PROFILE
+from core.stop_control import bot_state_transaction, guard_stop_transition
 
 
 def _normalize_watchlist_values(values: list[str] | None) -> list[str]:
@@ -2174,7 +2175,10 @@ def _normalize_bot_state(state: dict) -> dict:
 
 def save_bot_state(state: dict) -> None:
     ensure_app_directories()
-    save_json_state("bot_state", state, BOT_STATE_FILE)
+    with bot_state_transaction():
+        previous = load_json_state("bot_state", lambda: deepcopy(DEFAULT_STATE), BOT_STATE_FILE)
+        guard_stop_transition(previous, state)
+        save_json_state("bot_state", state, BOT_STATE_FILE)
 
 
 def update_bot_state(updater) -> dict:
@@ -2186,12 +2190,29 @@ def update_bot_state(updater) -> dict:
     ensure_storage()
     return update_json_state(
         "bot_state", lambda: deepcopy(DEFAULT_STATE), BOT_STATE_FILE,
-        lambda state: updater(_normalize_bot_state(state)),
+        lambda state: _guarded_bot_update(state, updater),
     )
 
 
+def _guarded_bot_update(state, updater):
+    previous = deepcopy(state)
+    result = updater(_normalize_bot_state(state))
+    guard_stop_transition(previous, result)
+    return result
+
+
 def reset_state() -> dict:
-    return update_bot_state(lambda state: deepcopy(DEFAULT_STATE))
+    def reset(state):
+        result = deepcopy(DEFAULT_STATE)
+        # Resetting configuration must not clear a stopped operator intention.
+        if state.get("bot_status") == "STOPPED":
+            result["bot_status"] = "STOPPED"
+        if state.get("stop_control"):
+            result["stop_control"] = deepcopy(state["stop_control"])
+        if state.get("cycle_activity"):
+            result["cycle_activity"] = deepcopy(state["cycle_activity"])
+        return result
+    return update_bot_state(reset)
 
 
 def append_csv_row(file_path, row: dict) -> None:

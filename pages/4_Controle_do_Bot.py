@@ -1,11 +1,17 @@
 from __future__ import annotations
 
 import json
+from copy import deepcopy
 from datetime import datetime, timezone
 
 import pandas as pd
 import streamlit as st
 
+from core.stop_control import start_robot
+from core.ui_mutations import (
+    render_pending_intent, render_stop_status, request_stop_from_ui, run_ui_mutation,
+    visible_control_snapshot, classify_cycle_feedback,
+)
 from core.alerts import send_email_alert
 from core.auth.guards import render_auth_toolbar, require_admin
 from core.broker import broker_status_label, probe_broker_status
@@ -415,8 +421,13 @@ with act_c1:
 
 with act_c2:
     if st.button("Recalcular saude", use_container_width=True):
-        production_state = update_production_status(evaluate_production_health(load_bot_state()))
-        st.info(f"Saude recalculada: {health_level_label(production_state.get('health_level'))}")
+        outcome = run_ui_mutation(
+            lambda: update_production_status(evaluate_production_health(load_bot_state())),
+            ui=st, action="Recalcular saúde",
+        )
+        if outcome.confirmed:
+            production_state = outcome.value
+            st.info(f"Saude recalculada: {health_level_label(production_state.get('health_level'))}")
 
 email_reporting_status = build_email_reporting_status(load_bot_state())
 st.subheader("Email reporting")
@@ -1883,12 +1894,16 @@ if phase2_1_fine_tune:
 val_actions1, val_actions2 = st.columns(2)
 with val_actions1:
     if st.button("Recalcular validacao swing", use_container_width=True):
-        validation_report = refresh_swing_validation_cycle()
-        st.info("Validacao swing recalculada.")
+        outcome = run_ui_mutation(refresh_swing_validation_cycle, ui=st, action="Recalcular validação swing")
+        if outcome.confirmed:
+            validation_report = outcome.value
+            st.info("Validacao swing recalculada.")
 with val_actions2:
     if st.button("Reiniciar ciclo swing 10 dias", use_container_width=True):
-        validation_report = reset_swing_validation_cycle()
-        st.warning("Novo ciclo swing iniciado a partir de agora.")
+        outcome = run_ui_mutation(reset_swing_validation_cycle, ui=st, action="Reiniciar ciclo swing")
+        if outcome.confirmed:
+            validation_report = outcome.value
+            st.warning("Novo ciclo swing iniciado a partir de agora.")
 
 validation_state = load_bot_state().get("validation", {}) or {}
 st.caption(
@@ -2193,36 +2208,72 @@ mode_index = mode_options.index(state["bot_mode"]) if state.get("bot_mode") in m
 status = st.radio("Status do bot", status_options, index=status_index, format_func=bot_status_label, horizontal=True)
 mode = st.selectbox("Modo do bot", mode_options, index=mode_index)
 
+control_expected = visible_control_snapshot(ui=st, state=state, key="control")
+render_stop_status(ui=st, state=state)
+render_pending_intent(st)
+if st.button("⏹ Parar robô", use_container_width=True):
+    request_stop_from_ui(ui=st, requested_by=current_user["username"])
+
 c1, c2, c3, c4 = st.columns(4)
 with c1:
     if st.button("Salvar status", use_container_width=True):
-        state["bot_status"] = status
-        state["bot_mode"] = mode
-        save_bot_state(state)
-        log_event("INFO", f"Status atualizado para {status} / {mode}")
-        st.success("Status salvo.")
+        if status == "STOPPED":
+            request_stop_from_ui(ui=st, requested_by=current_user["username"])
+        else:
+            def save_status():
+                if status == "RUNNING":
+                    # START is explicit and checked against the operator's snapshot.
+                    return start_robot(control_expected, requested_by=current_user["username"], bot_mode=mode)
+                # Do not let an unconfirmed UI snapshot undo a newer STOP.
+                candidate = deepcopy(control_expected)
+                candidate["bot_status"] = status
+                candidate["bot_mode"] = mode
+                save_bot_state(candidate)
+                return candidate
+            outcome = run_ui_mutation(save_status, ui=st, action="Salvar status do bot")
+            if outcome.confirmed:
+                st.success("Status persistido.")
 
 with c2:
     if st.button("Executar ciclo agora", use_container_width=True):
-        result = run_trader_cycle()
-        cycle = result.get("cycle_result", {}) or {}
-        risk = result.get("risk", {}) or {}
-        blocked = bool(risk.get("daily_loss_block_active", False))
-        st.success(
-            f"Ciclo executado. Trades feitos: {int(cycle.get('trades_executed', 0) or 0)} | "
-            f"Feed: {market_data_status_label(cycle.get('market_data_status'))} | "
-            f"Trava diaria: {'BLOQUEADA' if blocked else 'LIBERADA'}"
-        )
+        outcome = run_ui_mutation(run_trader_cycle, ui=st, action="Executar ciclo trader")
+        if outcome.confirmed:
+            result = outcome.value
+            feedback = classify_cycle_feedback(result)
+            if feedback == "COMMITTED_BEFORE_STOP":
+                st.warning(
+                    "Ciclo PAPER confirmado antes do registro STOPPED retornado. "
+                    f"Trades feitos: {result.get('cycle_result', {}).get('trades_executed', 0)}. "
+                    "A parada não cancela esse commit retroativamente."
+                )
+            elif feedback == "NOT_COMMITTED":
+                st.info("Ciclo não confirmado: nenhuma nova entrada foi confirmada por esta solicitação.")
+            elif feedback == "COMMITTED":
+                cycle = result.get("cycle_result", {}) or {}
+                risk = result.get("risk", {}) or {}
+                blocked = bool(risk.get("daily_loss_block_active", False))
+                st.success(
+                    f"Ciclo executado. Trades feitos: {int(cycle.get('trades_executed', 0) or 0)} | "
+                    f"Feed: {market_data_status_label(cycle.get('market_data_status'))} | "
+                    f"Trava diaria: {'BLOQUEADA' if blocked else 'LIBERADA'}"
+                )
+            else:
+                st.warning("Resultado sem confirmação verificável de commit. Recarregue e confira o estado persistido.")
 
 with c3:
     if st.button("Pausar entradas", use_container_width=True):
-        state["bot_status"] = "PAUSED"
-        save_bot_state(state)
-        st.warning("Bot pausado.")
+        def pause_entries():
+            candidate = deepcopy(control_expected)
+            candidate["bot_status"] = "PAUSED"
+            save_bot_state(candidate)
+        outcome = run_ui_mutation(pause_entries, ui=st, action="Pausar entradas")
+        if outcome.confirmed:
+            st.warning("Pausa de entradas persistida.")
 
 with c4:
     if st.button("Reset geral", use_container_width=True):
-        reset_state()
-        st.error("Estado resetado.")
+        outcome = run_ui_mutation(reset_state, ui=st, action="Reset geral")
+        if outcome.confirmed:
+            st.warning("Estado resetado. Uma parada persistida continua exigindo início explícito.")
 
-st.info("Ligado abre e gerencia posicoes. Pausado nao abre novas posicoes. Parado paralisa tudo.")
+st.info("Ligado abre e gerencia posições. Pausado não abre novas posições. Parada solicitada exige confirmação do protocolo; commits anteriores não são cancelados.")

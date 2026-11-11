@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from copy import deepcopy
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -76,7 +77,11 @@ from core.signal_rejection_analysis import (
     build_signal_rejection_events,
     summarize_rejection_events,
 )
-from core.state_store import log_event
+from core.state_store import log_event, load_bot_state, update_bot_state
+from core.broker import build_broker_runtime_config
+from contextlib import contextmanager, ExitStack
+from core.persistence import persistence_transaction, PersistenceConflictError, _local_lock, _ACTIVE_CONNECTION
+from core.config import BOT_STATE_FILE
 from core.strategy_structure_audit import build_strategy_structure_audit
 from core.trader_reports import append_trade_report, build_closed_trade_report
 
@@ -976,8 +981,72 @@ def run_paper_trading_demo(config: PaperTradingConfig = PaperTradingConfig()) ->
     }
 
 
-@transactional_persistence
-def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[str, Any]:
+@contextmanager
+def _paper_commit_scope():
+    # Match STOP's bot-state lock in the local fallback too. PostgreSQL retains
+    # the existing global unit-of-work lock; no feed request runs in this scope.
+    with persistence_transaction(), ExitStack() as stack:
+        if not database_enabled():
+            stack.enter_context(_local_lock(BOT_STATE_FILE))
+            stack.enter_context(_local_lock(PAPER_STATE_FILE))
+        yield
+
+
+def _commit_paper_draft(state, trades, reports, config, commit_guard=None, commit_finalize=None):
+    """Publish an optimistic draft only after validating current control/state.
+
+    PostgreSQL commits cash, positions, trades, reports and the platform mirror
+    together. A refused draft has no financial writes; it is never retried here.
+    """
+    from core.stop_control import mutate_acknowledgement
+    with _paper_commit_scope():
+        latest = load_bot_state()
+        if (latest.get("stop_control", {}).get("status") in {"PERSISTED", "ACKNOWLEDGED"}
+                and latest.get("bot_status") != "STOPPED"):
+            raise RuntimeError("PAPER commit refused: inconsistent stop control requires review.")
+        if latest.get("bot_status") == "STOPPED":
+            update_bot_state(lambda current: mutate_acknowledgement(current, "paper_commit_guard"))
+            return False
+        runtime = build_broker_runtime_config(latest.get("security", {}))
+        if (runtime["provider"] != "paper" or runtime["configured_mode"] != "paper"
+                or runtime["live_requested"] or runtime["real_mode_enabled"]):
+            raise RuntimeError("PAPER commit refused: broker must remain exclusively paper.")
+        if commit_guard is not None:
+            commit_guard(latest)
+        if any(trade.get("side") == "BUY" for trade in trades) and bool(
+            latest.get("risk", {}).get("daily_loss_block_active", False)
+        ):
+            raise PersistenceConflictError("Risk state changed; review before another cycle.")
+        # CAS must run before append, particularly in the per-file fallback.
+        # In PostgreSQL any later append/report failure rolls back this save too.
+        save_paper_state(state)
+        for trade in trades:
+            _append_paper_trade(trade)
+        for report in reports:
+            append_trade_report(report)
+        if commit_finalize is not None:
+            commit_finalize()
+        return True
+
+
+def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig(), *,
+                    commit_guard=None, commit_finalize=None) -> dict[str, Any]:
+    if _ACTIVE_CONNECTION.get() is not None:
+        raise RuntimeError("Market acquisition cannot run inside a persistence transaction.")
+    control = load_bot_state()
+    if control.get("bot_status") == "STOPPED":
+        from core.stop_control import acknowledge_stop
+        acknowledge_stop(worker_id="paper_cycle")
+        return {"status": "STOPPED", "committed": False, "trades_executed": 0,
+                "signals": [], "draft_discarded": True}
+    expected_control = deepcopy({key: control.get(key) for key in ("bot_status", "stop_control")})
+    supplied_guard = commit_guard
+    def commit_guard(latest):
+        if {key: latest.get(key) for key in ("bot_status", "stop_control")} != expected_control:
+            raise PersistenceConflictError("Operator control changed during acquisition; reload and review.")
+        if supplied_guard is not None:
+            supplied_guard(latest)
+
     ensure_paper_files(config)
     state = load_paper_state(config)
 
@@ -999,6 +1068,7 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[s
             state["last_prices"][symbol] = round(float(data["close"].iloc[-1]), 6)
 
     trades_executed: list[dict[str, Any]] = []
+    trade_reports: list[dict[str, Any]] = []
     signals: list[dict[str, Any]] = []
     market_context = get_market_context(market_data)
     macro_alert = default_macro_alert_state()
@@ -1099,8 +1169,7 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[s
             "reason": reason,
         }
         trades_executed.append(trade)
-        _append_paper_trade(trade)
-        append_trade_report(
+        trade_reports.append(
             build_closed_trade_report(
                 position=position,
                 closed_at=closed_at,
@@ -1622,7 +1691,6 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[s
             "reason": f"score {candidate['score']:.2f} | rsi {candidate['rsi']:.1f}",
         }
         trades_executed.append(trade)
-        _append_paper_trade(trade)
 
     state["run_count"] = int(state.get("run_count", 0)) + 1
     state["updated_at"] = _utc_now_iso()
@@ -1660,7 +1728,10 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[s
         }
     )
     state["history"] = history[-max(int(config.history_limit), 1) :]
-    save_paper_state(state)
+    if not _commit_paper_draft(state, trades_executed, trade_reports, config,
+                               commit_guard=commit_guard, commit_finalize=commit_finalize):
+        return {"status": "STOPPED", "committed": False, "state": load_paper_state(config),
+                "trades_executed": 0, "signals": [], "draft_discarded": True}
 
     report = build_paper_report({"signals": signals}, initial_capital=float(config.initial_capital))
     cycle_validation["rejection_events"] = rejection_events
@@ -1670,6 +1741,7 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[s
     )
 
     return {
+        "committed": True,
         "state": state,
         "trades": read_paper_trades(limit=200),
         "equity": read_paper_equity(limit=200),

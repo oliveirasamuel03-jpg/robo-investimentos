@@ -10,6 +10,8 @@ MODULES_TO_CLEAR = [
     "core.config",
     "core.persistence",
     "core.state_store",
+    "core.stop_control",
+    "core.ui_mutations",
     "core.market_data",
     "core.market_context",
     "core.macro_alerts",

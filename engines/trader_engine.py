@@ -10,7 +10,10 @@ from core.config import (
     TRADER_ORDERS_COLUMNS,
     TRADER_ORDERS_FILE,
 )
-from core.persistence import transactional_persistence
+from core.persistence import transactional_persistence, PersistenceConflictError
+from datetime import datetime, timezone
+from uuid import uuid4
+from copy import deepcopy
 from core.broker import probe_broker_status
 from core.daily_risk import evaluate_daily_loss_guard
 from core.macro_alerts import default_macro_alert_state, evaluate_configured_macro_alert
@@ -20,6 +23,7 @@ from core.state_store import (
     read_storage_table,
     replace_storage_table,
     save_bot_state,
+    update_bot_state,
     update_broker_status,
     update_macro_alert_status,
     update_market_context_status,
@@ -215,45 +219,90 @@ def _sync_trader_orders_into_storage() -> None:
     replace_storage_table(TRADER_ORDERS_FILE, rows_to_store, columns=TRADER_ORDERS_COLUMNS)
 
 
-@transactional_persistence
+def _operational_fingerprint(state):
+    # Heartbeat/chart/diagnostic writes do not invalidate an acquisition. Trading
+    # settings, risk, control intent, current platform positions and capital do.
+    return deepcopy({key: state.get(key) for key in (
+        "bot_status", "bot_mode", "trader", "security", "risk", "wallet_value",
+        "positions", "cash", "realized_pnl", "stop_control", "macro_alert",
+    )})
+
+
+def _cycle_phase(cycle_id, phase):
+    now = datetime.now(timezone.utc).isoformat()
+    def update(state):
+        previous = state.get("cycle_activity", {})
+        # Completion of an old attempt cannot hide a newer attempt's activity.
+        if phase != "PREPARING" and previous.get("cycle_id") != cycle_id:
+            return state
+        state["cycle_activity"] = {
+            "cycle_id": cycle_id, "phase": phase,
+            "started_at": now if phase == "PREPARING" else previous.get("started_at", ""),
+            "finished_at": "" if phase == "PREPARING" else now,
+        }
+        return state
+    update_bot_state(update)
+
+
 def run_trader_cycle(*, persist_market_data: bool = True) -> dict:
+    from core.stop_control import acknowledge_stop
     state = load_bot_state()
-    risk_state = refresh_daily_loss_guard(state)
-    state = load_bot_state()
-    broker_status = probe_broker_status(state.get("security", {}), requested_by="worker_cycle")
-    update_broker_status(broker_status)
-
     if state.get("bot_status") == "STOPPED":
-        log_event("INFO", "Trader parado pelo status STOPPED")
+        acknowledge_stop(worker_id="trader_cycle")
         return {"status": "STOPPED"}
-
     if not state["trader"].get("enabled", True):
-        log_event("INFO", "Trader desabilitado")
         return {"status": "DISABLED"}
 
-    refresh_macro_alert_state()
-    state = load_bot_state()
-    cfg = build_paper_cfg_from_platform_state(state, risk_state=risk_state)
-    ensure_paper_files(cfg)
+    cycle_id = uuid4().hex
+    _cycle_phase(cycle_id, "PREPARING")
+    try:
+        risk_state = refresh_daily_loss_guard(load_bot_state())
+        broker_status = probe_broker_status(load_bot_state().get("security", {}), requested_by="worker_cycle")
+        update_broker_status(broker_status)
+        refresh_macro_alert_state()
+        state = load_bot_state()
+        if state.get("bot_status") == "STOPPED":
+            acknowledge_stop(worker_id="trader_cycle")
+            _cycle_phase(cycle_id, "IDLE")
+            return {"status": "STOPPED"}
+        cfg = build_paper_cfg_from_platform_state(state, risk_state=risk_state)
+        expected = _operational_fingerprint(state)
 
-    cycle_result = run_paper_cycle(cfg)
-    if persist_market_data:
-        update_market_data_status(cycle_result.get("market_data_status"))
-    update_market_context_status(cycle_result.get("market_context"))
-    _sync_trader_orders_into_storage()
-    platform_state = sync_platform_positions_from_paper()
-    post_risk_state = refresh_daily_loss_guard(load_bot_state())
-    report = build_paper_report()
-    equity_df = read_paper_equity(limit=200)
+        def validate(latest):
+            if _operational_fingerprint(latest) != expected:
+                raise PersistenceConflictError("Operational state changed during acquisition; reload and review.")
 
-    return {
-        "status": state.get("bot_status"),
-        "cycle_result": cycle_result,
-        "paper_report": report,
-        "paper_equity": equity_df.to_dict(orient="records") if not equity_df.empty else [],
-        "broker_status": broker_status,
-        "risk": post_risk_state,
-    }
+        def finalize():
+            # This callback is inside the SAME transaction as the PAPER ledger.
+            # It performs persistence and local calculations only, never feeds.
+            _sync_trader_orders_into_storage()
+            sync_platform_positions_from_paper()
+            refresh_daily_loss_guard(load_bot_state())
+            _cycle_phase(cycle_id, "IDLE")
+
+        cycle_result = run_paper_cycle(cfg, commit_guard=validate, commit_finalize=finalize)
+        if cycle_result.get("status") == "STOPPED":
+            _cycle_phase(cycle_id, "IDLE")
+            return {"status": "STOPPED", "committed": False, "cycle_result": cycle_result}
+        if persist_market_data:
+            update_market_data_status(cycle_result.get("market_data_status"))
+        update_market_context_status(cycle_result.get("market_context"))
+        report = build_paper_report()
+        equity_df = read_paper_equity(limit=200)
+        return {
+            "status": load_bot_state().get("bot_status"), "committed": True,
+            "cycle_result": cycle_result, "paper_report": report,
+            "paper_equity": equity_df.to_dict(orient="records") if not equity_df.empty else [],
+            "broker_status": broker_status, "risk": load_bot_state().get("risk", {}),
+        }
+    except Exception:
+        # Best-effort diagnostic completion only; never retry the financial unit.
+        # A database outage may leave PREPARING as last observed, not proof of life.
+        try:
+            _cycle_phase(cycle_id, "FAILED")
+        except Exception:
+            pass
+        raise
 
 
 @transactional_persistence

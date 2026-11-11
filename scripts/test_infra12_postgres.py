@@ -95,7 +95,7 @@ def main() -> int:
         with tempfile.TemporaryDirectory(prefix="atlas-infra12-storage-") as directory:
             os.environ["ROBO_STORAGE_DIR"] = directory
             import pytest
-            options = ["-q", "tests/test_infra12_postgres.py", "tests/test_infra12_retention_postgres.py"]
+            options = ["-q", "tests/test_infra12_postgres.py", "tests/test_infra12_retention_postgres.py", "tests/test_infra121_postgres.py"]
             if args.junitxml:
                 options += [f"--junitxml={args.junitxml.resolve()}"]
             return pytest.main(options)

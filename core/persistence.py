@@ -212,7 +212,11 @@ def _require_psycopg() -> None:
 
 def _connect():
     _require_psycopg()
-    return psycopg.connect(get_database_url(), autocommit=True)
+    url = get_database_url()
+    # Bound a missing connection timeout too; a UI STOP must not wait forever
+    # for the network layer before it can report that persistence is unconfirmed.
+    options = {} if "connect_timeout" in psycopg.conninfo.conninfo_to_dict(url) else {"connect_timeout": 5}
+    return psycopg.connect(url, autocommit=True, **options)
 
 
 def _ensure_db_schema() -> None:
@@ -308,6 +312,15 @@ def _check_snapshot(payload, source, current, new, strict):
         raise PersistenceConflictError("Refusing unversioned overwrite; load a state snapshot first.")
 
 
+def _guard_named_state(namespace, current_text, candidate):
+    # Protect control intent even through the generic persistence API. This is
+    # deliberately independent of UI conventions; external SQL/old writers still
+    # require a coordinated rollout, as advisory locks always did.
+    if namespace == "bot_state" and current_text is not None:
+        from core.stop_control import guard_stop_transition
+        guard_stop_transition(_decode_json(current_text, dict, "bot control"), candidate)
+
+
 def save_json_state(namespace, payload, local_path):
     if not isinstance(payload, dict):
         raise PersistenceDataError("State must be a JSON object")
@@ -318,6 +331,7 @@ def save_json_state(namespace, payload, local_path):
             current = local_path.read_text(encoding="utf-8") if local_path.exists() else None
             if current is not None:
                 _decode_json(current, dict, "local state")
+            _guard_named_state(namespace, current, payload)
             _check_snapshot(payload, source, current, text, strict=False)
             _atomic_write_text(local_path, text)
     else:
@@ -327,6 +341,7 @@ def save_json_state(namespace, payload, local_path):
             current = row[0] if row else None
             if current is not None:
                 _decode_json(current, dict, "database state")
+            _guard_named_state(namespace, current, payload)
             _check_snapshot(payload, source, current, text, strict=True)
             if current is None:
                 changed = conn.execute("""INSERT INTO app_state(namespace,payload_json) VALUES (%s,%s)
@@ -350,6 +365,7 @@ def update_json_state(namespace, default_factory, local_path, updater):
             if not isinstance(result, dict):
                 raise TypeError("State updater must return a dict")
             text = _encode(result)
+            _guard_named_state(namespace, current, result)
             _atomic_write_text(local_path, text)
             return StateSnapshot(result, _state_source(namespace, local_path), text)
     with persistence_transaction(namespace):

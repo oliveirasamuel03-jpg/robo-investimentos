@@ -30,6 +30,7 @@ from core.state_store import (
     update_retention_status,
     update_validation_status,
 )
+from core.stop_control import acknowledge_stop
 from core.swing_validation import refresh_swing_validation_cycle
 from engines.trader_engine import refresh_daily_loss_guard, run_trader_cycle
 
@@ -1866,6 +1867,8 @@ def worker_loop() -> None:
             state = load_bot_state()
 
             if state.get("bot_status") != "RUNNING":
+                if state.get("bot_status") == "STOPPED":
+                    acknowledge_stop(worker_id="trader_worker")
                 update_runtime_state(
                     last_action="Robo pausado. Aguardando ativacao.",
                     next_run_delta_seconds=PAUSED_SLEEP_SECONDS,
