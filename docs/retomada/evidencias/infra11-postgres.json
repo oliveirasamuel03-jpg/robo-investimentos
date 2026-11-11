@@ -1,0 +1,28 @@
+{
+  "passed": 19,
+  "checks": [
+    "private_listener_only",
+    "read_only_audit_does_not_create_schema",
+    "json_state_roundtrip",
+    "serialization_failure_rolls_back_delete_and_insert",
+    "sql_failure_rolls_back_delete_and_insert",
+    "other_namespace_preserved",
+    "successful_replace_commits",
+    "postgres_limit_one",
+    "postgres_limit_zero",
+    "corrupt_state_preserved",
+    "read_only_inventory_detects_corruption",
+    "corrupt_row_preserved",
+    "postgres_auth_roundtrip",
+    "postgres_bot_state_roundtrip",
+    "postgres_paper_guards",
+    "postgres_paper_state_initialized",
+    "dump_restore_exact_app_state",
+    "dump_restore_exact_app_rows",
+    "restored_sequence_advances"
+  ],
+  "server_version": "16.10",
+  "fixture_dump_sha256": "506ef94893f361c6499b2a42999e42ce7bec4a26a798dcc9f4342abade7b66a6",
+  "cluster_stopped": true,
+  "scope": "LOCAL_SYNTHETIC_ONLY_NOT_OLD_DATABASE_RECOVERY"
+}

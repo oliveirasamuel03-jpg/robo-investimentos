@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import tempfile
 from pathlib import Path
 from typing import Any, Callable
 
@@ -14,6 +15,43 @@ except Exception:
 
 
 _DB_SCHEMA_READY = False
+
+
+class PersistenceDataError(RuntimeError):
+    """Existing data is invalid; do not replace it with an empty/default state."""
+
+
+def _decode_json(text: str, expected_type: type, source: str):
+    try:
+        data = json.loads(text)
+    except (ValueError, TypeError) as exc:
+        raise PersistenceDataError(f"Invalid JSON in {source}; recovery required.") from exc
+    if not isinstance(data, expected_type):
+        raise PersistenceDataError(f"Invalid data structure in {source}; recovery required.")
+    if expected_type is list and any(not isinstance(row, dict) for row in data):
+        raise PersistenceDataError(f"Invalid row in {source}; recovery required.")
+    return data
+
+
+def _atomic_write_text(path: Path, text: str) -> None:
+    """Publish a complete local file, preserving the old file on write failure.
+
+    This prevents torn writes; it does not serialize concurrent read-modify-write.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = None
+    try:
+        with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", newline="",
+                                         dir=path.parent, prefix=f".{path.name}.",
+                                         suffix=".tmp", delete=False) as handle:
+            temporary = Path(handle.name)
+            handle.write(text)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, path)
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
 
 
 def get_database_url() -> str:
@@ -72,32 +110,23 @@ def _ensure_db_schema() -> None:
 
 
 def _load_local_json_state(path: Path, default_factory: Callable[[], dict[str, Any]]) -> dict[str, Any]:
-    if not path.exists():
-        return default_factory()
-
     try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except Exception:
+        text = path.read_text(encoding="utf-8")
+    except FileNotFoundError:
         return default_factory()
-
-    if isinstance(data, dict):
-        return data
-    return default_factory()
+    except UnicodeError as exc:
+        raise PersistenceDataError("Invalid state file encoding; recovery required.") from exc
+    return _decode_json(text, dict, "local state")
 
 
 def _load_local_json_rows(path: Path) -> list[dict[str, Any]]:
-    if not path.exists():
-        return []
-
     try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except Exception:
+        text = path.read_text(encoding="utf-8")
+    except FileNotFoundError:
         return []
-
-    if not isinstance(data, list):
-        return []
-
-    return [row for row in data if isinstance(row, dict)]
+    except UnicodeError as exc:
+        raise PersistenceDataError("Invalid rows file encoding; recovery required.") from exc
+    return _decode_json(text, list, "local rows")
 
 
 def load_json_state(
@@ -116,12 +145,7 @@ def load_json_state(
             row = cur.fetchone()
 
     if row:
-        try:
-            payload = json.loads(str(row[0]))
-        except Exception:
-            payload = default_factory()
-        if isinstance(payload, dict):
-            return payload
+        return _decode_json(str(row[0]), dict, "database state")
 
     payload = _load_local_json_state(local_path, default_factory)
     save_json_state(namespace, payload, local_path)
@@ -130,8 +154,7 @@ def load_json_state(
 
 def save_json_state(namespace: str, payload: dict[str, Any], local_path: Path) -> None:
     if not database_enabled():
-        local_path.parent.mkdir(parents=True, exist_ok=True)
-        local_path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
+        _atomic_write_text(local_path, json.dumps(payload, indent=2, ensure_ascii=False))
         return
 
     _ensure_db_schema()
@@ -150,6 +173,12 @@ def save_json_state(namespace: str, payload: dict[str, Any], local_path: Path) -
 
 
 def load_json_rows(namespace: str, local_path: Path, limit: int | None = None) -> list[dict[str, Any]]:
+    if limit is not None:
+        limit = int(limit)
+        if limit < 0:
+            raise ValueError("limit must be non-negative")
+        if limit == 0:
+            return []
     if not database_enabled():
         rows = _load_local_json_rows(local_path)
         if limit is None:
@@ -182,12 +211,7 @@ def load_json_rows(namespace: str, local_path: Path, limit: int | None = None) -
     if results:
         rows: list[dict[str, Any]] = []
         for result in results:
-            try:
-                parsed = json.loads(str(result[0]))
-            except Exception:
-                continue
-            if isinstance(parsed, dict):
-                rows.append(parsed)
+            rows.append(_decode_json(str(result[0]), dict, "database row"))
         return rows
 
     rows = _load_local_json_rows(local_path)
@@ -203,7 +227,7 @@ def append_json_row(namespace: str, row: dict[str, Any], local_path: Path) -> No
         local_path.parent.mkdir(parents=True, exist_ok=True)
         rows = _load_local_json_rows(local_path)
         rows.append(row)
-        local_path.write_text(json.dumps(rows, indent=2, ensure_ascii=False), encoding="utf-8")
+        _atomic_write_text(local_path, json.dumps(rows, indent=2, ensure_ascii=False))
         return
 
     _ensure_db_schema()
@@ -218,14 +242,14 @@ def append_json_row(namespace: str, row: dict[str, Any], local_path: Path) -> No
 
 def replace_json_rows(namespace: str, rows: list[dict[str, Any]], local_path: Path) -> None:
     if not database_enabled():
-        local_path.parent.mkdir(parents=True, exist_ok=True)
-        local_path.write_text(json.dumps(rows, indent=2, ensure_ascii=False), encoding="utf-8")
+        _atomic_write_text(local_path, json.dumps(rows, indent=2, ensure_ascii=False))
         return
 
     _ensure_db_schema()
 
     with _connect() as conn:
-        with conn.cursor() as cur:
+        # Autocommit remains enabled for other operations; replacement is all-or-nothing.
+        with conn.transaction(), conn.cursor() as cur:
             cur.execute("DELETE FROM app_rows WHERE namespace = %s", (namespace,))
             for row in rows:
                 cur.execute(
@@ -266,7 +290,7 @@ def append_table_row(file_path: Path | str, row: dict[str, Any], columns: list[s
         path.parent.mkdir(parents=True, exist_ok=True)
         df = read_table(path, columns=columns)
         df = pd.concat([df, pd.DataFrame([row])], ignore_index=True)
-        df.to_csv(path, index=False)
+        _atomic_write_text(path, df.to_csv(index=False))
         return
 
     append_json_row(_table_namespace(path), row, path.with_suffix(path.suffix + ".json"))
@@ -283,7 +307,7 @@ def replace_table(file_path: Path | str, rows: list[dict[str, Any]], columns: li
                 if column not in df.columns:
                     df[column] = pd.Series(dtype="object")
             df = df[columns]
-        df.to_csv(path, index=False)
+        _atomic_write_text(path, df.to_csv(index=False))
         return
 
     replace_json_rows(_table_namespace(path), rows, path.with_suffix(path.suffix + ".json"))

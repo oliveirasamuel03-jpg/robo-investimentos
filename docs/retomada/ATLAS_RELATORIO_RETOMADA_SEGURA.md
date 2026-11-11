@@ -1,5 +1,10 @@
 # ATLAS — Retomada segura INFRA-1
 
+> Continuidade: [INFRA-1.1 — persistência e recuperação local](ATLAS_INFRA_1_1_PERSISTENCIA.md).
+> A nova fase corrige gravações parciais e corrupção JSON silenciosa e acrescenta
+> 19 verificações reais em PostgreSQL local, além de 349 testes offline aprovados.
+> O relatório INFRA-1 abaixo fica preservado como registro histórico da primeira entrega.
+
 Data: 10/11/2026. PAPER_ONLY / COST_CONTROLLED / NO_PRODUCTION_DEPLOY.
 Escopo exclusivo: `oliveirasamuel03-jpg/robo-investimentos`.
 
