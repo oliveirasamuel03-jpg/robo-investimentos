@@ -63,6 +63,10 @@ from core.persistence import (
     database_enabled,
     load_json_rows,
     load_json_state,
+    inherit_state_snapshot,
+    transactional_persistence,
+    update_json_state,
+    ensure_json_rows_file,
     replace_json_rows,
     save_json_state,
 )
@@ -210,10 +214,10 @@ def ensure_paper_files(config: PaperTradingConfig | None = None) -> None:
         return
 
     if not PAPER_STATE_FILE.exists():
-        save_paper_state(_default_state(initial_capital))
+        update_json_state(PAPER_STATE_NAMESPACE, lambda: _default_state(initial_capital),
+                          PAPER_STATE_FILE, lambda state: state)
 
-    if not PAPER_TRADES_FILE.exists():
-        PAPER_TRADES_FILE.write_text("[]", encoding="utf-8")
+    ensure_json_rows_file(PAPER_TRADES_FILE)
 
 
 def load_paper_state(config: PaperTradingConfig | None = None) -> dict[str, Any]:
@@ -226,12 +230,13 @@ def load_paper_state(config: PaperTradingConfig | None = None) -> dict[str, Any]
     )
     merged = _default_state(float(state.get("initial_capital", desired_initial_capital) or desired_initial_capital))
     merged.update(state)
+    merged = inherit_state_snapshot(merged, state)
     merged["positions"] = merged.get("positions", {}) or {}
     merged["asset_cooldowns"] = merged.get("asset_cooldowns", {}) or {}
     merged["last_prices"] = merged.get("last_prices", {}) or {}
     merged["history"] = merged.get("history", []) or []
     if _should_migrate_fresh_paper_state(merged, desired_initial_capital):
-        merged = _default_state(desired_initial_capital)
+        merged = inherit_state_snapshot(_default_state(desired_initial_capital), merged)
         save_paper_state(merged)
     return merged
 
@@ -241,10 +246,11 @@ def save_paper_state(state: dict[str, Any]) -> None:
     save_json_state(PAPER_STATE_NAMESPACE, state, PAPER_STATE_FILE)
 
 
+@transactional_persistence
 def reset_paper_state(config: PaperTradingConfig | None = None) -> dict[str, Any]:
     initial_capital = float(config.initial_capital) if config else 10000.0
     state = _default_state(initial_capital)
-    save_paper_state(state)
+    update_json_state(PAPER_STATE_NAMESPACE, lambda: state, PAPER_STATE_FILE, lambda _current: state)
     replace_json_rows(PAPER_TRADES_NAMESPACE, [], PAPER_TRADES_FILE)
     return state
 
@@ -970,6 +976,7 @@ def run_paper_trading_demo(config: PaperTradingConfig = PaperTradingConfig()) ->
     }
 
 
+@transactional_persistence
 def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig()) -> dict[str, Any]:
     ensure_paper_files(config)
     state = load_paper_state(config)

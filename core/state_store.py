@@ -92,10 +92,12 @@ from core.market_data import classify_feed_status, legacy_market_status
 from core.persistence import (
     append_table_row,
     database_enabled,
+    ensure_table_file,
     load_json_state,
     read_table,
     replace_table,
     save_json_state,
+    update_json_state,
 )
 from core.trader_profiles import DEFAULT_TRADER_PROFILE
 
@@ -943,9 +945,7 @@ DEFAULT_STATE = {
 
 
 def _ensure_csv(file_path, columns: list[str]) -> None:
-    file_path.parent.mkdir(parents=True, exist_ok=True)
-    if not file_path.exists():
-        pd.DataFrame(columns=columns).to_csv(file_path, index=False)
+    ensure_table_file(file_path, columns)
 
 
 def ensure_storage() -> None:
@@ -955,7 +955,7 @@ def ensure_storage() -> None:
         return
 
     if not BOT_STATE_FILE.exists():
-        save_bot_state(deepcopy(DEFAULT_STATE))
+        update_json_state("bot_state", lambda: deepcopy(DEFAULT_STATE), BOT_STATE_FILE, lambda state: state)
 
     _ensure_csv(TRADER_ORDERS_FILE, TRADER_ORDERS_COLUMNS)
     _ensure_csv(TRADER_REPORTS_FILE, TRADER_REPORTS_COLUMNS)
@@ -974,6 +974,10 @@ def _merge_missing_keys(current: dict, default: dict) -> dict:
 def load_bot_state() -> dict:
     ensure_storage()
     state = load_json_state("bot_state", lambda: deepcopy(DEFAULT_STATE), BOT_STATE_FILE)
+    return _normalize_bot_state(state)
+
+
+def _normalize_bot_state(state: dict) -> dict:
     state = _merge_missing_keys(state, deepcopy(DEFAULT_STATE))
     production_state = state.get("production", {}) or {}
     production_state["enabled"] = PRODUCTION_MODE
@@ -2173,10 +2177,21 @@ def save_bot_state(state: dict) -> None:
     save_json_state("bot_state", state, BOT_STATE_FILE)
 
 
+def update_bot_state(updater) -> dict:
+    """Apply a bounded state mutation against the latest committed snapshot.
+
+    The updater performs no market requests; the persistence layer serializes
+    its read, validation and write as one operation.
+    """
+    ensure_storage()
+    return update_json_state(
+        "bot_state", lambda: deepcopy(DEFAULT_STATE), BOT_STATE_FILE,
+        lambda state: updater(_normalize_bot_state(state)),
+    )
+
+
 def reset_state() -> dict:
-    state = deepcopy(DEFAULT_STATE)
-    save_bot_state(state)
-    return state
+    return update_bot_state(lambda state: deepcopy(DEFAULT_STATE))
 
 
 def append_csv_row(file_path, row: dict) -> None:
@@ -2219,10 +2234,12 @@ def resolve_market_data_views(state: dict) -> tuple[dict, dict]:
 
 
 def update_worker_heartbeat(status: str = "online") -> None:
-    state = load_bot_state()
-    state["worker_status"] = status
-    state["worker_heartbeat"] = datetime.utcnow().isoformat()
-    save_bot_state(state)
+    def update(state: dict) -> dict:
+        state["worker_status"] = status
+        state["worker_heartbeat"] = datetime.utcnow().isoformat()
+        return state
+
+    update_bot_state(update)
 
 
 def persist_worker_cycle_state(
@@ -2234,38 +2251,39 @@ def persist_worker_cycle_state(
     runtime_started_at: str = "",
     process_role: str = "worker",
 ) -> dict:
-    state = load_bot_state()
-    now = datetime.utcnow()
-    iso_now = now.isoformat()
-    state["last_action"] = str(last_action or "")
-    state["last_run_at"] = iso_now
-    state["next_run_at"] = (now + timedelta(seconds=int(next_run_delta_seconds))).isoformat()
-    state["worker_status"] = str(worker_status or "online")
-    state["worker_heartbeat"] = iso_now
+    def update(state: dict) -> dict:
+        now = datetime.utcnow()
+        iso_now = now.isoformat()
+        state["last_action"] = str(last_action or "")
+        state["last_run_at"] = iso_now
+        state["next_run_at"] = (now + timedelta(seconds=int(next_run_delta_seconds))).isoformat()
+        state["worker_status"] = str(worker_status or "online")
+        state["worker_heartbeat"] = iso_now
 
-    payload = dict(market_data_payload or {})
-    payload.setdefault("requested_by", "worker_cycle")
-    payload["build_active"] = str(payload.get("build_active") or MARKET_DATA_BUILD_LABEL)
-    payload["git_sha"] = str(payload.get("git_sha") or RAILWAY_GIT_COMMIT_SHA or "")
-    payload["source_commit_sha"] = str(payload.get("source_commit_sha") or APP_SOURCE_COMMIT_SHA or "")
-    payload["build_timestamp"] = str(payload.get("build_timestamp") or BUILD_TIMESTAMP or "")
-    payload["runtime_started_at"] = str(payload.get("runtime_started_at") or runtime_started_at or "")
-    payload["service_name"] = str(payload.get("service_name") or SERVICE_NAME or "")
-    payload["process_role"] = str(payload.get("process_role") or process_role or "worker")
-    payload["state_writer"] = "worker"
-    payload["state_written_at"] = iso_now
-    payload["state_build_sha"] = str(payload.get("state_build_sha") or payload.get("git_sha") or "")
-    payload["state_schema_version"] = str(payload.get("state_schema_version") or STATE_SCHEMA_VERSION)
-    payload["ui_audit_probe"] = str(payload.get("ui_audit_probe") or "worker_state_v2")
-    payload["provider_effective"] = str(payload.get("provider_effective") or payload.get("provider") or "")
-    if payload.get("requested_symbols") is None and payload.get("symbols") is not None:
-        payload["requested_symbols"] = list(payload.get("symbols") or [])
+        payload = dict(market_data_payload or {})
+        payload.setdefault("requested_by", "worker_cycle")
+        payload["build_active"] = str(payload.get("build_active") or MARKET_DATA_BUILD_LABEL)
+        payload["git_sha"] = str(payload.get("git_sha") or RAILWAY_GIT_COMMIT_SHA or "")
+        payload["source_commit_sha"] = str(payload.get("source_commit_sha") or APP_SOURCE_COMMIT_SHA or "")
+        payload["build_timestamp"] = str(payload.get("build_timestamp") or BUILD_TIMESTAMP or "")
+        payload["runtime_started_at"] = str(payload.get("runtime_started_at") or runtime_started_at or "")
+        payload["service_name"] = str(payload.get("service_name") or SERVICE_NAME or "")
+        payload["process_role"] = str(payload.get("process_role") or process_role or "worker")
+        payload["state_writer"] = "worker"
+        payload["state_written_at"] = iso_now
+        payload["state_build_sha"] = str(payload.get("state_build_sha") or payload.get("git_sha") or "")
+        payload["state_schema_version"] = str(payload.get("state_schema_version") or STATE_SCHEMA_VERSION)
+        payload["ui_audit_probe"] = str(payload.get("ui_audit_probe") or "worker_state_v2")
+        payload["provider_effective"] = str(payload.get("provider_effective") or payload.get("provider") or "")
+        if payload.get("requested_symbols") is None and payload.get("symbols") is not None:
+            payload["requested_symbols"] = list(payload.get("symbols") or [])
 
-    if payload:
-        update_market_data_status(payload, state=state, save=False)
+        if payload:
+            update_market_data_status(payload, state=state, save=False)
 
-    save_bot_state(state)
-    return state
+        return state
+
+    return update_bot_state(update)
 
 
 def update_market_data_status(
@@ -2274,7 +2292,17 @@ def update_market_data_status(
     state: dict | None = None,
     save: bool = True,
 ) -> dict:
-    current_state = state or load_bot_state()
+    if save and state is None:
+        result = {}
+
+        def update(current_state: dict) -> dict:
+            result["context"] = update_market_data_status(status_payload, state=current_state, save=False)
+            return current_state
+
+        update_bot_state(update)
+        return result["context"]
+
+    current_state = state if state is not None else load_bot_state()
     state_written_at = datetime.utcnow().isoformat()
     default_service_name = str(SERVICE_NAME or "").strip() or str(current_state.get("service_name") or "")
     market_state = current_state.get("market_data", {}) or {}
@@ -2480,166 +2508,184 @@ def update_market_data_status(
 
 
 def update_broker_status(status_payload: dict | None) -> dict:
-    state = load_bot_state()
-    broker_state = state.get("broker", {}) or {}
-    payload = status_payload or {}
+    def update(state: dict) -> dict:
+        broker_state = state.get("broker", {}) or {}
+        payload = status_payload or {}
 
-    for key in (
-        "provider",
-        "mode",
-        "status",
-        "last_sync_at",
-        "last_error",
-        "account_id",
-        "requested_by",
-        "configured_mode",
-        "effective_mode",
-        "base_url",
-        "api_key_configured",
-        "api_secret_configured",
-        "execution_enabled",
-        "can_submit_orders",
-        "warning",
-    ):
-        if payload.get(key) is not None:
-            broker_state[key] = payload.get(key)
+        for key in (
+            "provider",
+            "mode",
+            "status",
+            "last_sync_at",
+            "last_error",
+            "account_id",
+            "requested_by",
+            "configured_mode",
+            "effective_mode",
+            "base_url",
+            "api_key_configured",
+            "api_secret_configured",
+            "execution_enabled",
+            "can_submit_orders",
+            "warning",
+        ):
+            if payload.get(key) is not None:
+                broker_state[key] = payload.get(key)
 
-    state["broker"] = broker_state
-    save_bot_state(state)
-    return broker_state
+        state["broker"] = broker_state
+        return state
+
+    state = update_bot_state(update)
+    return state["broker"]
 
 
 def update_market_context_status(status_payload: dict | None) -> dict:
-    state = load_bot_state()
-    market_context_state = state.get("market_context", {}) or {}
-    payload = status_payload or {}
+    def update(state: dict) -> dict:
+        market_context_state = state.get("market_context", {}) or {}
+        payload = status_payload or {}
 
-    for key, value in payload.items():
-        if value is not None:
-            market_context_state[key] = value
+        for key, value in payload.items():
+            if value is not None:
+                market_context_state[key] = value
 
-    state["market_context"] = market_context_state
-    save_bot_state(state)
-    return market_context_state
+        state["market_context"] = market_context_state
+        return state
+
+    state = update_bot_state(update)
+    return state["market_context"]
 
 
 def update_macro_alert_status(status_payload: dict | None) -> dict:
-    state = load_bot_state()
-    macro_state = state.get("macro_alert", {}) or {}
-    payload = status_payload or {}
+    def update(state: dict) -> dict:
+        macro_state = state.get("macro_alert", {}) or {}
+        payload = status_payload or {}
 
-    for key, value in payload.items():
-        if value is not None:
-            macro_state[key] = value
+        for key, value in payload.items():
+            if value is not None:
+                macro_state[key] = value
 
-    macro_state["macro_alert_enabled"] = MACRO_ALERTS_ENABLED
-    macro_state["macro_alerts_file"] = MACRO_ALERTS_FILE
-    macro_state["macro_alert_pre_event_minutes"] = MACRO_ALERT_PRE_EVENT_MINUTES
-    macro_state["macro_alert_event_window_minutes"] = MACRO_ALERT_EVENT_WINDOW_MINUTES
-    macro_state["macro_alert_post_event_minutes"] = MACRO_ALERT_POST_EVENT_MINUTES
-    state["macro_alert"] = macro_state
-    save_bot_state(state)
-    return macro_state
+        macro_state["macro_alert_enabled"] = MACRO_ALERTS_ENABLED
+        macro_state["macro_alerts_file"] = MACRO_ALERTS_FILE
+        macro_state["macro_alert_pre_event_minutes"] = MACRO_ALERT_PRE_EVENT_MINUTES
+        macro_state["macro_alert_event_window_minutes"] = MACRO_ALERT_EVENT_WINDOW_MINUTES
+        macro_state["macro_alert_post_event_minutes"] = MACRO_ALERT_POST_EVENT_MINUTES
+        state["macro_alert"] = macro_state
+        return state
+
+    state = update_bot_state(update)
+    return state["macro_alert"]
 
 
 def update_external_signal_status(status_payload: dict | None) -> dict:
-    state = load_bot_state()
-    external_signal_state = state.get("external_signal", {}) or {}
-    payload = status_payload or {}
+    def update(state: dict) -> dict:
+        external_signal_state = state.get("external_signal", {}) or {}
+        payload = status_payload or {}
 
-    for key, value in payload.items():
-        if value is not None:
-            external_signal_state[key] = value
+        for key, value in payload.items():
+            if value is not None:
+                external_signal_state[key] = value
 
-    external_signal_state["enabled"] = EXTERNAL_SIGNAL_WEBHOOK_ENABLED
-    external_signal_state["webhook_configured"] = bool(
-        EXTERNAL_SIGNAL_WEBHOOK_ENABLED and EXTERNAL_SIGNAL_SECRET and EXTERNAL_SIGNAL_ALLOWED_SOURCES
-    )
-    external_signal_state["allowed_sources"] = EXTERNAL_SIGNAL_ALLOWED_SOURCES
-    external_signal_state["allowed_timeframes"] = EXTERNAL_SIGNAL_ALLOWED_TIMEFRAMES
-    external_signal_state["max_age_seconds"] = EXTERNAL_SIGNAL_MAX_AGE_SECONDS
-    external_signal_state["dedupe_seconds"] = EXTERNAL_SIGNAL_DEDUPE_SECONDS
-    external_signal_state["test_panel_enabled"] = EXTERNAL_SIGNAL_TEST_PANEL_ENABLED
-    external_signal_state["audit_only"] = True
-    external_signal_state["recent_events"] = [
-        event
-        for event in list(external_signal_state.get("recent_events", []) or [])
-        if isinstance(event, dict)
-    ][-20:]
-    state["external_signal"] = external_signal_state
-    save_bot_state(state)
-    return external_signal_state
+        external_signal_state["enabled"] = EXTERNAL_SIGNAL_WEBHOOK_ENABLED
+        external_signal_state["webhook_configured"] = bool(
+            EXTERNAL_SIGNAL_WEBHOOK_ENABLED and EXTERNAL_SIGNAL_SECRET and EXTERNAL_SIGNAL_ALLOWED_SOURCES
+        )
+        external_signal_state["allowed_sources"] = EXTERNAL_SIGNAL_ALLOWED_SOURCES
+        external_signal_state["allowed_timeframes"] = EXTERNAL_SIGNAL_ALLOWED_TIMEFRAMES
+        external_signal_state["max_age_seconds"] = EXTERNAL_SIGNAL_MAX_AGE_SECONDS
+        external_signal_state["dedupe_seconds"] = EXTERNAL_SIGNAL_DEDUPE_SECONDS
+        external_signal_state["test_panel_enabled"] = EXTERNAL_SIGNAL_TEST_PANEL_ENABLED
+        external_signal_state["audit_only"] = True
+        external_signal_state["recent_events"] = [
+            event
+            for event in list(external_signal_state.get("recent_events", []) or [])
+            if isinstance(event, dict)
+        ][-20:]
+        state["external_signal"] = external_signal_state
+        return state
+
+    state = update_bot_state(update)
+    return state["external_signal"]
 
 
 def update_production_status(status_payload: dict | None) -> dict:
-    state = load_bot_state()
-    production_state = state.get("production", {}) or {}
-    payload = status_payload or {}
+    def update(state: dict) -> dict:
+        production_state = state.get("production", {}) or {}
+        payload = status_payload or {}
 
-    for key, value in payload.items():
-        if value is not None:
-            production_state[key] = value
+        for key, value in payload.items():
+            if value is not None:
+                production_state[key] = value
 
-    state["production"] = production_state
-    save_bot_state(state)
-    return production_state
+        state["production"] = production_state
+        return state
+
+    state = update_bot_state(update)
+    return state["production"]
 
 
 def update_email_reporting_status(status_payload: dict | None) -> dict:
-    state = load_bot_state()
-    email_reporting_state = state.get("email_reporting", {}) or {}
-    payload = status_payload or {}
+    def update(state: dict) -> dict:
+        email_reporting_state = state.get("email_reporting", {}) or {}
+        payload = status_payload or {}
 
-    for key, value in payload.items():
-        if value is not None:
-            email_reporting_state[key] = value
+        for key, value in payload.items():
+            if value is not None:
+                email_reporting_state[key] = value
 
-    state["email_reporting"] = email_reporting_state
-    save_bot_state(state)
-    return email_reporting_state
+        state["email_reporting"] = email_reporting_state
+        return state
+
+    state = update_bot_state(update)
+    return state["email_reporting"]
 
 
 def update_risk_status(status_payload: dict | None) -> dict:
-    state = load_bot_state()
-    risk_state = state.get("risk", {}) or {}
-    payload = status_payload or {}
+    def update(state: dict) -> dict:
+        risk_state = state.get("risk", {}) or {}
+        payload = status_payload or {}
 
-    for key, value in payload.items():
-        if value is not None:
-            risk_state[key] = value
+        for key, value in payload.items():
+            if value is not None:
+                risk_state[key] = value
 
-    risk_state["daily_loss_limit_brl"] = max(
-        1.0,
-        float(risk_state.get("daily_loss_limit_brl") or DAILY_LOSS_LIMIT_BRL_DEFAULT),
-    )
-    state["risk"] = risk_state
-    save_bot_state(state)
-    return risk_state
+        risk_state["daily_loss_limit_brl"] = max(
+            1.0,
+            float(risk_state.get("daily_loss_limit_brl") or DAILY_LOSS_LIMIT_BRL_DEFAULT),
+        )
+        state["risk"] = risk_state
+        return state
+
+    state = update_bot_state(update)
+    return state["risk"]
 
 
 def update_retention_status(status_payload: dict | None) -> dict:
-    state = load_bot_state()
-    retention_state = state.get("retention", {}) or {}
-    payload = status_payload or {}
+    def update(state: dict) -> dict:
+        retention_state = state.get("retention", {}) or {}
+        payload = status_payload or {}
 
-    for key, value in payload.items():
-        if value is not None:
-            retention_state[key] = value
+        for key, value in payload.items():
+            if value is not None:
+                retention_state[key] = value
 
-    state["retention"] = retention_state
-    save_bot_state(state)
-    return retention_state
+        state["retention"] = retention_state
+        return state
+
+    state = update_bot_state(update)
+    return state["retention"]
 
 
 def update_validation_status(status_payload: dict | None) -> dict:
-    state = load_bot_state()
-    validation_state = state.get("validation", {}) or {}
-    payload = status_payload or {}
+    def update(state: dict) -> dict:
+        validation_state = state.get("validation", {}) or {}
+        payload = status_payload or {}
 
-    for key, value in payload.items():
-        if value is not None:
-            validation_state[key] = value
+        for key, value in payload.items():
+            if value is not None:
+                validation_state[key] = value
 
-    state["validation"] = validation_state
-    save_bot_state(state)
-    return validation_state
+        state["validation"] = validation_state
+        return state
+
+    state = update_bot_state(update)
+    return state["validation"]

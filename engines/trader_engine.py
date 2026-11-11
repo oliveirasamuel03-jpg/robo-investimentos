@@ -10,6 +10,7 @@ from core.config import (
     TRADER_ORDERS_COLUMNS,
     TRADER_ORDERS_FILE,
 )
+from core.persistence import transactional_persistence
 from core.broker import probe_broker_status
 from core.daily_risk import evaluate_daily_loss_guard
 from core.macro_alerts import default_macro_alert_state, evaluate_configured_macro_alert
@@ -137,6 +138,7 @@ def refresh_macro_alert_state() -> dict:
     return update_macro_alert_status(macro_alert)
 
 
+@transactional_persistence
 def sync_platform_positions_from_paper() -> dict:
     platform_state = load_bot_state()
     paper_state = load_paper_state()
@@ -172,6 +174,7 @@ def sync_platform_positions_from_paper() -> dict:
     return platform_state
 
 
+@transactional_persistence
 def _sync_trader_orders_into_storage() -> None:
     trades = read_paper_trades(limit=200)
     if not trades:
@@ -212,6 +215,7 @@ def _sync_trader_orders_into_storage() -> None:
     replace_storage_table(TRADER_ORDERS_FILE, rows_to_store, columns=TRADER_ORDERS_COLUMNS)
 
 
+@transactional_persistence
 def run_trader_cycle(*, persist_market_data: bool = True) -> dict:
     state = load_bot_state()
     risk_state = refresh_daily_loss_guard(state)
@@ -252,6 +256,7 @@ def run_trader_cycle(*, persist_market_data: bool = True) -> dict:
     }
 
 
+@transactional_persistence
 def reset_trader_module() -> dict:
     state = load_bot_state()
     cfg = build_paper_cfg_from_platform_state(state)

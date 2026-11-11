@@ -8,8 +8,9 @@ SET LOCAL search_path = public;
 DO $$
 BEGIN
     IF EXISTS (SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
-               WHERE n.nspname='public' AND c.relkind IN ('r','p','v','m','S','f')) THEN
-        RAISE EXCEPTION 'Refusing initialization: public schema is not empty';
+               WHERE n.nspname <> 'information_schema' AND n.nspname !~ '^pg_'
+               AND c.relkind IN ('r','p','v','m','S','f')) THEN
+        RAISE EXCEPTION 'Refusing initialization: database contains user relations';
     END IF;
 END $$;
 CREATE TABLE public.app_state (

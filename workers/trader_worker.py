@@ -19,6 +19,7 @@ from core.email_reports import final_report_path_reachable, process_report_email
 from core.market_data import build_feed_quality_snapshot
 from core.production_monitor import evaluate_production_health
 from core.provider_budget_visual_fallback import build_provider_budget_visual_fallback_log_lines
+from core.persistence import persistence_transaction
 from core.retention import run_retention_job, should_run_retention_job
 from core.state_store import (
     load_bot_state,
@@ -1747,20 +1748,22 @@ def _run_daily_retention_maintenance() -> None:
     current_time = datetime.now(timezone.utc)
 
     try:
-        summary = run_retention_job(
-            now=current_time,
-            retention_days=int(retention_state.get("retention_days") or 60),
-            archive_trader_orders=bool(retention_state.get("archive_trader_orders", False)),
-        )
-        update_retention_status(summary)
-        last_summary = summary.get("last_summary", {}) or {}
-        log_event(
-            "INFO",
-            "Retencao executada com sucesso: "
-            f"relatorios={int(last_summary.get('trade_reports_archived_rows', 0) or 0)}, "
-            f"logs={int(last_summary.get('bot_logs_archived_rows', 0) or 0)}, "
-            f"weeklies={int(last_summary.get('weekly_reports_generated', 0) or 0)}",
-        )
+        # Archive rows and publish their catalog in the same PostgreSQL commit.
+        with persistence_transaction():
+            summary = run_retention_job(
+                now=current_time,
+                retention_days=int(retention_state.get("retention_days") or 60),
+                archive_trader_orders=bool(retention_state.get("archive_trader_orders", False)),
+            )
+            update_retention_status(summary)
+            last_summary = summary.get("last_summary", {}) or {}
+            log_event(
+                "INFO",
+                "Retencao executada com sucesso: "
+                f"relatorios={int(last_summary.get('trade_reports_archived_rows', 0) or 0)}, "
+                f"logs={int(last_summary.get('bot_logs_archived_rows', 0) or 0)}, "
+                f"weeklies={int(last_summary.get('weekly_reports_generated', 0) or 0)}",
+            )
     except Exception as exc:
         update_retention_status(
             {

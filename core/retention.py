@@ -23,7 +23,9 @@ from core.config import (
     WEEKLY_REPORTS_DIR,
     WEEKLY_REPORT_RUNTIME_WEEKS,
 )
-from core.persistence import load_json_state, read_table, replace_table, save_json_state
+from core.persistence import (
+    load_json_state, read_table, replace_table, transactional_persistence, update_json_state,
+)
 from core.state_store import load_bot_state
 from core.trader_reports import (
     calculate_trade_report_metrics,
@@ -137,7 +139,10 @@ def _weekly_summary_namespace(week_key: str, *, archived: bool) -> str:
 
 def _save_weekly_summary(summary: dict[str, Any], *, week_key: str, archived: bool) -> None:
     path = _weekly_summary_path(week_key, archived=archived)
-    save_json_state(_weekly_summary_namespace(week_key, archived=archived), summary, path)
+    update_json_state(
+        _weekly_summary_namespace(week_key, archived=archived), dict, path,
+        lambda _current: summary,
+    )
 
 
 def load_weekly_summary(report_entry: dict[str, Any]) -> dict[str, Any]:
@@ -157,6 +162,7 @@ def read_weekly_report_rows(report_entry: dict[str, Any]) -> pd.DataFrame:
     return normalize_trade_reports_frame(read_table(csv_path, columns=TRADER_REPORTS_COLUMNS))
 
 
+@transactional_persistence
 def _archive_old_rows(
     *,
     runtime_path: Path,
@@ -543,6 +549,7 @@ def should_run_retention_job(state: dict | None = None, *, now: datetime | None 
     return (current_time - last_run_at.to_pydatetime()) >= timedelta(hours=run_interval_hours)
 
 
+@transactional_persistence
 def run_retention_job(
     *,
     now: datetime | None = None,
