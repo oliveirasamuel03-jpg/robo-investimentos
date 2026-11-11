@@ -1,0 +1,70 @@
+........................................................................ [ 15%]
+...............................................................sssssssss [ 31%]
+ssssssssssssssssssssss.................................................. [ 47%]
+........................................................................ [ 63%]
+........................................................................ [ 79%]
+........................................................................ [ 95%]
+...................                                                      [100%]
+=============================== warnings summary ===============================
+tests/test_alerts.py: 1 warning
+tests/test_email_reports.py: 8 warnings
+tests/test_external_signals.py: 1 warning
+tests/test_infra12_persistence.py: 1 warning
+  /workspace/robo-investimentos/core/state_store.py:2221: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    "timestamp": datetime.utcnow().isoformat(),
+
+tests/test_infra1_security.py::test_worker_import_and_simulated_heartbeat
+  /workspace/robo-investimentos/core/state_store.py:2255: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    now = datetime.utcnow()
+
+tests/test_infra1_security.py::test_worker_import_and_simulated_heartbeat
+  /workspace/robo-investimentos/core/state_store.py:2306: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    state_written_at = datetime.utcnow().isoformat()
+
+tests/test_infra1_security.py: 3 warnings
+tests/test_state_auth_concurrency.py: 1 warning
+tests/test_state_store.py: 7 warnings
+tests/test_trade_reports.py: 2 warnings
+tests/test_trader_smoke.py: 2 warnings
+  /workspace/robo-investimentos/core/state_store.py:2306: DeprecationWarning:
+
+  datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+
+tests/test_integrity_diagnostics.py: 2 warnings
+tests/test_trade_reports.py: 2 warnings
+tests/test_trader_smoke.py: 9 warnings
+  /workspace/robo-investimentos/core/multi_timeframe_swing_audit.py:182: FutureWarning:
+
+  'H' is deprecated and will be removed in a future version, please use 'h' instead.
+
+tests/test_integrity_diagnostics.py::test_current_paper_engine_output_satisfies_diagnostic_contract
+tests/test_trade_reports.py::test_closed_trade_report_is_generated_after_position_exit
+  /workspace/robo-investimentos/core/persistence.py:476: FutureWarning:
+
+  The behavior of DataFrame concatenation with empty or all-NA entries is deprecated. In a future version, this will no longer exclude empty or all-NA columns when determining the result dtypes. To retain the old behavior, exclude the relevant entries before the concat operation.
+
+tests/test_retention.py::test_archive_old_trade_reports_is_idempotent
+  /workspace/robo-investimentos/core/retention.py:194: FutureWarning:
+
+  The behavior of DataFrame concatenation with empty or all-NA entries is deprecated. In a future version, this will no longer exclude empty or all-NA columns when determining the result dtypes. To retain the old behavior, exclude the relevant entries before the concat operation.
+
+tests/test_state_auth_concurrency.py::test_parallel_status_updates_preserve_stopped_and_financial_state
+  /workspace/robo-investimentos/core/state_store.py:2239: DeprecationWarning:
+
+  datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+
+tests/test_state_store.py::test_update_market_data_status_logs_provider_switch
+  /workspace/robo-investimentos/core/state_store.py:2221: DeprecationWarning:
+
+  datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+
+tests/test_state_store.py::test_persist_worker_cycle_state_writes_shared_runtime_snapshot
+tests/test_state_store.py::test_persist_worker_cycle_state_uses_optional_source_commit_sha_env
+  /workspace/robo-investimentos/core/state_store.py:2255: DeprecationWarning:
+
+  datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+- generated xml file: /workspace/robo-investimentos/docs/retomada/evidencias/infra12-offline.xml -
+420 passed, 31 skipped, 48 warnings in 11.82s
+Offline guard: 50 network/process attempts blocked.

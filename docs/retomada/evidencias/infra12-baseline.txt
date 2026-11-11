@@ -1,0 +1,61 @@
+Baseline commit: c0b1f68214114460f0b07300044ac067e35b09d5
+Command: .venv/bin/python scripts/test_offline.py -q (git archive temporary copy)
+Exit: 0
+........................................................................ [ 20%]
+........................................................................ [ 41%]
+........................................................................ [ 61%]
+........................................................................ [ 82%]
+.............................................................            [100%]
+=============================== warnings summary ===============================
+tests/test_alerts.py: 1 warning
+tests/test_email_reports.py: 8 warnings
+tests/test_external_signals.py: 1 warning
+  /tmp/atlas-infra12-baseline-yidyj7su/core/state_store.py:2206: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    "timestamp": datetime.utcnow().isoformat(),
+
+tests/test_infra1_security.py::test_worker_import_and_simulated_heartbeat
+  /tmp/atlas-infra12-baseline-yidyj7su/core/state_store.py:2238: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    now = datetime.utcnow()
+
+tests/test_infra1_security.py::test_worker_import_and_simulated_heartbeat
+  /tmp/atlas-infra12-baseline-yidyj7su/core/state_store.py:2278: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    state_written_at = datetime.utcnow().isoformat()
+
+tests/test_infra1_security.py: 3 warnings
+tests/test_state_store.py: 7 warnings
+tests/test_trade_reports.py: 2 warnings
+tests/test_trader_smoke.py: 2 warnings
+  /tmp/atlas-infra12-baseline-yidyj7su/core/state_store.py:2278: DeprecationWarning:
+
+  datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+
+tests/test_retention.py::test_archive_old_trade_reports_is_idempotent
+  /tmp/atlas-infra12-baseline-yidyj7su/core/retention.py:188: FutureWarning:
+
+  The behavior of DataFrame concatenation with empty or all-NA entries is deprecated. In a future version, this will no longer exclude empty or all-NA columns when determining the result dtypes. To retain the old behavior, exclude the relevant entries before the concat operation.
+
+tests/test_state_store.py::test_update_market_data_status_logs_provider_switch
+  /tmp/atlas-infra12-baseline-yidyj7su/core/state_store.py:2206: DeprecationWarning:
+
+  datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+
+tests/test_state_store.py::test_persist_worker_cycle_state_writes_shared_runtime_snapshot
+tests/test_state_store.py::test_persist_worker_cycle_state_uses_optional_source_commit_sha_env
+  /tmp/atlas-infra12-baseline-yidyj7su/core/state_store.py:2238: DeprecationWarning:
+
+  datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+
+tests/test_trade_reports.py: 2 warnings
+tests/test_trader_smoke.py: 9 warnings
+  /tmp/atlas-infra12-baseline-yidyj7su/core/multi_timeframe_swing_audit.py:182: FutureWarning:
+
+  'H' is deprecated and will be removed in a future version, please use 'h' instead.
+
+tests/test_trade_reports.py::test_closed_trade_report_is_generated_after_position_exit
+  /tmp/atlas-infra12-baseline-yidyj7su/core/persistence.py:292: FutureWarning:
+
+  The behavior of DataFrame concatenation with empty or all-NA entries is deprecated. In a future version, this will no longer exclude empty or all-NA columns when determining the result dtypes. To retain the old behavior, exclude the relevant entries before the concat operation.
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+349 passed, 42 warnings in 16.76s
+Offline guard: 38 network/process attempts blocked.

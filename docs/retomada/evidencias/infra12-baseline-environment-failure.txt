@@ -1,0 +1,53 @@
+EXCERTO de falha de ambiente; não é evidência de regressão de código.
+Log integral temporário: /tmp/atlas-infra12-baseline-environment-failure-full.txt
+SHA256 integral: d6060369933a2df146852fc5cade76c1dea78047a4f71bfd5c79b06d56658333
+Linhas originais: 16381
+Resumo original: 5 failed, 204 passed, 18 warnings, 140 errors in 28.40s
+
+    ???
+<frozen importlib._bootstrap_external>:999: in exec_module
+    ???
+<frozen importlib._bootstrap>:488: in _call_with_frames_removed
+    ???
+core/multi_timeframe_data_fetcher.py:10: in <module>
+    from core.market_data import fetch_market_data_frame, frame_data_source, frame_provider_name
+core/market_data.py:17: in <module>
+    from core.config import (
+core/config.py:332: in <module>
+    ensure_app_directories()
+core/config.py:329: in ensure_app_directories
+    directory.mkdir(parents=True, exist_ok=True)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = PosixPath('/tmp/atlas-offline-5ykk2fk_/runtime'), mode = 511
+parents = True, exist_ok = True
+
+    def mkdir(self, mode=0o777, parents=False, exist_ok=False):
+        """
+        Create a new directory at this given path.
+        """
+        try:
+>           os.mkdir(self, mode)
+E           OSError: [Errno 28] No space left on device: '/tmp/atlas-offline-5ykk2fk_/runtime'
+
+/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/pathlib.py:1311: OSError
+_________________ test_cache_miss_respects_max_calls_per_cycle _________________
+
+    def test_cache_miss_respects_max_calls_per_cycle():
+>       fetcher = load_module("core.multi_timeframe_data_fetcher")
+
+tests/test_multi_timeframe_data_fetcher.py:62:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+tests/conftest.py:80: in load_module
+    return importlib.import_module(name)
+
+ERROR tests/test_trader_smoke.py::test_fetch_market_data_map_normalizes_intraday_interval_for_twelvedata_chart_request
+ERROR tests/test_trader_smoke.py::test_fetch_market_data_map_uses_twelvedata_as_primary_provider
+ERROR tests/test_trader_smoke.py::test_twelvedata_uses_provider_specific_fresh_cache_window
+ERROR tests/test_trader_smoke.py::test_fetch_market_data_map_falls_back_to_yahoo_when_twelvedata_fails
+ERROR tests/test_trader_smoke.py::test_fetch_market_data_map_reports_missing_twelvedata_key_before_request
+ERROR tests/test_trader_smoke.py::test_fetch_market_data_map_uses_synthetic_fallback_when_all_providers_fail
+ERROR tests/test_trader_smoke.py::test_fetch_market_data_map_surfaces_twelvedata_credit_limit_errors
+ERROR tests/test_trader_smoke.py::test_run_trader_cycle_updates_market_data_state
+5 failed, 204 passed, 18 warnings, 140 errors in 28.40s
+Offline guard: 2 network/process attempts blocked.

@@ -1,0 +1,14 @@
+$ .venv/bin/python -m compileall -q core engines workers paper_trading_engine.py scripts tests
+exit_code=0
+
+
+$ .venv/bin/python -m pip check
+exit_code=0
+No broken requirements found.
+
+
+$ git diff --check
+exit_code=0
+
+$ git diff --cached --check (including added report and evidence)
+exit_code=0

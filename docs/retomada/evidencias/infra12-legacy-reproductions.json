@@ -1,0 +1,12 @@
+{
+  "base_commit": "c0b1f68214114460f0b07300044ac067e35b09d5",
+  "scope": "LOCAL_SYNTHETIC_ONLY",
+  "broker_mode": "paper",
+  "broker_provider": "paper",
+  "stale_snapshot_undid_STOPPED_reproduced": true,
+  "corrupt_CSV_silently_replaced_reproduced": true,
+  "concurrent_append_expected": 2,
+  "concurrent_append_actual": 1,
+  "lost_append_reproduced": true,
+  "method": "Legacy core/persistence.py loaded directly from git show in a temporary directory; barrier after both legacy history reads; no database or network."
+}
