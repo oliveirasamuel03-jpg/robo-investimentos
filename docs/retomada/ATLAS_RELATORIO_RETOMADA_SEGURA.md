@@ -1,8 +1,9 @@
 # ATLAS — Retomada segura INFRA-1
 
 > Atualização de 11/11/2026: [acesso, recuperação e financeiro](ATLAS_ACESSO_RECUPERACAO_FINANCEIRO.md).
-> Acesso antigo negado; backup não comprovado; imagem histórica PostgreSQL 18;
-> billing sem sessão autenticada. Homologação externa permanece bloqueada.
+> Painel antigo autenticado: serviços offline e nenhum backup listado no volume.
+> PostgreSQL 18 na configuração; financeiro novo ainda sem acesso na sessão.
+> Homologação externa permanece bloqueada. Detalhes no documento acima.
 
 > Continuidade: [INFRA-1.1 — persistência e recuperação local](ATLAS_INFRA_1_1_PERSISTENCIA.md).
 > A nova fase corrige gravações parciais e corrupção JSON silenciosa e acrescenta

@@ -6,6 +6,37 @@ Base auditada: `9e05cb2c43d2199904c94f26fb790882896cb57c`.
 
 ## Evidências e limites
 
+### Atualização após autenticação no painel — 11/11/2026
+
+O login autorizado abriu o workspace antigo `oliveirasamuel03-jpg's Projects`,
+com `jubilant-beauty`. Isso não autentica a conta nova no navegador nem muda
+as permissões do conector. A tabela abaixo preserva o levantamento anterior.
+
+- Web, work e Postgres aparecem offline; Postgres sem deployment ativo.
+- Imagem PostgreSQL 18 confirmada na configuração visível, sem conexão SQL
+  para confirmar a versão efetiva ou a integridade dos dados.
+- Aba Backups do Postgres: `No Backups — This service's volume does not have any backups.`
+  Não existem backups listados nessa aba. Isso não exclui eventual cópia externa.
+- Volume permanece associado ao serviço. Não foi montado, exportado ou excluído.
+- Trial expirado e acesso limitado. Usage registra custo de volume mesmo com
+  compute offline. Billing apresenta pendência da assinatura encerrada.
+  Valores da fatura, dados de pagamento e links privados não são publicados aqui.
+- Criação de novos backups aparece condicionada a upgrade Pro; não foi solicitada.
+- A sessão autenticada não abre o projeto novo: retorna 404. O seletor de
+  workspaces da sessão consultada lista somente o workspace antigo.
+- Nenhum pagamento, upgrade, restore, deploy, restart ou alteração de limites.
+
+**Próximo bloqueio:** autenticar a identidade que possui `Samuel Oliveira's Projects`
+para consultar o financeiro novo. Para o histórico antigo, consultar suporte sobre
+exportação preservando o volume, sem autorizar contratação ou reativação. Nenhuma
+mensagem ao suporte foi enviada. Banco novo continua sendo decisão separada e não
+representa migração do histórico.
+
+Validação desta atualização: documentação apenas, `git diff --check`; resultados
+de testes de código anteriores não foram reexecutados nem ampliados.
+
+### Levantamento anterior à autenticação
+
 | Item | Resultado |
 |---|---|
 | Dossiê histórico | Lido `ATLAS_ROBO_INVESTIMENTO_DOSSIE_MIGRACAO.md`, registro de 10/11/2026; inventário, não backup |
