@@ -1964,7 +1964,8 @@ def worker_loop() -> None:
                 post_commit_failure(result['cycle_id'], confirmed=True)
                 emit_worker_observability_log('POST_COMMIT_DIAGNOSTIC_FAILURE: commit confirmado; falha posterior do worker. Não repetir operação financeira.')
             else:
-                error_msg = type(exc).__name__
+                error_msg = ('NOT_COMMITTED: ausência financeira comprovada; sem retry da intenção.'
+                             if getattr(exc, 'commit_outcome', None) == 'NOT_COMMITTED' else type(exc).__name__)
                 log_event("ERROR", f"Erro no worker: {error_msg}")
                 mark_error(error_msg)
                 health_payload = _refresh_production_monitor(cycle_success=False, exception_message=error_msg)

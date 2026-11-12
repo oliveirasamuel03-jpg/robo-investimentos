@@ -48,6 +48,11 @@ def run_ui_mutation(operation: Callable[[], Any], *, ui, action: str) -> Mutatio
         )
         return MutationResult(False, error_code="CONFLICT")
     except Exception as exc:
+        if getattr(exc, 'commit_outcome', None) == 'NOT_COMMITTED':
+            _remember(ui, action, 'NOT_COMMITTED')
+            ui.info('NOT_COMMITTED: ausência da unidade financeira comprovada no PostgreSQL. '
+                    'A operação não foi confirmada e não houve repetição automática.')
+            return MutationResult(False, value={'commit_outcome': 'NOT_COMMITTED'}, error_code='NOT_COMMITTED')
         _remember(ui, action, "UNCONFIRMED")
         code = "LOCK_TIMEOUT" if getattr(exc, "sqlstate", None) == "55P03" else "WRITE_FAILED"
         ui.error(

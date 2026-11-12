@@ -135,3 +135,18 @@ def test_post_commit_label_requires_positive_evidence(isolated_storage, monkeypa
     result = q.post_commit_failure(cycle_id)
     assert result['outcome'] == 'UNKNOWN_COMMIT' and result['committed'] is False
     assert q.gate_status()['blocked']
+
+
+def test_proven_not_committed_is_not_displayed_as_unknown(isolated_storage):
+    helper = load_module('core.ui_mutations')
+    ui, attempts = UI(), []
+    def failed_before_commit():
+        attempts.append(True)
+        exc = ValueError('synthetic body failure')
+        exc.commit_outcome = 'NOT_COMMITTED'
+        raise exc
+    result = helper.run_ui_mutation(failed_before_commit, ui=ui, action='Ciclo PAPER')
+    assert result.error_code == 'NOT_COMMITTED' and not result.confirmed
+    assert len(attempts) == 1
+    assert any('NOT_COMMITTED' in message for _, message in ui.messages)
+    assert not any('UNKNOWN_COMMIT' in message for _, message in ui.messages)
