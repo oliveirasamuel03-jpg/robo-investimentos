@@ -347,7 +347,9 @@ def _guard_named_state(namespace, current_text, candidate):
     guard_state_write(namespace, previous, candidate)
     if namespace == "bot_state" and current_text is not None:
         from core.stop_control import guard_stop_transition
-        guard_stop_transition(_decode_json(current_text, dict, "bot control"), candidate)
+        # Both guards inspect the same strictly decoded current document.
+        # They are read-only; no second parse or weakened STOP validation.
+        guard_stop_transition(previous, candidate)
 
 
 def save_json_state(namespace, payload, local_path):
@@ -368,8 +370,8 @@ def save_json_state(namespace, payload, local_path):
             conn = _ACTIVE_CONNECTION.get()
             row = conn.execute("SELECT payload_json FROM app_state WHERE namespace = %s FOR UPDATE", (namespace,)).fetchone()
             current = row[0] if row else None
-            if current is not None:
-                _decode_json(current, dict, "database state")
+            # _guard_named_state always strictly decodes existing JSON before
+            # checking financial/STOP guards. Do not parse it twice here.
             _guard_named_state(namespace, current, payload)
             _check_snapshot(payload, source, current, text, strict=True)
             if current is None:

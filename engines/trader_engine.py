@@ -10,7 +10,8 @@ from core.config import (
     TRADER_ORDERS_COLUMNS,
     TRADER_ORDERS_FILE,
 )
-from core.persistence import transactional_persistence, PersistenceConflictError
+from core.persistence import (transactional_persistence, PersistenceConflictError,
+                              database_enabled, load_json_rows, append_table_row)
 from datetime import datetime, timezone
 from uuid import uuid4
 from copy import deepcopy
@@ -184,17 +185,18 @@ def _sync_trader_orders_into_storage() -> None:
     if not trades:
         return
 
-    df_existing = read_storage_table(TRADER_ORDERS_FILE, columns=TRADER_ORDERS_COLUMNS)
-
-    existing_keys = set(
-        zip(
-            df_existing.get("timestamp", []),
-            df_existing.get("asset", []),
-            df_existing.get("side", []),
-        )
-    )
-
-    rows_to_store = df_existing.to_dict(orient="records")
+    if database_enabled():
+        # Validate every existing JSON row, retain the same identity contract,
+        # then append only absent orders in this SAME financial transaction.
+        # Existing seq, timestamps, payload and metadata must never be rewritten.
+        existing = load_json_rows('table:trader_orders.csv', TRADER_ORDERS_FILE.with_suffix('.csv.json'))
+        existing_keys = {(row.get('timestamp'), row.get('asset'), row.get('side')) for row in existing}
+        rows_to_store = []
+    else:
+        df_existing = read_storage_table(TRADER_ORDERS_FILE, columns=TRADER_ORDERS_COLUMNS)
+        existing_keys = set(zip(df_existing.get("timestamp", []), df_existing.get("asset", []),
+                                df_existing.get("side", [])))
+        rows_to_store = df_existing.to_dict(orient="records")
 
     for trade in trades:
         key = (trade.get("timestamp"), trade.get("asset"), trade.get("side"))
@@ -216,7 +218,11 @@ def _sync_trader_orders_into_storage() -> None:
         )
         existing_keys.add(key)
 
-    replace_storage_table(TRADER_ORDERS_FILE, rows_to_store, columns=TRADER_ORDERS_COLUMNS)
+    if database_enabled():
+        for row in rows_to_store:
+            append_table_row(TRADER_ORDERS_FILE, row, columns=TRADER_ORDERS_COLUMNS)
+    else:
+        replace_storage_table(TRADER_ORDERS_FILE, rows_to_store, columns=TRADER_ORDERS_COLUMNS)
 
 
 def _operational_fingerprint(state):

@@ -143,8 +143,14 @@ def _state(namespace, path):
     return p._decode_json(path.read_text(), dict, 'reconciliation local state')
 
 
-def manifest():
-    """Exact persisted snapshot, under the common writer fence during verification."""
+def manifest(*, _observed_rows=None):
+    """Exact persisted snapshot, under the common writer fence during verification.
+
+    Optional output shares the rows just decoded from this query with the same
+    reconciliation call. The caller consumes it only in this verification; it
+    is not cached or accepted as input on later calls. No database read/hash is
+    skipped. Existing receipt hash format remains unchanged.
+    """
     from paper_trading_engine import PAPER_STATE_FILE, PAPER_TRADES_FILE
     paper = _state('paper_state', PAPER_STATE_FILE)
     bot = _state('bot_state', BOT_STATE_FILE)
@@ -154,8 +160,10 @@ def manifest():
             for namespace in sorted(FINANCIAL_ROWS):
                 rows = conn.execute('SELECT seq,row_json FROM app_rows WHERE namespace=%s ORDER BY seq',
                                     (namespace,)).fetchall()
-                result[namespace] = {'count': len(rows), 'sha256': _hash([
-                    [seq, p._decode_json(text, dict, 'reconciliation row')] for seq, text in rows])}
+                decoded = [[seq, p._decode_json(text, dict, 'reconciliation row')] for seq, text in rows]
+                result[namespace] = {'count': len(rows), 'sha256': _hash(decoded)}
+                if _observed_rows is not None:
+                    _observed_rows[namespace] = [item[1] for item in decoded]
     else:
         for namespace, path in [('paper_trades', PAPER_TRADES_FILE),
                                 ('table:trader_orders.csv', TRADER_ORDERS_FILE),
@@ -194,18 +202,22 @@ def reject_duplicate_events(trades, reports):
     keys = [(t.get('trade_id'), t.get('side')) for t in trades if t.get('trade_id')]
     if len(keys) != len(set(keys)):
         raise p.PersistenceDataError('Duplicate event in financial draft')
-    existing = p.load_json_rows('paper_trades', PAPER_TRADES_FILE)
-    if set(keys) & {(t.get('trade_id'), t.get('side')) for t in existing}:
-        raise p.PersistenceDataError('Trade identity already persisted; no overwrite or retry')
+    # An empty candidate set cannot duplicate an identity. Strict validation of
+    # ALL histories still occurs in begin_intent, record_unit_result and reconcile.
+    if keys:
+        existing = p.load_json_rows('paper_trades', PAPER_TRADES_FILE)
+        if set(keys) & {(t.get('trade_id'), t.get('side')) for t in existing}:
+            raise p.PersistenceDataError('Trade identity already persisted; no overwrite or retry')
     report_ids = [r.get('trade_id') for r in reports if r.get('trade_id')]
     if len(report_ids) != len(set(report_ids)):
         raise p.PersistenceDataError('Duplicate closed report in draft')
-    if p.database_enabled():
-        rows = p.load_json_rows('table:trade_reports.csv', TRADER_REPORTS_FILE.with_suffix('.csv.json'))
-    else:
-        rows = p.read_table(TRADER_REPORTS_FILE).to_dict('records')
-    if set(report_ids) & {r.get('trade_id') for r in rows}:
-        raise p.PersistenceDataError('Closed report already persisted')
+    if report_ids:
+        if p.database_enabled():
+            rows = p.load_json_rows('table:trade_reports.csv', TRADER_REPORTS_FILE.with_suffix('.csv.json'))
+        else:
+            rows = p.read_table(TRADER_REPORTS_FILE).to_dict('records')
+        if set(report_ids) & {r.get('trade_id') for r in rows}:
+            raise p.PersistenceDataError('Closed report already persisted')
 
 
 def record_unit_result(cycle_id, committed):
@@ -249,7 +261,8 @@ def reconcile(cycle_id=None, *, release=True):
                         'historical': True, 'current_cycle_id': gate.get('last_cycle_id'),
                         'evidence': 'PREVIOUSLY_VERIFIED_RECEIPT_NOT_CURRENT_STATE',
                         'resolution_recorded': True}
-            current = manifest()
+            observed_rows = {}
+            current = manifest(_observed_rows=observed_rows)
             status = receipt.get('status')
             if status == 'COMMITTED' and current == receipt.get('after'):
                 from paper_trading_engine import PAPER_STATE_FILE
@@ -260,8 +273,8 @@ def reconcile(cycle_id=None, *, release=True):
                     raise ReconciliationRequired(cycle_id, 'UNEXPECTED_FINANCIAL_STATE')
                 if p.database_enabled():
                     from paper_trading_engine import PAPER_TRADES_FILE
-                    actual_trades = p.load_json_rows('paper_trades', PAPER_TRADES_FILE)
-                    actual_reports = p.load_json_rows('table:trade_reports.csv', TRADER_REPORTS_FILE.with_suffix('.csv.json'))
+                    actual_trades = observed_rows['paper_trades']
+                    actual_reports = observed_rows['table:trade_reports.csv']
                     for rows, expected in ((actual_trades, receipt['planned_trades']),
                                            (actual_reports, receipt['planned_reports'])):
                         observed = [_hash({k: v for k, v in row.items() if k != 'cycle_id'})
