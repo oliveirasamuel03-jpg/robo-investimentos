@@ -1,0 +1,893 @@
+{
+  "cases": {
+    "0": {
+      "budgets_ms": {
+        "financial_lock_ms": 1500,
+        "reconciliation_ms": 2000,
+        "stop_ack_ms": 1000,
+        "stop_verified_ms": 2000
+      },
+      "elapsed_seconds": 17.17033474300115,
+      "historical_events": 0,
+      "hours72_authorized": false,
+      "inclusive_stage_profile": {
+        "core.commit_protocol._hash:inside": {
+          "calls": 264,
+          "ms": 170.81512498407392
+        },
+        "core.commit_protocol.begin_intent:outside": {
+          "calls": 10,
+          "ms": 406.7296580033144
+        },
+        "core.commit_protocol.manifest:inside": {
+          "calls": 50,
+          "ms": 628.8956649732427
+        },
+        "core.commit_protocol.reconcile:outside": {
+          "calls": 30,
+          "ms": 1625.6083540065447
+        },
+        "core.commit_protocol.record_unit_result:inside": {
+          "calls": 10,
+          "ms": 141.0230990004493
+        },
+        "core.commit_protocol.reject_duplicate_events:inside": {
+          "calls": 10,
+          "ms": 34.19544701318955
+        },
+        "core.persistence._decode_json:inside": {
+          "calls": 1308,
+          "ms": 1561.8334687897004
+        },
+        "core.persistence._decode_json:outside": {
+          "calls": 526,
+          "ms": 860.5795960611431
+        },
+        "engines.trader_engine._sync_trader_orders_into_storage:inside": {
+          "calls": 10,
+          "ms": 241.50284800271038
+        }
+      },
+      "limits": {
+        "max_historical_events": 5000,
+        "measured_window_seconds": 240,
+        "python_peak_bytes": 134217728,
+        "repetitions": 10,
+        "server_cpus": 1,
+        "server_memory_bytes": 536870912
+      },
+      "lock_timeout_unchanged_seconds": 5,
+      "new_trades": 1,
+      "no_financial_retry": true,
+      "profile_note": "Inclusive times overlap; do not sum parents/children. Entry location for wrappers; manifest/decode execute inside lock.",
+      "receipts_growth": [
+        {
+          "payload_bytes": 1635,
+          "receipts": 1
+        },
+        {
+          "payload_bytes": 3204,
+          "receipts": 2
+        },
+        {
+          "payload_bytes": 4773,
+          "receipts": 3
+        },
+        {
+          "payload_bytes": 6342,
+          "receipts": 4
+        },
+        {
+          "payload_bytes": 7911,
+          "receipts": 5
+        },
+        {
+          "payload_bytes": 9480,
+          "receipts": 6
+        },
+        {
+          "payload_bytes": 11049,
+          "receipts": 7
+        },
+        {
+          "payload_bytes": 12618,
+          "receipts": 8
+        },
+        {
+          "payload_bytes": 14187,
+          "receipts": 9
+        },
+        {
+          "payload_bytes": 15756,
+          "receipts": 10
+        }
+      ],
+      "samples": [
+        {
+          "commit_ack_ms": 1.2723309991997667,
+          "controlled_lock_setup_ms": 23.870712000643834,
+          "financial_lock_ms": 202.09629299642984,
+          "iteration": 1,
+          "process_rss_high_water_bytes": 155111424,
+          "python_peak_bytes": 2411258,
+          "reconciliation_ms": 37.72518900223076,
+          "stop_ack_ms": 101.44151600252371,
+          "stop_commit_ack_ms": 233.8110799973947,
+          "stop_persisted": true,
+          "stop_verified_ms": 282.4123519967543
+        },
+        {
+          "commit_ack_ms": 1.3122100062901154,
+          "controlled_lock_setup_ms": 25.26746000512503,
+          "financial_lock_ms": 210.3092630059109,
+          "iteration": 2,
+          "process_rss_high_water_bytes": 155111424,
+          "python_peak_bytes": 1499842,
+          "reconciliation_ms": 38.01591999945231,
+          "stop_ack_ms": 115.94299900025362,
+          "stop_commit_ack_ms": 249.15719799901126,
+          "stop_persisted": true,
+          "stop_verified_ms": 301.9297959981486
+        },
+        {
+          "commit_ack_ms": 0.8403470055782236,
+          "controlled_lock_setup_ms": 23.59782100393204,
+          "financial_lock_ms": 204.83586100453977,
+          "iteration": 3,
+          "process_rss_high_water_bytes": 155111424,
+          "python_peak_bytes": 1503993,
+          "reconciliation_ms": 37.035972003650386,
+          "stop_ack_ms": 109.87454900168814,
+          "stop_commit_ack_ms": 246.46637499972712,
+          "stop_persisted": true,
+          "stop_verified_ms": 298.9602689995081
+        },
+        {
+          "commit_ack_ms": 0.8691360053489916,
+          "controlled_lock_setup_ms": 22.493930999189615,
+          "financial_lock_ms": 200.09224200475728,
+          "iteration": 4,
+          "process_rss_high_water_bytes": 155111424,
+          "python_peak_bytes": 1515924,
+          "reconciliation_ms": 42.36558199772844,
+          "stop_ack_ms": 121.72608599939849,
+          "stop_commit_ack_ms": 233.68058999767527,
+          "stop_persisted": true,
+          "stop_verified_ms": 276.0332580000977
+        },
+        {
+          "commit_ack_ms": 0.934486000915058,
+          "controlled_lock_setup_ms": 29.440776001138147,
+          "financial_lock_ms": 265.27277199784294,
+          "iteration": 5,
+          "process_rss_high_water_bytes": 155348992,
+          "python_peak_bytes": 1520898,
+          "reconciliation_ms": 36.10125300474465,
+          "stop_ack_ms": 123.27225899935002,
+          "stop_commit_ack_ms": 311.3551750066108,
+          "stop_persisted": true,
+          "stop_verified_ms": 358.4415710065514
+        },
+        {
+          "commit_ack_ms": 0.9643999947002158,
+          "controlled_lock_setup_ms": 22.912469001312274,
+          "financial_lock_ms": 207.51780999853509,
+          "iteration": 6,
+          "process_rss_high_water_bytes": 155480064,
+          "python_peak_bytes": 1546771,
+          "reconciliation_ms": 40.98780699860072,
+          "stop_ack_ms": 109.94953000044916,
+          "stop_commit_ack_ms": 247.69132700021146,
+          "stop_persisted": true,
+          "stop_verified_ms": 294.901358000061
+        },
+        {
+          "commit_ack_ms": 0.8451880057691596,
+          "controlled_lock_setup_ms": 25.148617001832463,
+          "financial_lock_ms": 207.84187400568044,
+          "iteration": 7,
+          "process_rss_high_water_bytes": 155480064,
+          "python_peak_bytes": 1540150,
+          "reconciliation_ms": 46.06688499916345,
+          "stop_ack_ms": 108.65471499710111,
+          "stop_commit_ack_ms": 243.53156899451278,
+          "stop_persisted": true,
+          "stop_verified_ms": 294.87995900126407
+        },
+        {
+          "commit_ack_ms": 2.893123004469089,
+          "controlled_lock_setup_ms": 24.273643997730687,
+          "financial_lock_ms": 208.5169650017633,
+          "iteration": 8,
+          "process_rss_high_water_bytes": 155480064,
+          "python_peak_bytes": 1542109,
+          "reconciliation_ms": 42.82750200218288,
+          "stop_ack_ms": 106.0495730052935,
+          "stop_commit_ack_ms": 243.0680539982859,
+          "stop_persisted": true,
+          "stop_verified_ms": 294.3029989983188
+        },
+        {
+          "commit_ack_ms": 1.5594030046486296,
+          "controlled_lock_setup_ms": 29.323575996386353,
+          "financial_lock_ms": 218.68691599956946,
+          "iteration": 9,
+          "process_rss_high_water_bytes": 155611136,
+          "python_peak_bytes": 1576103,
+          "reconciliation_ms": 41.836880998744164,
+          "stop_ack_ms": 105.26818099606317,
+          "stop_commit_ack_ms": 266.63815500069177,
+          "stop_persisted": true,
+          "stop_verified_ms": 313.49396500445437
+        },
+        {
+          "commit_ack_ms": 0.7704780000494793,
+          "controlled_lock_setup_ms": 20.844017999479547,
+          "financial_lock_ms": 213.04882600088604,
+          "iteration": 10,
+          "process_rss_high_water_bytes": 155742208,
+          "python_peak_bytes": 1567882,
+          "reconciliation_ms": 38.45959900354501,
+          "stop_ack_ms": 111.77782400045544,
+          "stop_commit_ack_ms": 254.2291900026612,
+          "stop_persisted": true,
+          "stop_verified_ms": 301.0584290022962
+        }
+      ],
+      "statistics": {
+        "commit_ack_ms": {
+          "max": 2.893123004469089,
+          "median": 0.9494429978076369,
+          "n": 10,
+          "p95": 2.893123004469089,
+          "p95_method": "nearest_rank; n=10 gives observed maximum"
+        },
+        "financial_lock_ms": {
+          "max": 265.27277199784294,
+          "median": 208.17941950372187,
+          "n": 10,
+          "p95": 265.27277199784294,
+          "p95_method": "nearest_rank; n=10 gives observed maximum"
+        },
+        "process_rss_high_water_bytes": {
+          "max": 155742208,
+          "median": 155414528.0,
+          "n": 10,
+          "p95": 155742208,
+          "p95_method": "nearest_rank; n=10 gives observed maximum"
+        },
+        "python_peak_bytes": {
+          "max": 2411258,
+          "median": 1541129.5,
+          "n": 10,
+          "p95": 2411258,
+          "p95_method": "nearest_rank; n=10 gives observed maximum"
+        },
+        "reconciliation_ms": {
+          "max": 46.06688499916345,
+          "median": 39.72370300107286,
+          "n": 10,
+          "p95": 46.06688499916345,
+          "p95_method": "nearest_rank; n=10 gives observed maximum"
+        },
+        "stop_ack_ms": {
+          "max": 123.27225899935002,
+          "median": 109.91203950106865,
+          "n": 10,
+          "p95": 123.27225899935002,
+          "p95_method": "nearest_rank; n=10 gives observed maximum"
+        },
+        "stop_commit_ack_ms": {
+          "max": 311.3551750066108,
+          "median": 247.0788509999693,
+          "n": 10,
+          "p95": 311.3551750066108,
+          "p95_method": "nearest_rank; n=10 gives observed maximum"
+        },
+        "stop_verified_ms": {
+          "max": 358.4415710065514,
+          "median": 296.93081349978456,
+          "n": 10,
+          "p95": 358.4415710065514,
+          "p95_method": "nearest_rank; n=10 gives observed maximum"
+        }
+      },
+      "timeout_observed": false,
+      "unexecuted_repetitions": 0,
+      "within_candidate_budgets": true
+    },
+    "1000": {
+      "budgets_ms": {
+        "financial_lock_ms": 1500,
+        "reconciliation_ms": 2000,
+        "stop_ack_ms": 1000,
+        "stop_verified_ms": 2000
+      },
+      "elapsed_seconds": 35.06009354900016,
+      "historical_events": 1000,
+      "hours72_authorized": false,
+      "inclusive_stage_profile": {
+        "core.commit_protocol._hash:inside": {
+          "calls": 264,
+          "ms": 3205.4160529442015
+        },
+        "core.commit_protocol.begin_intent:outside": {
+          "calls": 10,
+          "ms": 2101.794140988204
+        },
+        "core.commit_protocol.manifest:inside": {
+          "calls": 50,
+          "ms": 9198.375450010644
+        },
+        "core.commit_protocol.reconcile:outside": {
+          "calls": 30,
+          "ms": 9630.201293024584
+        },
+        "core.commit_protocol.record_unit_result:inside": {
+          "calls": 10,
+          "ms": 1746.486731011828
+        },
+        "core.commit_protocol.reject_duplicate_events:inside": {
+          "calls": 10,
+          "ms": 612.0806629915023
+        },
+        "core.persistence._decode_json:inside": {
+          "calls": 218298,
+          "ms": 8786.1497465492
+        },
+        "core.persistence._decode_json:outside": {
+          "calls": 42516,
+          "ms": 2019.9988743916037
+        },
+        "engines.trader_engine._sync_trader_orders_into_storage:inside": {
+          "calls": 10,
+          "ms": 4370.062596011849
+        }
+      },
+      "limits": {
+        "max_historical_events": 5000,
+        "measured_window_seconds": 240,
+        "python_peak_bytes": 134217728,
+        "repetitions": 10,
+        "server_cpus": 1,
+        "server_memory_bytes": 536870912
+      },
+      "lock_timeout_unchanged_seconds": 5,
+      "new_trades": 1,
+      "no_financial_retry": true,
+      "profile_note": "Inclusive times overlap; do not sum parents/children. Entry location for wrappers; manifest/decode execute inside lock.",
+      "receipts_growth": [
+        {
+          "payload_bytes": 1651,
+          "receipts": 1
+        },
+        {
+          "payload_bytes": 3236,
+          "receipts": 2
+        },
+        {
+          "payload_bytes": 4821,
+          "receipts": 3
+        },
+        {
+          "payload_bytes": 6406,
+          "receipts": 4
+        },
+        {
+          "payload_bytes": 7991,
+          "receipts": 5
+        },
+        {
+          "payload_bytes": 9576,
+          "receipts": 6
+        },
+        {
+          "payload_bytes": 11161,
+          "receipts": 7
+        },
+        {
+          "payload_bytes": 12746,
+          "receipts": 8
+        },
+        {
+          "payload_bytes": 14331,
+          "receipts": 9
+        },
+        {
+          "payload_bytes": 15916,
+          "receipts": 10
+        }
+      ],
+      "samples": [
+        {
+          "commit_ack_ms": 0.8791559957899153,
+          "controlled_lock_setup_ms": 28.980697999941185,
+          "financial_lock_ms": 871.1853819986572,
+          "iteration": 1,
+          "process_rss_high_water_bytes": 168251392,
+          "python_peak_bytes": 2908722,
+          "reconciliation_ms": 331.62517700111493,
+          "stop_ack_ms": 118.57508100365521,
+          "stop_commit_ack_ms": 908.7246650015004,
+          "stop_persisted": true,
+          "stop_verified_ms": 1003.8184099976206
+        },
+        {
+          "commit_ack_ms": 1.5501420057262294,
+          "controlled_lock_setup_ms": 29.18191899516387,
+          "financial_lock_ms": 861.002751000342,
+          "iteration": 2,
+          "process_rss_high_water_bytes": 168558592,
+          "python_peak_bytes": 2901541,
+          "reconciliation_ms": 324.30618600483285,
+          "stop_ack_ms": 106.52335999475326,
+          "stop_commit_ack_ms": 895.1437639989308,
+          "stop_persisted": true,
+          "stop_verified_ms": 1004.4166239968035
+        },
+        {
+          "commit_ack_ms": 0.8681780018378049,
+          "controlled_lock_setup_ms": 22.369462996721268,
+          "financial_lock_ms": 825.6488249971881,
+          "iteration": 3,
+          "process_rss_high_water_bytes": 168558592,
+          "python_peak_bytes": 2872765,
+          "reconciliation_ms": 332.15496499906294,
+          "stop_ack_ms": 126.75111600401578,
+          "stop_commit_ack_ms": 861.942611001723,
+          "stop_persisted": true,
+          "stop_verified_ms": 994.0836070018122
+        },
+        {
+          "commit_ack_ms": 1.9952290022047237,
+          "controlled_lock_setup_ms": 23.42187500471482,
+          "financial_lock_ms": 948.4820120051154,
+          "iteration": 4,
+          "process_rss_high_water_bytes": 169013248,
+          "python_peak_bytes": 2885162,
+          "reconciliation_ms": 394.06313600193243,
+          "stop_ack_ms": 94.17547399789328,
+          "stop_commit_ack_ms": 984.532198002853,
+          "stop_persisted": true,
+          "stop_verified_ms": 1122.703637003724
+        },
+        {
+          "commit_ack_ms": 0.9507040012977086,
+          "controlled_lock_setup_ms": 21.445888000016566,
+          "financial_lock_ms": 901.7577109989361,
+          "iteration": 5,
+          "process_rss_high_water_bytes": 169406464,
+          "python_peak_bytes": 2886289,
+          "reconciliation_ms": 307.0896179997362,
+          "stop_ack_ms": 103.2317530043656,
+          "stop_commit_ack_ms": 936.4334769998095,
+          "stop_persisted": true,
+          "stop_verified_ms": 1068.6682949963142
+        },
+        {
+          "commit_ack_ms": 1.0391280011390336,
+          "controlled_lock_setup_ms": 28.34573599830037,
+          "financial_lock_ms": 934.9842500014347,
+          "iteration": 6,
+          "process_rss_high_water_bytes": 170323968,
+          "python_peak_bytes": 2905412,
+          "reconciliation_ms": 342.0151079990319,
+          "stop_ack_ms": 120.10314899816876,
+          "stop_commit_ack_ms": 965.6572149979183,
+          "stop_persisted": true,
+          "stop_verified_ms": 1067.9931739941821
+        },
+        {
+          "commit_ack_ms": 0.9123130002990365,
+          "controlled_lock_setup_ms": 25.246849996619858,
+          "financial_lock_ms": 833.0192979992717,
+          "iteration": 7,
+          "process_rss_high_water_bytes": 170323968,
+          "python_peak_bytes": 3010468,
+          "reconciliation_ms": 340.2239159986493,
+          "stop_ack_ms": 103.9987489930354,
+          "stop_commit_ack_ms": 868.9175740000792,
+          "stop_persisted": true,
+          "stop_verified_ms": 963.7851119987317
+        },
+        {
+          "commit_ack_ms": 1.6339860012521967,
+          "controlled_lock_setup_ms": 24.29441000276711,
+          "financial_lock_ms": 890.7900350022828,
+          "iteration": 8,
+          "process_rss_high_water_bytes": 170323968,
+          "python_peak_bytes": 2912057,
+          "reconciliation_ms": 335.0288809961057,
+          "stop_ack_ms": 102.50179300055606,
+          "stop_commit_ack_ms": 931.2925120029831,
+          "stop_persisted": true,
+          "stop_verified_ms": 1032.9619780022767
+        },
+        {
+          "commit_ack_ms": 1.0498979972908273,
+          "controlled_lock_setup_ms": 23.73905899730744,
+          "financial_lock_ms": 915.5524460002198,
+          "iteration": 9,
+          "process_rss_high_water_bytes": 170323968,
+          "python_peak_bytes": 2938129,
+          "reconciliation_ms": 335.49699299328495,
+          "stop_ack_ms": 117.56804000469856,
+          "stop_commit_ack_ms": 957.5215750010102,
+          "stop_persisted": true,
+          "stop_verified_ms": 1100.412439001957
+        },
+        {
+          "commit_ack_ms": 1.1044050042983145,
+          "controlled_lock_setup_ms": 28.106687001127284,
+          "financial_lock_ms": 903.5348890029127,
+          "iteration": 10,
+          "process_rss_high_water_bytes": 170323968,
+          "python_peak_bytes": 2926578,
+          "reconciliation_ms": 369.4963740053936,
+          "stop_ack_ms": 97.37183299876051,
+          "stop_commit_ack_ms": 946.1177050034166,
+          "stop_persisted": true,
+          "stop_verified_ms": 1086.970857999404
+        }
+      ],
+      "statistics": {
+        "commit_ack_ms": {
+          "max": 1.9952290022047237,
+          "median": 1.0445129992149305,
+          "n": 10,
+          "p95": 1.9952290022047237,
+          "p95_method": "nearest_rank; n=10 gives observed maximum"
+        },
+        "financial_lock_ms": {
+          "max": 948.4820120051154,
+          "median": 896.2738730006095,
+          "n": 10,
+          "p95": 948.4820120051154,
+          "p95_method": "nearest_rank; n=10 gives observed maximum"
+        },
+        "process_rss_high_water_bytes": {
+          "max": 170323968,
+          "median": 169865216.0,
+          "n": 10,
+          "p95": 170323968,
+          "p95_method": "nearest_rank; n=10 gives observed maximum"
+        },
+        "python_peak_bytes": {
+          "max": 3010468,
+          "median": 2907067.0,
+          "n": 10,
+          "p95": 3010468,
+          "p95_method": "nearest_rank; n=10 gives observed maximum"
+        },
+        "reconciliation_ms": {
+          "max": 394.06313600193243,
+          "median": 335.26293699469534,
+          "n": 10,
+          "p95": 394.06313600193243,
+          "p95_method": "nearest_rank; n=10 gives observed maximum"
+        },
+        "stop_ack_ms": {
+          "max": 126.75111600401578,
+          "median": 105.26105449389433,
+          "n": 10,
+          "p95": 126.75111600401578,
+          "p95_method": "nearest_rank; n=10 gives observed maximum"
+        },
+        "stop_commit_ack_ms": {
+          "max": 984.532198002853,
+          "median": 933.8629945013963,
+          "n": 10,
+          "p95": 984.532198002853,
+          "p95_method": "nearest_rank; n=10 gives observed maximum"
+        },
+        "stop_verified_ms": {
+          "max": 1122.703637003724,
+          "median": 1050.4775759982294,
+          "n": 10,
+          "p95": 1122.703637003724,
+          "p95_method": "nearest_rank; n=10 gives observed maximum"
+        }
+      },
+      "timeout_observed": false,
+      "unexecuted_repetitions": 0,
+      "within_candidate_budgets": true
+    },
+    "5000": {
+      "budgets_ms": {
+        "financial_lock_ms": 1500,
+        "reconciliation_ms": 2000,
+        "stop_ack_ms": 1000,
+        "stop_verified_ms": 2000
+      },
+      "elapsed_seconds": 117.59725204599818,
+      "historical_events": 5000,
+      "hours72_authorized": false,
+      "inclusive_stage_profile": {
+        "core.commit_protocol._hash:inside": {
+          "calls": 264,
+          "ms": 17043.38532597467
+        },
+        "core.commit_protocol.begin_intent:outside": {
+          "calls": 10,
+          "ms": 10101.141557992378
+        },
+        "core.commit_protocol.manifest:inside": {
+          "calls": 50,
+          "ms": 47573.80180997279
+        },
+        "core.commit_protocol.reconcile:outside": {
+          "calls": 30,
+          "ms": 44851.543556011165
+        },
+        "core.commit_protocol.record_unit_result:inside": {
+          "calls": 10,
+          "ms": 9163.508007994096
+        },
+        "core.commit_protocol.reject_duplicate_events:inside": {
+          "calls": 10,
+          "ms": 3360.845196984883
+        },
+        "core.persistence._decode_json:inside": {
+          "calls": 1078288,
+          "ms": 40464.674184251635
+        },
+        "core.persistence._decode_json:outside": {
+          "calls": 202507,
+          "ms": 6511.277779791271
+        },
+        "engines.trader_engine._sync_trader_orders_into_storage:inside": {
+          "calls": 10,
+          "ms": 23695.398185991507
+        }
+      },
+      "limits": {
+        "max_historical_events": 5000,
+        "measured_window_seconds": 240,
+        "python_peak_bytes": 134217728,
+        "repetitions": 10,
+        "server_cpus": 1,
+        "server_memory_bytes": 536870912
+      },
+      "lock_timeout_unchanged_seconds": 5,
+      "new_trades": 1,
+      "no_financial_retry": true,
+      "profile_note": "Inclusive times overlap; do not sum parents/children. Entry location for wrappers; manifest/decode execute inside lock.",
+      "receipts_growth": [
+        {
+          "payload_bytes": 1653,
+          "receipts": 1
+        },
+        {
+          "payload_bytes": 3240,
+          "receipts": 2
+        },
+        {
+          "payload_bytes": 4827,
+          "receipts": 3
+        },
+        {
+          "payload_bytes": 6414,
+          "receipts": 4
+        },
+        {
+          "payload_bytes": 8001,
+          "receipts": 5
+        },
+        {
+          "payload_bytes": 9588,
+          "receipts": 6
+        },
+        {
+          "payload_bytes": 11175,
+          "receipts": 7
+        },
+        {
+          "payload_bytes": 12762,
+          "receipts": 8
+        },
+        {
+          "payload_bytes": 14349,
+          "receipts": 9
+        },
+        {
+          "payload_bytes": 15936,
+          "receipts": 10
+        }
+      ],
+      "samples": [
+        {
+          "commit_ack_ms": 3.186852001817897,
+          "controlled_lock_setup_ms": 25.334876001579687,
+          "financial_lock_ms": 5023.946590001287,
+          "iteration": 1,
+          "process_rss_high_water_bytes": 210284544,
+          "python_peak_bytes": 10819847,
+          "reconciliation_ms": 1961.3748679985292,
+          "stop_ack_ms": 173.48261100414675,
+          "stop_commit_ack_ms": 5058.2167399988975,
+          "stop_persisted": true,
+          "stop_verified_ms": 5157.035754004028
+        },
+        {
+          "commit_ack_ms": 2.346246998058632,
+          "controlled_lock_setup_ms": 23.81261799746426,
+          "financial_lock_ms": 3921.675637997396,
+          "iteration": 2,
+          "process_rss_high_water_bytes": 234762240,
+          "python_peak_bytes": 11061595,
+          "reconciliation_ms": 1509.7056629965664,
+          "stop_ack_ms": 102.76679699745728,
+          "stop_commit_ack_ms": 3961.60678799788,
+          "stop_persisted": true,
+          "stop_verified_ms": 4075.055777997477
+        },
+        {
+          "commit_ack_ms": 1.245897998160217,
+          "controlled_lock_setup_ms": 29.04226499958895,
+          "financial_lock_ms": 4301.26777899568,
+          "iteration": 3,
+          "process_rss_high_water_bytes": 234762240,
+          "python_peak_bytes": 11056563,
+          "reconciliation_ms": 1685.8876819969737,
+          "stop_ack_ms": 127.48849500349024,
+          "stop_commit_ack_ms": 4352.126178004255,
+          "stop_persisted": true,
+          "stop_verified_ms": 4402.939681000134
+        },
+        {
+          "commit_ack_ms": 1.2925070041092113,
+          "controlled_lock_setup_ms": 21.880774998862762,
+          "financial_lock_ms": 3684.8134480023873,
+          "iteration": 4,
+          "process_rss_high_water_bytes": 234762240,
+          "python_peak_bytes": 11066905,
+          "reconciliation_ms": 1659.3514679989312,
+          "stop_ack_ms": 117.00683000526624,
+          "stop_commit_ack_ms": 3731.862380998791,
+          "stop_persisted": true,
+          "stop_verified_ms": 3822.6989319955464
+        },
+        {
+          "commit_ack_ms": 1.1369580024620518,
+          "controlled_lock_setup_ms": 24.32994300033897,
+          "financial_lock_ms": 3587.8884449994075,
+          "iteration": 5,
+          "process_rss_high_water_bytes": 234762240,
+          "python_peak_bytes": 11067650,
+          "reconciliation_ms": 1503.4882690015365,
+          "stop_ack_ms": 110.33261600096012,
+          "stop_commit_ack_ms": 3636.4451159970486,
+          "stop_persisted": true,
+          "stop_verified_ms": 3786.0964170031366
+        },
+        {
+          "commit_ack_ms": 1.4032399994903244,
+          "controlled_lock_setup_ms": 22.021423996193334,
+          "financial_lock_ms": 4017.647020998993,
+          "iteration": 6,
+          "process_rss_high_water_bytes": 234762240,
+          "python_peak_bytes": 11088291,
+          "reconciliation_ms": 1639.811903994996,
+          "stop_ack_ms": 110.19750199920963,
+          "stop_commit_ack_ms": 4055.505684002128,
+          "stop_persisted": true,
+          "stop_verified_ms": 4148.5861930050305
+        },
+        {
+          "commit_ack_ms": 1.5588889946229756,
+          "controlled_lock_setup_ms": 27.122910003527068,
+          "financial_lock_ms": 4009.586621999915,
+          "iteration": 7,
+          "process_rss_high_water_bytes": 234762240,
+          "python_peak_bytes": 11096007,
+          "reconciliation_ms": 1586.0102839942556,
+          "stop_ack_ms": 116.83126400021138,
+          "stop_commit_ack_ms": 4047.315965006419,
+          "stop_persisted": true,
+          "stop_verified_ms": 4160.326147000887
+        },
+        {
+          "commit_ack_ms": 0.8350249991053715,
+          "controlled_lock_setup_ms": 28.713667998090386,
+          "financial_lock_ms": 4223.74148399831,
+          "iteration": 8,
+          "process_rss_high_water_bytes": 234762240,
+          "python_peak_bytes": 11091357,
+          "reconciliation_ms": 1873.9486880003824,
+          "stop_ack_ms": 113.57337799563538,
+          "stop_commit_ack_ms": 4257.183993999206,
+          "stop_persisted": true,
+          "stop_verified_ms": 4314.116790999833
+        },
+        {
+          "commit_ack_ms": 1.640354996197857,
+          "controlled_lock_setup_ms": 34.47839800355723,
+          "financial_lock_ms": 4233.293395998771,
+          "iteration": 9,
+          "process_rss_high_water_bytes": 234762240,
+          "python_peak_bytes": 11133502,
+          "reconciliation_ms": 1478.1331880003563,
+          "stop_ack_ms": 106.66612799832365,
+          "stop_commit_ack_ms": 4276.972377003403,
+          "stop_persisted": true,
+          "stop_verified_ms": 4431.312015003641
+        },
+        {
+          "commit_ack_ms": 0.9817839963943698,
+          "controlled_lock_setup_ms": 27.22857499611564,
+          "financial_lock_ms": 3991.57890999777,
+          "iteration": 10,
+          "process_rss_high_water_bytes": 234762240,
+          "python_peak_bytes": 11104466,
+          "reconciliation_ms": 1538.9769680041354,
+          "stop_ack_ms": 114.85989099310245,
+          "stop_commit_ack_ms": 4030.2833070018096,
+          "stop_persisted": true,
+          "stop_verified_ms": 4151.253076997818
+        }
+      ],
+      "statistics": {
+        "commit_ack_ms": {
+          "max": 3.186852001817897,
+          "median": 1.3478735017997678,
+          "n": 10,
+          "p95": 3.186852001817897,
+          "p95_method": "nearest_rank; n=10 gives observed maximum"
+        },
+        "financial_lock_ms": {
+          "max": 5023.946590001287,
+          "median": 4013.616821499454,
+          "n": 10,
+          "p95": 5023.946590001287,
+          "p95_method": "nearest_rank; n=10 gives observed maximum"
+        },
+        "process_rss_high_water_bytes": {
+          "max": 234762240,
+          "median": 234762240.0,
+          "n": 10,
+          "p95": 234762240,
+          "p95_method": "nearest_rank; n=10 gives observed maximum"
+        },
+        "python_peak_bytes": {
+          "max": 11133502,
+          "median": 11077970.5,
+          "n": 10,
+          "p95": 11133502,
+          "p95_method": "nearest_rank; n=10 gives observed maximum"
+        },
+        "reconciliation_ms": {
+          "max": 1961.3748679985292,
+          "median": 1612.9110939946258,
+          "n": 10,
+          "p95": 1961.3748679985292,
+          "p95_method": "nearest_rank; n=10 gives observed maximum"
+        },
+        "stop_ack_ms": {
+          "max": 173.48261100414675,
+          "median": 114.21663449436892,
+          "n": 10,
+          "p95": 173.48261100414675,
+          "p95_method": "nearest_rank; n=10 gives observed maximum"
+        },
+        "stop_commit_ack_ms": {
+          "max": 5058.2167399988975,
+          "median": 4051.4108245042735,
+          "n": 10,
+          "p95": 5058.2167399988975,
+          "p95_method": "nearest_rank; n=10 gives observed maximum"
+        },
+        "stop_verified_ms": {
+          "max": 5157.035754004028,
+          "median": 4155.789611999353,
+          "n": 10,
+          "p95": 5157.035754004028,
+          "p95_method": "nearest_rank; n=10 gives observed maximum"
+        }
+      },
+      "timeout_observed": false,
+      "unexecuted_repetitions": 0,
+      "within_candidate_budgets": false
+    }
+  },
+  "scope": "LOCAL_SYNTHETIC_ONLY"
+}

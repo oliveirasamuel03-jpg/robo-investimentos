@@ -1,0 +1,27 @@
+{"server_version": "18.6 (Debian 18.6-1.pgdg13+2)", "image": ["postgres@sha256:e3d24f6906d0760bf4da0dae872415391ededefad23fd471c47dc53b0ddf3c42"], "scope": "LOCAL_SYNTHETIC_ONLY", "broker_mode": "paper", "broker_provider": "paper", "listener": "127.0.0.1"}
+........................................................................ [ 74%]
+.........................                                                [100%]
+=============================== warnings summary ===============================
+tests/test_infra12_postgres.py: 1 warning
+tests/test_infra121_postgres.py: 11 warnings
+tests/test_infra122_postgres.py: 20 warnings
+tests/test_infra123_postgres.py: 33 warnings
+tests/test_infra124_postgres.py: 36 warnings
+  /workspace/robo-investimentos/core/multi_timeframe_swing_audit.py:182: FutureWarning: 'H' is deprecated and will be removed in a future version, please use 'h' instead.
+    resampled = data.resample(rule).agg(agg).dropna(subset=["open", "high", "low", "close"])
+
+tests/test_infra121_postgres.py::test_stop_and_heartbeat_preserve_each_other
+  /workspace/robo-investimentos/core/state_store.py:2262: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    state["worker_heartbeat"] = datetime.utcnow().isoformat()
+
+tests/test_infra121_postgres.py: 6 warnings
+tests/test_infra122_postgres.py: 4 warnings
+tests/test_infra123_postgres.py: 27 warnings
+tests/test_infra124_postgres.py: 32 warnings
+  /workspace/robo-investimentos/core/state_store.py:2329: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    state_written_at = datetime.utcnow().isoformat()
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+- generated xml file: /workspace/robo-investimentos/docs/retomada/evidencias/infra124-postgres18.xml -
+97 passed, 171 warnings in 298.67s (0:04:58)
+Disposable local PostgreSQL container and own volumes removed.

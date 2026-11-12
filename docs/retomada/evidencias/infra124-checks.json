@@ -1,0 +1,65 @@
+{
+  "scope": "LOCAL_SYNTHETIC_ONLY",
+  "python_version": "Python 3.12.14",
+  "platform": "Linux-6.18.57-x86_64-with-glibc2.41",
+  "checks": [
+    {
+      "command": [
+        ".venv/bin/python",
+        "-m",
+        "compileall",
+        "-q",
+        "core",
+        "engines",
+        "workers",
+        "pages",
+        "scripts",
+        "tests",
+        "paper_trading_engine.py"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        ".venv/bin/python",
+        "-m",
+        "pip",
+        "check"
+      ],
+      "exit_code": 0,
+      "stdout": "No broken requirements found.\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "git",
+        "diff",
+        "--cached",
+        "--check"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": "",
+      "scope": "all final documentation and evidence staged"
+    }
+  ],
+  "implementation_commit": "8a32328ec1fd32582ed253b3c1110ad586ab8435",
+  "secret_scan": {
+    "candidate_files": 33,
+    "matches": 0,
+    "patterns": "GitHub tokens, URI embedded passwords, password= literal",
+    "limitation": "Pattern scan, not a universal detector"
+  }
+}

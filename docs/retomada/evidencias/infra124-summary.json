@@ -1,0 +1,130 @@
+{
+  "base_commit": "8dc5e5a83bb9f30aba8941dbb00ae3e757fe36f9",
+  "branch": "atlas/infra-1-2-4-contencao-stop",
+  "deploy_command_executed": false,
+  "distinct_cases": 619,
+  "financial_retry": false,
+  "hours72_authorized": false,
+  "implementation_commit": "8a32328ec1fd32582ed253b3c1110ad586ab8435",
+  "lock_timeout_seconds_unchanged": 5,
+  "merge_executed": false,
+  "new_offline_cases": 4,
+  "new_postgres_cases": 15,
+  "paper_only": true,
+  "performance_assessment": {
+    "pg16:after:0": {
+      "samples": 10,
+      "timeout_observed": false,
+      "unexecuted_repetitions": 0,
+      "within_candidate_budgets": true
+    },
+    "pg16:after:1000": {
+      "samples": 10,
+      "timeout_observed": false,
+      "unexecuted_repetitions": 0,
+      "within_candidate_budgets": true
+    },
+    "pg16:after:5000": {
+      "samples": 10,
+      "timeout_observed": false,
+      "unexecuted_repetitions": 0,
+      "within_candidate_budgets": false
+    },
+    "pg16:before:0": {
+      "samples": 10,
+      "timeout_observed": false,
+      "unexecuted_repetitions": 0,
+      "within_candidate_budgets": true
+    },
+    "pg16:before:1000": {
+      "samples": 10,
+      "timeout_observed": false,
+      "unexecuted_repetitions": 0,
+      "within_candidate_budgets": true
+    },
+    "pg16:before:5000": {
+      "samples": 10,
+      "timeout_observed": false,
+      "unexecuted_repetitions": 0,
+      "within_candidate_budgets": false
+    },
+    "pg18:after:0": {
+      "samples": 10,
+      "timeout_observed": false,
+      "unexecuted_repetitions": 0,
+      "within_candidate_budgets": true
+    },
+    "pg18:after:1000": {
+      "samples": 10,
+      "timeout_observed": false,
+      "unexecuted_repetitions": 0,
+      "within_candidate_budgets": true
+    },
+    "pg18:after:5000": {
+      "samples": 10,
+      "timeout_observed": false,
+      "unexecuted_repetitions": 0,
+      "within_candidate_budgets": false
+    },
+    "pg18:before:0": {
+      "samples": 10,
+      "timeout_observed": false,
+      "unexecuted_repetitions": 0,
+      "within_candidate_budgets": true
+    },
+    "pg18:before:1000": {
+      "samples": 10,
+      "timeout_observed": false,
+      "unexecuted_repetitions": 0,
+      "within_candidate_budgets": true
+    },
+    "pg18:before:5000": {
+      "samples": 10,
+      "timeout_observed": false,
+      "unexecuted_repetitions": 0,
+      "within_candidate_budgets": false
+    }
+  },
+  "performance_status": "BLOCKED_CANDIDATE_PERFORMANCE",
+  "post_blocked_scenarios": [
+    "pg18:after:5000",
+    "pg16:after:5000"
+  ],
+  "post_stop_max_ms": 3564.2892949981615,
+  "pr_created": false,
+  "previous_distinct_cases_preserved": 600,
+  "railway_command_executed": false,
+  "real_receipts_growth_max": 128,
+  "receipt_financial_units_attempted": 0,
+  "schema_migration": false,
+  "scope": "LOCAL_SYNTHETIC_ONLY",
+  "test_runs": {
+    "offline": {
+      "errors": 0,
+      "failures": 0,
+      "passed": 522,
+      "seconds": 39.42,
+      "skipped": 97,
+      "tests": 619,
+      "warnings": 105
+    },
+    "postgres16": {
+      "errors": 0,
+      "failures": 0,
+      "passed": 97,
+      "seconds": 293.11,
+      "skipped": 0,
+      "tests": 97,
+      "warnings": 171
+    },
+    "postgres18": {
+      "errors": 0,
+      "failures": 0,
+      "passed": 97,
+      "seconds": 298.67,
+      "skipped": 0,
+      "tests": 97,
+      "warnings": 171
+    }
+  }
+}

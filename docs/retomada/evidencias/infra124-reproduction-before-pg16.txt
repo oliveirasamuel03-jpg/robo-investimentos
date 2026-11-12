@@ -1,0 +1,92 @@
+{"server_version": "16.15", "image": ["postgres@sha256:aa6cb33cf4c19c765cefcf48d96176258800870a9a1e930ad126200f9d825139"], "scope": "LOCAL_SYNTHETIC_ONLY", "broker_mode": "paper", "broker_provider": "paper", "listener": "127.0.0.1"}
+F......F                                                                 [100%]
+=================================== FAILURES ===================================
+______ test_order_sync_preserves_existing_rows_and_noop_does_not_rewrite _______
+
+pg = (<module 'core.persistence' from '/workspace/robo-investimentos/core/persistence.py'>, <psycopg.Connection [IDLE] (hos...aa4c8c host=127.0.0.1 port=35851', PosixPath('/tmp/pytest-of-agent/pytest-67/test_order_sync_preserves_exis0/storage'))
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7fa3ca53ebd0>
+
+    def test_order_sync_preserves_existing_rows_and_noop_does_not_rewrite(pg,monkeypatch):
+        p,conn,_,_,paper,trader,q=_setup(pg,monkeypatch)
+        seed_history(conn,paper,2)
+        def orders():
+            return conn.execute("SELECT seq,row_json,created_at FROM app_rows WHERE namespace='table:trader_orders.csv' ORDER BY seq").fetchall()
+        before=orders()
+        trader.run_trader_cycle()
+        first=orders()
+>       assert first[:len(before)]==before, 'Existing canonical rows must retain seq, JSON and timestamp'
+E       AssertionError: Existing canonical rows must retain seq, JSON and timestamp
+E       assert [(7, '{"times...imezone.utc))] == [(2, '{"times...imezone.utc))]
+E
+E         At index 0 diff: (7, '{"timestamp": "2026-01-01T00:00:00+00:00", "asset": "AAPL", "side": "BUY", "quantity": 1.0, "price": 10.0, "gross_value": 10.0, "cost": 0.0, "cash_after": 990.0, "source": "synthetic-history"}', datetime.datetime(2026, 11, 12, 3, 2, 29, 414307, tzinfo=datetime.timezone.utc)) != (2, '{"timestamp": "2026-01-01T00:00:00+00:00", "asset": "AAPL", "side": "BUY", "quantity": 1.0, "price": 10.0, "gross_value": 10.0, "cost": 0.0, "cash_after": 990.0, "source": "synthetic-history"}', datetime.datetime(2026, 11, 12, 3, 2, 28, 913573, tzinfo=datetime.timezone.utc))
+E         Use -v to get more diff
+
+tests/test_infra124_postgres.py:181: AssertionError
+------------------------------ Captured log call -------------------------------
+ERROR    yfinance:base.py:131 Failed to get ticker 'AAPL' reason: Local PostgreSQL tests: non-loopback resolution blocked
+ERROR    yfinance:multi.py:181
+1 Failed download:
+ERROR    yfinance:multi.py:194 ['AAPL']: RuntimeError('Local PostgreSQL tests: non-loopback resolution blocked')
+ERROR    yfinance:base.py:131 Failed to get ticker 'AAPL' reason: Local PostgreSQL tests: non-loopback resolution blocked
+ERROR    yfinance:multi.py:181
+1 Failed download:
+ERROR    yfinance:multi.py:194 ['AAPL']: RuntimeError('Local PostgreSQL tests: non-loopback resolution blocked')
+ERROR    yfinance:base.py:131 Failed to get ticker 'BTC-USD' reason: Local PostgreSQL tests: non-loopback resolution blocked
+ERROR    yfinance:multi.py:181
+1 Failed download:
+ERROR    yfinance:multi.py:194 ['BTC-USD']: RuntimeError('Local PostgreSQL tests: non-loopback resolution blocked')
+_________ test_reconciliation_reuses_only_current_fenced_observations __________
+
+pg = (<module 'core.persistence' from '/workspace/robo-investimentos/core/persistence.py'>, <psycopg.Connection [IDLE] (hos...f6a597 host=127.0.0.1 port=35851', PosixPath('/tmp/pytest-of-agent/pytest-67/test_reconciliation_reuses_onl0/storage'))
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7fa3b2ea3c20>
+
+    def test_reconciliation_reuses_only_current_fenced_observations(pg,monkeypatch):
+        p,conn,_,_,paper,trader,q=_setup(pg,monkeypatch)
+        first=trader.run_trader_cycle()['cycle_id']
+        calls=[];original=p.load_json_rows
+        def count(namespace,*args,**kwargs):
+            calls.append(namespace)
+            return original(namespace,*args,**kwargs)
+        monkeypatch.setattr(p,'load_json_rows',count)
+        expected=q.manifest()
+        assert q.reconcile(first)['outcome']=='COMMITTED'
+>       assert not set(calls)&{'paper_trades','table:trade_reports.csv'}, 'Do not decode the same fenced rows twice'
+E       AssertionError: Do not decode the same fenced rows twice
+E       assert not ({'paper_trades', 'table:trade_reports.csv'} & {'paper_trades', 'table:trade_reports.csv'})
+E        +  where {'paper_trades', 'table:trade_reports.csv'} = set(['paper_trades', 'table:trade_reports.csv'])
+
+tests/test_infra124_postgres.py:279: AssertionError
+------------------------------ Captured log call -------------------------------
+ERROR    yfinance:base.py:131 Failed to get ticker 'AAPL' reason: Local PostgreSQL tests: non-loopback resolution blocked
+ERROR    yfinance:multi.py:181
+1 Failed download:
+ERROR    yfinance:multi.py:194 ['AAPL']: RuntimeError('Local PostgreSQL tests: non-loopback resolution blocked')
+ERROR    yfinance:base.py:131 Failed to get ticker 'AAPL' reason: Local PostgreSQL tests: non-loopback resolution blocked
+ERROR    yfinance:multi.py:181
+1 Failed download:
+ERROR    yfinance:multi.py:194 ['AAPL']: RuntimeError('Local PostgreSQL tests: non-loopback resolution blocked')
+ERROR    yfinance:base.py:131 Failed to get ticker 'BTC-USD' reason: Local PostgreSQL tests: non-loopback resolution blocked
+ERROR    yfinance:multi.py:181
+1 Failed download:
+ERROR    yfinance:multi.py:194 ['BTC-USD']: RuntimeError('Local PostgreSQL tests: non-loopback resolution blocked')
+=============================== warnings summary ===============================
+tests/test_infra124_postgres.py::test_order_sync_preserves_existing_rows_and_noop_does_not_rewrite
+tests/test_infra124_postgres.py::test_sync_failure_rolls_back_full_financial_unit
+tests/test_infra124_postgres.py::test_history_tampered_after_receipt_stays_fenced[paper_trades]
+tests/test_infra124_postgres.py::test_history_tampered_after_receipt_stays_fenced[table:trader_orders.csv]
+tests/test_infra124_postgres.py::test_history_tampered_after_receipt_stays_fenced[table:trade_reports.csv]
+tests/test_infra124_postgres.py::test_reconciliation_reuses_only_current_fenced_observations
+  /workspace/robo-investimentos/core/multi_timeframe_swing_audit.py:182: FutureWarning: 'H' is deprecated and will be removed in a future version, please use 'h' instead.
+    resampled = data.resample(rule).agg(agg).dropna(subset=["open", "high", "low", "close"])
+
+tests/test_infra124_postgres.py::test_order_sync_preserves_existing_rows_and_noop_does_not_rewrite
+tests/test_infra124_postgres.py::test_reconciliation_reuses_only_current_fenced_observations
+  /workspace/robo-investimentos/core/state_store.py:2329: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    state_written_at = datetime.utcnow().isoformat()
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_infra124_postgres.py::test_order_sync_preserves_existing_rows_and_noop_does_not_rewrite
+FAILED tests/test_infra124_postgres.py::test_reconciliation_reuses_only_current_fenced_observations
+2 failed, 6 passed, 3 deselected, 8 warnings in 18.11s
+Disposable local PostgreSQL container and own volumes removed.

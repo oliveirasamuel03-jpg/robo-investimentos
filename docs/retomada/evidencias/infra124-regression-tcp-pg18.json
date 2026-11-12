@@ -1,0 +1,99 @@
+{
+  "cases": {
+    "after_known_confirmation": {
+      "driver_ack_before_cut": true,
+      "fault_type": "REAL_LOOPBACK_TCP_SOCKET_CLOSE",
+      "new_connection_recovered": true,
+      "outcome": "COMMITTED",
+      "proxy_events": [
+        {
+          "backend_pid": 3061,
+          "fault": "after_driver_confirmed_commit",
+          "monotonic": 51676.288456358,
+          "real_socket_close": true
+        }
+      ],
+      "server_trades": 1
+    },
+    "before_commit": {
+      "fault_type": "REAL_LOOPBACK_TCP_SOCKET_CLOSE",
+      "proxy_events": [
+        {
+          "backend_pid": 2861,
+          "fault": "before_commit",
+          "monotonic": 51668.131796922,
+          "real_socket_close": true
+        }
+      ],
+      "python_exception_injected": false,
+      "python_process_abrupt_exit_code": 79,
+      "reconciled_outcome": "NOT_COMMITTED",
+      "restart_blocked": true,
+      "server_receipt_observed": "PREPARED",
+      "server_trades_observed": 0,
+      "trades_not_reexecuted": true
+    },
+    "drop_commit_reply": {
+      "fault_type": "REAL_LOOPBACK_TCP_SOCKET_CLOSE",
+      "proxy_events": [
+        {
+          "backend_pid": 2997,
+          "complete_commit_forwarded": true,
+          "fault": "drop_commit_reply",
+          "monotonic": 51673.999841425
+        },
+        {
+          "backend_pid": 2997,
+          "fault": "server_commit_reply_dropped",
+          "monotonic": 51674.001936492,
+          "real_socket_close": true,
+          "reply_bytes_withheld": 12,
+          "server_command_complete_commit": true
+        }
+      ],
+      "python_exception_injected": false,
+      "python_process_abrupt_exit_code": 79,
+      "reconciled_outcome": "COMMITTED",
+      "restart_blocked": true,
+      "server_receipt_observed": "COMMITTED",
+      "server_trades_observed": 1,
+      "trades_not_reexecuted": true
+    },
+    "partial_commit": {
+      "fault_type": "REAL_LOOPBACK_TCP_SOCKET_CLOSE",
+      "proxy_events": [
+        {
+          "backend_pid": 2929,
+          "commit_bytes_forwarded": 7,
+          "complete_commit_forwarded": false,
+          "complete_frame_bytes": 12,
+          "fault": "partial_commit",
+          "monotonic": 51671.067836603,
+          "real_socket_close": true
+        }
+      ],
+      "python_exception_injected": false,
+      "python_process_abrupt_exit_code": 79,
+      "reconciled_outcome": "NOT_COMMITTED",
+      "restart_blocked": true,
+      "server_receipt_observed": "PREPARED",
+      "server_trades_observed": 0,
+      "trades_not_reexecuted": true
+    },
+    "post_commit_diagnostic": {
+      "fault_type": "REAL_LOOPBACK_TCP_SOCKET_CLOSE",
+      "outcome": "POST_COMMIT_DIAGNOSTIC_FAILURE",
+      "proxy_events": [
+        {
+          "backend_pid": 3147,
+          "fault": "post_commit_diagnostic_connection",
+          "monotonic": 51677.734935543,
+          "real_socket_close": true
+        }
+      ],
+      "python_exception_injected": false,
+      "trades_not_reexecuted": true
+    }
+  },
+  "scope": "LOCAL_SYNTHETIC_ONLY"
+}
