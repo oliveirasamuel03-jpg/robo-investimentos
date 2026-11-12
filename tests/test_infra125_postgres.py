@@ -531,3 +531,52 @@ def test_actual_retention_rollback_and_archive_preserve_or_invalidate_proof(pg,m
     evidence(conn,'blockers','retention',{'active_gate_rolled_back_maintenance':True,'history_preserved_in_archive':True,
         'committed_archive_invalidated_old_proof':True,'current_verifier_also_unknown_after_archive':True,
         'archive_compatibility':'NOT_PROVEN_FOR_OPERATIONAL_INTEGRATION'})
+
+
+@pytest.mark.parametrize('commit',[True,False])
+def test_inflight_financial_unit_does_not_publish_tentative_snapshot_absence(pg,monkeypatch,commit):
+    p,conn,store,control,paper,trader,q=_setup(pg,monkeypatch)
+    at_commit=threading.Event();release_finance=threading.Event();allow_worker_verification=threading.Event()
+    original_reconcile=q.reconcile
+    def boundary(connection,witness):
+        at_commit.set();assert release_finance.wait(10)
+        if not commit:raise ValueError('synthetic financial BODY rollback before COMMIT')
+    def worker_verification(*args,**kwargs):
+        if threading.current_thread().name.startswith('inflight-finance'):
+            assert allow_worker_verification.wait(15)
+        return original_reconcile(*args,**kwargs)
+    monkeypatch.setattr(p,'_before_financial_commit',boundary)
+    monkeypatch.setattr(q,'reconcile',worker_verification)
+    with ThreadPoolExecutor(max_workers=1,thread_name_prefix='inflight-finance') as finances,ThreadPoolExecutor(max_workers=1) as publishers:
+        finance=finances.submit(trader.run_trader_cycle)
+        assert at_commit.wait(15)
+        cycle=q.gate_status()['cycle_id']
+        proto=SnapshotPrototype(pg[2]);proof=proto.prepare(cycle)
+        # MVCC sees the old preimage/PREPARED receipt. This is TENTATIVE ONLY:
+        # publishing must wait for the actual writer and prove its outcome afresh.
+        assert proof.result['outcome']=='NOT_COMMITTED'
+        publication=publishers.submit(proto.publish,proof)
+        try:
+            deadline=time.monotonic()+3
+            while not conn.execute("SELECT EXISTS(SELECT 1 FROM pg_locks WHERE locktype='advisory' AND NOT granted)").fetchone()[0]:
+                assert time.monotonic()<deadline;threading.Event().wait(.005)
+            assert not publication.done()
+            release_finance.set();result=publication.result(15)
+            if commit:
+                assert result['outcome']=='UNKNOWN_COMMIT' and not result['resolution_recorded']
+                assert q.gate_status()['blocked'] and len(paper.read_paper_trades())==1
+            else:
+                assert result['outcome']=='NOT_COMMITTED' and result['resolution_recorded']
+                assert not q.gate_status()['blocked'] and paper.read_paper_trades()==[]
+        finally:
+            release_finance.set();allow_worker_verification.set()
+        if commit:
+            assert finance.result(15)['commit_outcome']=='COMMITTED'
+        else:
+            with pytest.raises(ValueError) as caught:finance.result(15)
+            assert caught.value.commit_outcome=='NOT_COMMITTED'
+    evidence(conn,'races','inflight_commit' if commit else 'inflight_rollback',{
+        'snapshot_absence_was_tentative_only':True,'actual_advisory_wait_observed':True,
+        'published_outcome':result['outcome'],'financial_committed_on_server':commit,
+        'trades':len(paper.read_paper_trades()),'financial_retry':False,
+        'rollback_fault':'PYTHON_BODY_INJECTION' if not commit else None})
