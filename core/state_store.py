@@ -2202,6 +2202,8 @@ def _guarded_bot_update(state, updater):
 
 
 def reset_state() -> dict:
+    from core.commit_protocol import assert_execution_allowed
+    assert_execution_allowed()
     def reset(state):
         result = deepcopy(DEFAULT_STATE)
         # Resetting configuration must not clear a stopped operator intention.

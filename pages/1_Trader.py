@@ -10,7 +10,7 @@ import streamlit as st
 from core.stop_control import start_robot
 from core.ui_mutations import (
     render_pending_intent, render_stop_status, request_stop_from_ui, run_ui_mutation,
-    visible_control_snapshot, classify_cycle_feedback, operational_status_label,
+    visible_control_snapshot, classify_cycle_feedback, operational_status_label, render_commit_control,
 )
 from core.auth.guards import is_admin, render_auth_toolbar, require_auth
 from core.auth.security import verify_password
@@ -1636,6 +1636,7 @@ if bool(security_state.get("real_mode_enabled", False)):
 
 control_expected = visible_control_snapshot(ui=st, state=state, key="trader")
 render_stop_status(ui=st, state=state)
+render_commit_control(ui=st, allow_reconcile=admin_mode)
 render_pending_intent(st)
 b1, b2, b3, b4 = st.columns(4)
 
@@ -1677,6 +1678,12 @@ with b4:
                     f"Trades feitos: {result.get('cycle_result', {}).get('trades_executed', 0)}. "
                     "A parada não cancela esse commit retroativamente."
                 )
+            elif feedback == "POST_COMMIT_DIAGNOSTIC_FAILURE":
+                st.warning("Commit financeiro confirmado; falha posterior ao commit. Não repita a operação; reconcilie o ciclo.")
+            elif feedback == "UNKNOWN_COMMIT":
+                st.error("Resultado financeiro desconhecido. Reconciliação necessária; novos ciclos bloqueados.")
+            elif feedback == "LOCAL_ONLY":
+                st.warning("Simulação em arquivos locais; isso não confirma COMMIT PostgreSQL nem libera operação prolongada.")
             elif feedback == "NOT_COMMITTED":
                 st.info("Ciclo não confirmado: nenhuma nova entrada foi confirmada por esta solicitação.")
             elif feedback == "COMMITTED":

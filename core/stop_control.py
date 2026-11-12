@@ -195,6 +195,8 @@ def start_robot(expected_state: dict, requested_by: str = "operator", bot_mode: 
     Pending unacknowledged requests cannot be resumed.
     """
     from core.state_store import load_bot_state, update_bot_state
+    from core.commit_protocol import assert_execution_allowed
+    assert_execution_allowed()
     if bot_mode is not None and bot_mode not in {"Automatico", "Semi-automatico"}:
         raise ValueError("Invalid bot mode")
     if not isinstance(expected_state, p.StateSnapshot) or expected_state.expected is None:

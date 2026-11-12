@@ -7,6 +7,7 @@ import pytest
 
 
 MODULES_TO_CLEAR = [
+    "core.commit_protocol",
     "core.config",
     "core.persistence",
     "core.state_store",

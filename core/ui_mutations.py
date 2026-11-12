@@ -34,7 +34,12 @@ def run_ui_mutation(operation: Callable[[], Any], *, ui, action: str) -> Mutatio
 
     try:
         value = operation()
-    except PersistenceConflictError:
+    except PersistenceConflictError as exc:
+        if getattr(exc, 'outcome', None) == 'UNKNOWN_COMMIT':
+            _remember(ui, action, 'UNKNOWN_COMMIT')
+            ui.error('UNKNOWN_COMMIT: resultado financeiro desconhecido. Reconciliação necessária; '
+                     'novos ciclos bloqueados. Não repita a operação. STOP continua disponível.')
+            return MutationResult(False, error_code='UNKNOWN_COMMIT')
         _remember(ui, action, "UNCONFIRMED")
         ui.error(
             f"{action}: o estado mudou. A operação não foi confirmada. "
@@ -139,6 +144,11 @@ def visible_control_snapshot(*, ui, state: dict, key: str):
 
 def classify_cycle_feedback(result: dict) -> str:
     """A later STOP cannot turn an already committed cycle into an aborted one."""
+    outcome = result.get('commit_outcome') or result.get('outcome')
+    if outcome in {'UNKNOWN_COMMIT', 'POST_COMMIT_DIAGNOSTIC_FAILURE', 'LOCAL_ONLY'}:
+        return outcome
+    if outcome == 'NOT_COMMITTED':
+        return 'NOT_COMMITTED'
     committed = result.get("committed")
     if committed is True:
         return "COMMITTED_BEFORE_STOP" if result.get("status") == "STOPPED" else "COMMITTED"
@@ -162,3 +172,36 @@ def operational_status_label(state: dict) -> str:
             return "Parada confirmada"
         return "Parada pendente de confirmação"
     return "Estado desconhecido"
+
+
+def render_commit_control(*, ui, allow_reconcile=False):
+    """Read/verify existing evidence only. This button never executes a trade."""
+    from core.commit_protocol import gate_status, reconcile
+    try:
+        status = gate_status()
+    except Exception:
+        ui.error('Não foi possível verificar o resultado financeiro. Execução bloqueada; '
+                 'recupere a conexão e reconcilie. A ausência de leitura não libera operações.')
+        return
+    if not status['blocked']:
+        return
+    if status.get('reason') == 'POST_COMMIT_DIAGNOSTIC_FAILURE':
+        ui.warning('POST_COMMIT_DIAGNOSTIC_FAILURE: commit financeiro confirmado; '
+                   'diagnóstico posterior falhou. Não repita a operação financeira.')
+    else:
+        ui.error(f"UNKNOWN_COMMIT: ciclo {status['cycle_id']}. Reconciliação necessária; "
+                 'nenhum novo ciclo financeiro está autorizado. Isso não substitui STOP do operador.')
+    if ui.button('Verificar reconciliação (sem operar)', disabled=not allow_reconcile):
+        result = reconcile(status['cycle_id'])
+        if result['outcome'] == 'COMMITTED' and not result.get('resolution_recorded', False):
+            ui.warning('COMMITTED verificado; registro/liberação da reconciliação não confirmado. '
+                       'Não repita a operação. Recarregue o bloqueio e verifique a conexão.')
+        elif result['outcome'] == 'COMMITTED':
+            ui.success('COMMITTED: estado, saldo, posições, eventos e recibo confirmados no PostgreSQL. '
+                       'A reconciliação não executou operações financeiras.')
+        elif result['outcome'] == 'NOT_COMMITTED':
+            ui.info('NOT_COMMITTED: ausência de commit comprovada sob barreira de escritores. '
+                    'Nenhuma repetição financeira foi executada.')
+        else:
+            ui.error('UNKNOWN_COMMIT: divergência ou evidência insuficiente. Bloqueio mantido; '
+                     'investigue os namespaces. Nenhum registro foi apagado.')

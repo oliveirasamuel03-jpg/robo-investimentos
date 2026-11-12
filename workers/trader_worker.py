@@ -31,6 +31,7 @@ from core.state_store import (
     update_validation_status,
 )
 from core.stop_control import acknowledge_stop
+from core.commit_protocol import gate_status, ReconciliationRequired
 from core.swing_validation import refresh_swing_validation_cycle
 from engines.trader_engine import refresh_daily_loss_guard, run_trader_cycle
 
@@ -92,6 +93,11 @@ def mark_error(message: str) -> None:
 
 
 def build_action_text(result: dict) -> str:
+    outcome = result.get('commit_outcome') or result.get('outcome')
+    if outcome == 'POST_COMMIT_DIAGNOSTIC_FAILURE':
+        return 'Commit financeiro confirmado; diagnóstico posterior falhou. Reconciliação necessária, sem retry financeiro.'
+    if outcome == 'UNKNOWN_COMMIT':
+        return 'Resultado financeiro desconhecido. Novos ciclos bloqueados; reconciliação necessária.'
     cycle_result = result.get("cycle_result", {}) if isinstance(result, dict) else {}
     trades_executed = int(cycle_result.get("trades_executed", 0))
     if bool(cycle_result.get("entries_blocked_by_daily_loss", False)):
@@ -1861,10 +1867,19 @@ def worker_loop() -> None:
     emit_startup_marker("[worker_startup_marker] worker loop started")
 
     while True:
+        result = None
         try:
             current_time = datetime.now(timezone.utc)
             refresh_daily_loss_guard()
             state = load_bot_state()
+
+            if gate_status()['blocked']:
+                if state.get('bot_status') == 'STOPPED':
+                    acknowledge_stop(worker_id='trader_worker')
+                update_runtime_state(last_action='UNKNOWN_COMMIT: reconciliação necessária; ciclo financeiro bloqueado.',
+                                     next_run_delta_seconds=PAUSED_SLEEP_SECONDS)
+                time.sleep(PAUSED_SLEEP_SECONDS)
+                continue
 
             if state.get("bot_status") != "RUNNING":
                 if state.get("bot_status") == "STOPPED":
@@ -1883,6 +1898,11 @@ def worker_loop() -> None:
 
             result = run_trader_cycle(persist_market_data=False)
             action_text = build_action_text(result)
+            if result.get('commit_outcome') == 'POST_COMMIT_DIAGNOSTIC_FAILURE':
+                emit_worker_observability_log(action_text)
+                update_runtime_state(last_action=action_text, next_run_delta_seconds=PAUSED_SLEEP_SECONDS)
+                time.sleep(PAUSED_SLEEP_SECONDS)
+                continue
 
             persist_worker_cycle_state(
                 last_action=action_text,
@@ -1936,16 +1956,23 @@ def worker_loop() -> None:
             _maybe_send_reporting_emails(validation_report, current_time=current_time)
             _maybe_send_final_validation_email(validation_report, current_time=current_time)
 
+        except ReconciliationRequired:
+            emit_worker_observability_log('UNKNOWN_COMMIT: bloqueio persistente; reconciliação necessária, sem retry financeiro.')
         except Exception as exc:
-            error_msg = str(exc)
-            log_event("ERROR", f"Erro no worker: {error_msg}")
-            mark_error(error_msg)
-            health_payload = _refresh_production_monitor(cycle_success=False, exception_message=error_msg)
-            _log_cycle_health(health_payload)
-            _run_daily_retention_maintenance()
-            validation_report = refresh_swing_validation_cycle(now=datetime.now(timezone.utc))
-            _maybe_send_reporting_emails(validation_report, current_time=datetime.now(timezone.utc))
-            _maybe_send_final_validation_email(validation_report, current_time=datetime.now(timezone.utc))
+            if result and result.get('committed') and result.get('cycle_id'):
+                from core.commit_protocol import post_commit_failure
+                post_commit_failure(result['cycle_id'], confirmed=True)
+                emit_worker_observability_log('POST_COMMIT_DIAGNOSTIC_FAILURE: commit confirmado; falha posterior do worker. Não repetir operação financeira.')
+            else:
+                error_msg = type(exc).__name__
+                log_event("ERROR", f"Erro no worker: {error_msg}")
+                mark_error(error_msg)
+                health_payload = _refresh_production_monitor(cycle_success=False, exception_message=error_msg)
+                _log_cycle_health(health_payload)
+                _run_daily_retention_maintenance()
+                validation_report = refresh_swing_validation_cycle(now=datetime.now(timezone.utc))
+                _maybe_send_reporting_emails(validation_report, current_time=datetime.now(timezone.utc))
+                _maybe_send_final_validation_email(validation_report, current_time=datetime.now(timezone.utc))
 
         time.sleep(SLEEP_SECONDS)
 

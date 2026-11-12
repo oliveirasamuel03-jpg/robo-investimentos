@@ -253,6 +253,8 @@ def save_paper_state(state: dict[str, Any]) -> None:
 
 @transactional_persistence
 def reset_paper_state(config: PaperTradingConfig | None = None) -> dict[str, Any]:
+    from core.commit_protocol import assert_execution_allowed
+    assert_execution_allowed()
     initial_capital = float(config.initial_capital) if config else 10000.0
     state = _default_state(initial_capital)
     update_json_state(PAPER_STATE_NAMESPACE, lambda: state, PAPER_STATE_FILE, lambda _current: state)
@@ -982,57 +984,94 @@ def run_paper_trading_demo(config: PaperTradingConfig = PaperTradingConfig()) ->
 
 
 @contextmanager
-def _paper_commit_scope():
+def _paper_commit_scope(witness=None):
     # Match STOP's bot-state lock in the local fallback too. PostgreSQL retains
     # the existing global unit-of-work lock; no feed request runs in this scope.
-    with persistence_transaction(), ExitStack() as stack:
+    with persistence_transaction(witness=witness), ExitStack() as stack:
         if not database_enabled():
             stack.enter_context(_local_lock(BOT_STATE_FILE))
             stack.enter_context(_local_lock(PAPER_STATE_FILE))
         yield
 
 
-def _commit_paper_draft(state, trades, reports, config, commit_guard=None, commit_finalize=None):
-    """Publish an optimistic draft only after validating current control/state.
-
-    PostgreSQL commits cash, positions, trades, reports and the platform mirror
-    together. A refused draft has no financial writes; it is never retried here.
-    """
+def _validate_draft_control(trades, commit_guard):
     from core.stop_control import mutate_acknowledgement
+    latest = load_bot_state()
+    if (latest.get("stop_control", {}).get("status") in {"PERSISTED", "ACKNOWLEDGED"}
+            and latest.get("bot_status") != "STOPPED"):
+        raise RuntimeError("PAPER commit refused: inconsistent stop control requires review.")
+    if latest.get("bot_status") == "STOPPED":
+        update_bot_state(lambda current: mutate_acknowledgement(current, "paper_commit_guard"))
+        return False
+    runtime = build_broker_runtime_config(latest.get("security", {}))
+    if (runtime["provider"] != "paper" or runtime["configured_mode"] != "paper"
+            or runtime["live_requested"] or runtime["real_mode_enabled"]):
+        raise RuntimeError("PAPER commit refused: broker must remain exclusively paper.")
+    if commit_guard is not None:
+        commit_guard(latest)
+    if any(t.get("side") == "BUY" for t in trades) and bool(latest.get("risk", {}).get("daily_loss_block_active")):
+        raise PersistenceConflictError("Risk state changed; review before another cycle.")
+    return True
+
+
+def _commit_paper_draft(state, trades, reports, config, commit_guard=None, commit_finalize=None):
+    from core import persistence as persistence
+    import core.commit_protocol as protocol
+    # Pure/preflight failures do not create a financial intent. Repeat all checks
+    # under the final fence after the independent intent has become durable.
     with _paper_commit_scope():
-        latest = load_bot_state()
-        if (latest.get("stop_control", {}).get("status") in {"PERSISTED", "ACKNOWLEDGED"}
-                and latest.get("bot_status") != "STOPPED"):
-            raise RuntimeError("PAPER commit refused: inconsistent stop control requires review.")
-        if latest.get("bot_status") == "STOPPED":
-            update_bot_state(lambda current: mutate_acknowledgement(current, "paper_commit_guard"))
+        protocol.assert_execution_allowed()
+        if not _validate_draft_control(trades, commit_guard):
             return False
-        runtime = build_broker_runtime_config(latest.get("security", {}))
-        if (runtime["provider"] != "paper" or runtime["configured_mode"] != "paper"
-                or runtime["live_requested"] or runtime["real_mode_enabled"]):
-            raise RuntimeError("PAPER commit refused: broker must remain exclusively paper.")
-        if commit_guard is not None:
-            commit_guard(latest)
-        if any(trade.get("side") == "BUY" for trade in trades) and bool(
-            latest.get("risk", {}).get("daily_loss_block_active", False)
-        ):
-            raise PersistenceConflictError("Risk state changed; review before another cycle.")
-        # CAS must run before append, particularly in the per-file fallback.
-        # In PostgreSQL any later append/report failure rolls back this save too.
-        save_paper_state(state)
-        for trade in trades:
-            _append_paper_trade(trade)
-        for report in reports:
-            append_trade_report(report)
-        if commit_finalize is not None:
-            commit_finalize()
-        return True
+        current = load_paper_state(config)
+        persistence._check_snapshot(state, current.source, current.expected,
+                                    persistence._encode(state), strict=database_enabled())
+    cycle_id = protocol.begin_intent(state, trades, reports, require_platform=commit_finalize is not None)
+    witness = persistence.TransactionWitness()
+    accepted = False
+    try:
+        with protocol.protocol_write(), _paper_commit_scope(witness):
+            accepted = _validate_draft_control(trades, commit_guard)
+            if accepted:
+                protocol.reject_duplicate_events(trades, reports)
+                state["last_cycle_id"] = cycle_id
+                save_paper_state(state)
+                for trade in trades:
+                    _append_paper_trade({**trade, "cycle_id": cycle_id})
+                for report in reports:
+                    append_trade_report({**report, "cycle_id": cycle_id})
+                if commit_finalize is not None:
+                    commit_finalize()
+            protocol.record_unit_result(cycle_id, accepted)
+    except Exception as exc:
+        if accepted and witness.phase == 'COMMITTED':
+            protocol.post_commit_failure(cycle_id, confirmed=True)
+            raise protocol.PostCommitDiagnosticFailure(cycle_id) from exc
+        # BODY failure is not a COMMIT attempt. Still require a fresh, fenced
+        # exact-preimage verification before labelling it NOT_COMMITTED.
+        if witness.phase in {"BODY", "NOT_STARTED"}:
+            proof = protocol.reconcile(cycle_id)
+            if proof['outcome'] == 'NOT_COMMITTED':
+                exc.commit_outcome, exc.cycle_id = 'NOT_COMMITTED', cycle_id
+                raise
+        raise protocol.UnknownCommit(cycle_id, 'COMMIT_RESPONSE_NOT_VERIFIED') from exc
+    proof = protocol.reconcile(cycle_id, release=False)
+    if proof['outcome'] == 'UNKNOWN_COMMIT' or not proof.get('resolution_recorded', False):
+        if accepted and witness.phase == 'COMMITTED':
+            # A positive server reply is already known; a failed verification
+            # cannot turn it into a rollback or authorize another financial try.
+            protocol.post_commit_failure(cycle_id, confirmed=True)
+            raise protocol.PostCommitDiagnosticFailure(cycle_id)
+        raise protocol.UnknownCommit(cycle_id, proof.get('reason', 'VERIFICATION_FAILED'))
+    return accepted
 
 
 def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig(), *,
                     commit_guard=None, commit_finalize=None) -> dict[str, Any]:
     if _ACTIVE_CONNECTION.get() is not None:
         raise RuntimeError("Market acquisition cannot run inside a persistence transaction.")
+    from core.commit_protocol import assert_execution_allowed
+    assert_execution_allowed()
     control = load_bot_state()
     if control.get("bot_status") == "STOPPED":
         from core.stop_control import acknowledge_stop
@@ -1728,51 +1767,71 @@ def run_paper_cycle(config: PaperTradingConfig = PaperTradingConfig(), *,
         }
     )
     state["history"] = history[-max(int(config.history_limit), 1) :]
-    if not _commit_paper_draft(state, trades_executed, trade_reports, config,
-                               commit_guard=commit_guard, commit_finalize=commit_finalize):
+    from core.commit_protocol import PostCommitDiagnosticFailure
+    try:
+        accepted = _commit_paper_draft(state, trades_executed, trade_reports, config,
+                                       commit_guard=commit_guard, commit_finalize=commit_finalize)
+    except PostCommitDiagnosticFailure as exc:
+        return {"commit_outcome": exc.outcome, "outcome": exc.outcome, "committed": True,
+                "cycle_id": exc.cycle_id, "state": state, "trades_executed": len(trades_executed)}
+    if not accepted:
         return {"status": "STOPPED", "committed": False, "state": load_paper_state(config),
                 "trades_executed": 0, "signals": [], "draft_discarded": True}
 
-    report = build_paper_report({"signals": signals}, initial_capital=float(config.initial_capital))
-    cycle_validation["rejection_events"] = rejection_events
-    cycle_validation["rejection_summary"] = summarize_rejection_events(
-        rejection_events,
-        rejected_signal_count=int(cycle_validation.get("signals_rejected", 0) or 0),
-    )
+    try:
+        report = build_paper_report({"signals": signals}, initial_capital=float(config.initial_capital))
+        cycle_validation["rejection_events"] = rejection_events
+        cycle_validation["rejection_summary"] = summarize_rejection_events(
+            rejection_events,
+            rejected_signal_count=int(cycle_validation.get("signals_rejected", 0) or 0),
+        )
 
-    return {
-        "committed": True,
-        "state": state,
-        "trades": read_paper_trades(limit=200),
-        "equity": read_paper_equity(limit=200),
-        "report": report,
-        "signals": signals,
-        "trades_executed": len(trades_executed),
-        "entries_blocked_by_daily_loss": daily_loss_block_active,
-        "entries_block_reason": daily_loss_block_reason,
-        "daily_loss_limit_brl": round(float(daily_loss_limit), 2),
-        "daily_loss_consumed_brl": round(float(daily_loss_consumed), 2),
-        "daily_realized_pnl_brl": round(float(daily_realized_running), 2),
-        "daily_loss_day_key": current_day_key,
-        "market_data_status": market_data_status,
-        "market_context": market_context,
-        "macro_alert": macro_alert,
-        "validation_cycle": cycle_validation,
-        "phase2_fine_tune": phase2_fine_tune,
-        "phase2_1_fine_tune": phase2_1_fine_tune,
-        "strategy_structure_audit": strategy_structure_audit,
-        "market_structure_audit": market_structure_audit,
-        "fib_alignment_audit": fib_alignment_audit,
-        "multi_timeframe_intraday_fetcher": multi_timeframe_intraday_fetch.summary,
-        "multi_timeframe_swing_audit": multi_timeframe_swing_audit,
-        "bos_pivot_trace_audit": bos_pivot_trace_audit,
-        "shadow_decision_simulator": shadow_decision_simulator,
-        "strategy_decision_bridge_trace": strategy_decision_bridge_trace,
-        "feed_scope_reconciliation": feed_scope_reconciliation,
-        "provider_budget_visual_fallback": provider_budget_visual_fallback,
-        "no_setup_eligible_decomposition": no_setup_eligible_decomposition,
-        "reversal_blocker_routing_audit": reversal_blocker_routing_audit,
-        "setup_blocker_taxonomy_audit": setup_blocker_taxonomy_audit,
-        "bos_confirmation_quality_audit": bos_confirmation_quality_audit,
-        "h1_confirmation_after_h4_bos_audit": h1_confirmation_after_h4_bos_audit,
-    }
+        if commit_finalize is None:
+            from core.commit_protocol import reconcile, UnknownCommit
+            resolution = reconcile(state['last_cycle_id'])
+            if resolution['outcome'] == 'UNKNOWN_COMMIT' or not resolution.get('resolution_recorded', False):
+                raise PostCommitDiagnosticFailure(state['last_cycle_id'])
+        return {
+            "committed": True,
+            "cycle_id": state.get("last_cycle_id"),
+            "commit_outcome": "COMMITTED" if database_enabled() else "LOCAL_ONLY",
+            "state": state,
+            "trades": read_paper_trades(limit=200),
+            "equity": read_paper_equity(limit=200),
+            "report": report,
+            "signals": signals,
+            "trades_executed": len(trades_executed),
+            "entries_blocked_by_daily_loss": daily_loss_block_active,
+            "entries_block_reason": daily_loss_block_reason,
+            "daily_loss_limit_brl": round(float(daily_loss_limit), 2),
+            "daily_loss_consumed_brl": round(float(daily_loss_consumed), 2),
+            "daily_realized_pnl_brl": round(float(daily_realized_running), 2),
+            "daily_loss_day_key": current_day_key,
+            "market_data_status": market_data_status,
+            "market_context": market_context,
+            "macro_alert": macro_alert,
+            "validation_cycle": cycle_validation,
+            "phase2_fine_tune": phase2_fine_tune,
+            "phase2_1_fine_tune": phase2_1_fine_tune,
+            "strategy_structure_audit": strategy_structure_audit,
+            "market_structure_audit": market_structure_audit,
+            "fib_alignment_audit": fib_alignment_audit,
+            "multi_timeframe_intraday_fetcher": multi_timeframe_intraday_fetch.summary,
+            "multi_timeframe_swing_audit": multi_timeframe_swing_audit,
+            "bos_pivot_trace_audit": bos_pivot_trace_audit,
+            "shadow_decision_simulator": shadow_decision_simulator,
+            "strategy_decision_bridge_trace": strategy_decision_bridge_trace,
+            "feed_scope_reconciliation": feed_scope_reconciliation,
+            "provider_budget_visual_fallback": provider_budget_visual_fallback,
+            "no_setup_eligible_decomposition": no_setup_eligible_decomposition,
+            "reversal_blocker_routing_audit": reversal_blocker_routing_audit,
+            "setup_blocker_taxonomy_audit": setup_blocker_taxonomy_audit,
+            "bos_confirmation_quality_audit": bos_confirmation_quality_audit,
+            "h1_confirmation_after_h4_bos_audit": h1_confirmation_after_h4_bos_audit,
+        }
+
+    except Exception:
+        from core.commit_protocol import post_commit_failure
+        failure = post_commit_failure(state['last_cycle_id'], confirmed=True)
+        return {**failure, "state": state, "signals": signals,
+                "trades_executed": len(trades_executed), "commit_outcome": failure['outcome']}

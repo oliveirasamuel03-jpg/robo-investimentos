@@ -253,6 +253,9 @@ def run_trader_cycle(*, persist_market_data: bool = True) -> dict:
     if not state["trader"].get("enabled", True):
         return {"status": "DISABLED"}
 
+    from core.commit_protocol import assert_execution_allowed, post_commit_failure, reconcile
+    assert_execution_allowed()
+    cycle_result = None
     cycle_id = uuid4().hex
     _cycle_phase(cycle_id, "PREPARING")
     try:
@@ -284,18 +287,30 @@ def run_trader_cycle(*, persist_market_data: bool = True) -> dict:
         if cycle_result.get("status") == "STOPPED":
             _cycle_phase(cycle_id, "IDLE")
             return {"status": "STOPPED", "committed": False, "cycle_result": cycle_result}
+        if cycle_result.get('commit_outcome') == 'POST_COMMIT_DIAGNOSTIC_FAILURE':
+            return {**cycle_result, 'status': state.get('bot_status')}
         if persist_market_data:
             update_market_data_status(cycle_result.get("market_data_status"))
         update_market_context_status(cycle_result.get("market_context"))
         report = build_paper_report()
         equity_df = read_paper_equity(limit=200)
+        current_status = load_bot_state().get("bot_status")
+        current_risk = load_bot_state().get("risk", {})
+        resolution = reconcile(cycle_result['cycle_id'])
+        if resolution['outcome'] == 'UNKNOWN_COMMIT' or not resolution.get('resolution_recorded', False):
+            failure = post_commit_failure(cycle_result['cycle_id'], confirmed=True)
+            return {**failure, 'commit_outcome': failure['outcome'], 'status': current_status}
         return {
-            "status": load_bot_state().get("bot_status"), "committed": True,
+            "commit_outcome": cycle_result['commit_outcome'], "cycle_id": cycle_result['cycle_id'],
+            "status": current_status, "committed": True,
             "cycle_result": cycle_result, "paper_report": report,
             "paper_equity": equity_df.to_dict(orient="records") if not equity_df.empty else [],
-            "broker_status": broker_status, "risk": load_bot_state().get("risk", {}),
+            "broker_status": broker_status, "risk": current_risk,
         }
     except Exception:
+        if cycle_result and cycle_result.get('committed'):
+            failure = post_commit_failure(cycle_result['cycle_id'], confirmed=True)
+            return {**failure, 'commit_outcome': failure['outcome'], 'status': state.get('bot_status')}
         # Best-effort diagnostic completion only; never retry the financial unit.
         # A database outage may leave PREPARING as last observed, not proof of life.
         try:
@@ -307,6 +322,8 @@ def run_trader_cycle(*, persist_market_data: bool = True) -> dict:
 
 @transactional_persistence
 def reset_trader_module() -> dict:
+    from core.commit_protocol import assert_execution_allowed
+    assert_execution_allowed()
     state = load_bot_state()
     cfg = build_paper_cfg_from_platform_state(state)
     reset_paper_state(cfg)

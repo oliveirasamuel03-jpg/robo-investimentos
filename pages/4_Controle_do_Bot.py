@@ -10,7 +10,7 @@ import streamlit as st
 from core.stop_control import start_robot
 from core.ui_mutations import (
     render_pending_intent, render_stop_status, request_stop_from_ui, run_ui_mutation,
-    visible_control_snapshot, classify_cycle_feedback, operational_status_label,
+    visible_control_snapshot, classify_cycle_feedback, operational_status_label, render_commit_control,
 )
 from core.alerts import send_email_alert
 from core.auth.guards import render_auth_toolbar, require_admin
@@ -2210,6 +2210,7 @@ mode = st.selectbox("Modo do bot", mode_options, index=mode_index)
 
 control_expected = visible_control_snapshot(ui=st, state=state, key="control")
 render_stop_status(ui=st, state=state)
+render_commit_control(ui=st, allow_reconcile=True)
 render_pending_intent(st)
 if st.button("⏹ Parar robô", use_container_width=True):
     request_stop_from_ui(ui=st, requested_by=current_user["username"])
@@ -2246,6 +2247,12 @@ with c2:
                     f"Trades feitos: {result.get('cycle_result', {}).get('trades_executed', 0)}. "
                     "A parada não cancela esse commit retroativamente."
                 )
+            elif feedback == "POST_COMMIT_DIAGNOSTIC_FAILURE":
+                st.warning("Commit financeiro confirmado; falha posterior ao commit. Não repita a operação; reconcilie o ciclo.")
+            elif feedback == "UNKNOWN_COMMIT":
+                st.error("Resultado financeiro desconhecido. Reconciliação necessária; novos ciclos bloqueados.")
+            elif feedback == "LOCAL_ONLY":
+                st.warning("Simulação em arquivos locais; isso não confirma COMMIT PostgreSQL nem libera operação prolongada.")
             elif feedback == "NOT_COMMITTED":
                 st.info("Ciclo não confirmado: nenhuma nova entrada foi confirmada por esta solicitação.")
             elif feedback == "COMMITTED":

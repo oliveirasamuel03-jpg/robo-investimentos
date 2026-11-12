@@ -8,6 +8,7 @@ import fcntl
 from contextlib import contextmanager
 from contextvars import ContextVar
 from functools import wraps
+from dataclasses import dataclass
 import os
 import tempfile
 from pathlib import Path
@@ -107,8 +108,21 @@ def _lock_namespace(conn, namespace):
     conn.execute("SELECT pg_advisory_xact_lock(%s)", (key,))
 
 
+@dataclass
+class TransactionWitness:
+    phase: str = "NOT_STARTED"
+
+
+def _transaction_context(conn, witness):
+    return conn.transaction()
+
+
+def _before_financial_commit(conn, witness):
+    """Fault-injection seam; production performs no work here."""
+
+
 @contextmanager
-def persistence_transaction(*namespaces):
+def persistence_transaction(*namespaces, witness=None):
     """One PostgreSQL unit of work. Local files retain per-file atomicity only.
 
     A single transaction lock precedes namespace locks, so nested writes to logs,
@@ -116,7 +130,11 @@ def persistence_transaction(*namespaces):
     writers until a narrower aggregate contract can be introduced and homologated.
     """
     if not database_enabled():
+        if witness is not None:
+            witness.phase = "BODY"
         yield
+        if witness is not None:
+            witness.phase = "LOCAL_COMPLETED"
         return
     active = _ACTIVE_CONNECTION.get()
     if active is not None:
@@ -126,16 +144,24 @@ def persistence_transaction(*namespaces):
             yield
         return
     _ensure_db_schema()
-    with _connect() as conn, conn.transaction():
-        conn.execute("SET LOCAL lock_timeout = '5s'")
-        _lock_namespace(conn, "atlas:persistence-unit")
-        for namespace in sorted(set(namespaces)):
-            _lock_namespace(conn, namespace)
-        token = _ACTIVE_CONNECTION.set(conn)
-        try:
-            yield
-        finally:
-            _ACTIVE_CONNECTION.reset(token)
+    with _connect() as conn:
+        with _transaction_context(conn, witness):
+            conn.execute("SET LOCAL lock_timeout = '5s'")
+            _lock_namespace(conn, "atlas:persistence-unit")
+            for namespace in sorted(set(namespaces)):
+                _lock_namespace(conn, namespace)
+            token = _ACTIVE_CONNECTION.set(conn)
+            if witness is not None:
+                witness.phase = "BODY"
+            try:
+                yield
+                if witness is not None:
+                    _before_financial_commit(conn, witness)
+                    witness.phase = "COMMIT_ATTEMPTED"
+            finally:
+                _ACTIVE_CONNECTION.reset(token)
+        if witness is not None:
+            witness.phase = "COMMITTED"
 
 
 def transactional_persistence(function):
@@ -316,6 +342,9 @@ def _guard_named_state(namespace, current_text, candidate):
     # Protect control intent even through the generic persistence API. This is
     # deliberately independent of UI conventions; external SQL/old writers still
     # require a coordinated rollout, as advisory locks always did.
+    from core.commit_protocol import guard_state_write
+    previous = _decode_json(current_text, dict, "state guard") if current_text is not None else {}
+    guard_state_write(namespace, previous, candidate)
     if namespace == "bot_state" and current_text is not None:
         from core.stop_control import guard_stop_transition
         guard_stop_transition(_decode_json(current_text, dict, "bot control"), candidate)
@@ -424,6 +453,8 @@ def load_json_rows(namespace: str, local_path: Path, limit: int | None = None) -
 
 
 def append_json_row(namespace, row, local_path):
+    from core.commit_protocol import guard_rows_write
+    guard_rows_write(namespace)
     if not isinstance(row, dict):
         raise PersistenceDataError("History row must be an object")
     text = _encode(row)
@@ -434,10 +465,13 @@ def append_json_row(namespace, row, local_path):
             _atomic_write_text(local_path, _encode(rows))
         return
     with persistence_transaction(namespace):
+        guard_rows_write(namespace)
         _ACTIVE_CONNECTION.get().execute("INSERT INTO app_rows(namespace,row_json) VALUES (%s,%s)", (namespace,text))
 
 
 def replace_json_rows(namespace, rows, local_path):
+    from core.commit_protocol import guard_rows_write
+    guard_rows_write(namespace)
     if not isinstance(rows, list) or any(not isinstance(row, dict) for row in rows):
         raise PersistenceDataError("History must be a list of objects")
     texts = [_encode(row) for row in rows]
@@ -449,6 +483,7 @@ def replace_json_rows(namespace, rows, local_path):
         return
     with persistence_transaction(namespace):
         conn = _ACTIVE_CONNECTION.get()
+        guard_rows_write(namespace)
         for row in conn.execute("SELECT row_json FROM app_rows WHERE namespace=%s", (namespace,)):
             _decode_json(row[0], dict, "database history before replacement")
         conn.execute("DELETE FROM app_rows WHERE namespace = %s", (namespace,))
@@ -485,6 +520,8 @@ def read_table(file_path: Path | str, columns: list[str] | None = None) -> pd.Da
 
 def append_table_row(file_path: Path | str, row: dict[str, Any], columns: list[str] | None = None) -> None:
     path = Path(file_path)
+    from core.commit_protocol import guard_rows_write
+    guard_rows_write(_table_namespace(path))
 
     if not database_enabled():
         with _local_lock(path):
@@ -498,6 +535,8 @@ def append_table_row(file_path: Path | str, row: dict[str, Any], columns: list[s
 
 def replace_table(file_path: Path | str, rows: list[dict[str, Any]], columns: list[str] | None = None) -> None:
     path = Path(file_path)
+    from core.commit_protocol import guard_rows_write
+    guard_rows_write(_table_namespace(path))
 
     if not database_enabled():
         path.parent.mkdir(parents=True, exist_ok=True)
