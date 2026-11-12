@@ -45,6 +45,7 @@ def main() -> int:
     parser.add_argument('--infra124-benchmark-only', action='store_true')
     parser.add_argument('--infra124-safety-only', action='store_true')
     parser.add_argument('--measurement-label', choices=('before','after'), default='after')
+    parser.add_argument('--infra125-only', choices=('safety','benchmark','all'))
     args = parser.parse_args()
     image = f"postgres:{args.version}{'-alpine' if args.alpine else ''}"
     if (ROOT / ".env").exists():
@@ -119,11 +120,15 @@ def main() -> int:
             os.environ["ROBO_STORAGE_DIR"] = directory
             sys.addaudithook(_loopback_only)
             import pytest
-            options = ["-q", "tests/test_infra12_postgres.py", "tests/test_infra12_retention_postgres.py", "tests/test_infra121_postgres.py", "tests/test_infra122_postgres.py", "tests/test_infra123_postgres.py", "tests/test_infra124_postgres.py"]
+            options = ["-q", "tests/test_infra12_postgres.py", "tests/test_infra12_retention_postgres.py", "tests/test_infra121_postgres.py", "tests/test_infra122_postgres.py", "tests/test_infra123_postgres.py", "tests/test_infra124_postgres.py", "tests/test_infra125_postgres.py"]
             if args.infra124_benchmark_only:
                 options = ['-q', 'tests/test_infra124_postgres.py', '-k', 'test_protocol_load']
             if args.infra124_safety_only:
                 options = ['-q', 'tests/test_infra124_postgres.py', '-k', 'not test_protocol_load']
+            if args.infra125_only:
+                options = ['-q', 'tests/test_infra125_postgres.py']
+                if args.infra125_only != 'all':
+                    options += ['-k', 'test_snapshot_benchmark' if args.infra125_only == 'benchmark' else 'not test_snapshot_benchmark']
             if args.junitxml:
                 options += [f"--junitxml={args.junitxml.resolve()}"]
             return pytest.main(options)
