@@ -1,0 +1,19 @@
+{"server_version": "16.15", "image": ["postgres@sha256:aa6cb33cf4c19c765cefcf48d96176258800870a9a1e930ad126200f9d825139"], "scope": "LOCAL_SYNTHETIC_ONLY", "broker_mode": "paper", "broker_provider": "paper", "listener": "127.0.0.1"}
+.....................................                                    [100%]
+=============================== warnings summary ===============================
+tests/test_infra125_postgres.py: 154 warnings
+  /workspace/robo-investimentos/core/multi_timeframe_swing_audit.py:182: FutureWarning: 'H' is deprecated and will be removed in a future version, please use 'h' instead.
+    resampled = data.resample(rule).agg(agg).dropna(subset=["open", "high", "low", "close"])
+
+tests/test_infra125_postgres.py: 150 warnings
+  /workspace/robo-investimentos/core/state_store.py:2329: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    state_written_at = datetime.utcnow().isoformat()
+
+tests/test_infra125_postgres.py::test_snapshot_recheck_refuses_any_intervening_relevant_write[heartbeat]
+  /workspace/robo-investimentos/core/state_store.py:2262: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    state["worker_heartbeat"] = datetime.utcnow().isoformat()
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+- generated xml file: /workspace/robo-investimentos/docs/retomada/evidencias/infra125-prototype16.xml -
+37 passed, 305 warnings in 387.04s (0:06:27)
+Disposable local PostgreSQL container and own volumes removed.

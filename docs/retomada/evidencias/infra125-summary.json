@@ -1,0 +1,228 @@
+{
+  "adversarial_final_stop_max_ms": 5043.514868999864,
+  "base_commit": "64ca64f25020983546bfbce8427e7adac437ddf1",
+  "baseline_cases_preserved": 619,
+  "benchmark_assessments": {
+    "pg16:0:current": {
+      "samples": 10,
+      "stop_timeouts": 0,
+      "unexecuted_repetitions": 0,
+      "within_candidate_budgets": true
+    },
+    "pg16:0:snapshot": {
+      "samples": 10,
+      "stop_timeouts": 0,
+      "unexecuted_repetitions": 0,
+      "within_candidate_budgets": true
+    },
+    "pg16:1000:current": {
+      "samples": 10,
+      "stop_timeouts": 0,
+      "unexecuted_repetitions": 0,
+      "within_candidate_budgets": true
+    },
+    "pg16:1000:snapshot": {
+      "samples": 10,
+      "stop_timeouts": 0,
+      "unexecuted_repetitions": 0,
+      "within_candidate_budgets": true
+    },
+    "pg16:5000:current": {
+      "samples": 10,
+      "stop_timeouts": 0,
+      "unexecuted_repetitions": 0,
+      "within_candidate_budgets": false
+    },
+    "pg16:5000:snapshot": {
+      "samples": 10,
+      "stop_timeouts": 0,
+      "unexecuted_repetitions": 0,
+      "within_candidate_budgets": false
+    },
+    "pg18:0:current": {
+      "samples": 10,
+      "stop_timeouts": 0,
+      "unexecuted_repetitions": 0,
+      "within_candidate_budgets": true
+    },
+    "pg18:0:snapshot": {
+      "samples": 10,
+      "stop_timeouts": 0,
+      "unexecuted_repetitions": 0,
+      "within_candidate_budgets": true
+    },
+    "pg18:1000:current": {
+      "samples": 10,
+      "stop_timeouts": 0,
+      "unexecuted_repetitions": 0,
+      "within_candidate_budgets": false
+    },
+    "pg18:1000:snapshot": {
+      "samples": 10,
+      "stop_timeouts": 0,
+      "unexecuted_repetitions": 0,
+      "within_candidate_budgets": true
+    },
+    "pg18:5000:current": {
+      "samples": 10,
+      "stop_timeouts": 0,
+      "unexecuted_repetitions": 0,
+      "within_candidate_budgets": false
+    },
+    "pg18:5000:snapshot": {
+      "samples": 10,
+      "stop_timeouts": 0,
+      "unexecuted_repetitions": 0,
+      "within_candidate_budgets": false
+    }
+  },
+  "branch": "atlas/infra-1-2-5-snapshot-transacional",
+  "deploy_command_executed": false,
+  "distinct_cases": 667,
+  "exploratory_adversarial_stop_ms": 5037.620108000056,
+  "financial_retry": false,
+  "hours72_authorized": false,
+  "implementation_commit": "91572f7bb3c4ab3b9b5fc80e05ccbbb5e9bbc664",
+  "integration": "REJECTED",
+  "load_stop_max_ms": 2901.354782999988,
+  "local_ddl": "PROTOTYPE_ONLY",
+  "merge_executed": false,
+  "mvcc_tests_commit": "c5349161181c692f91d3f637cde653c4081f49e1",
+  "new_offline_cases": 6,
+  "new_postgres_cases": 42,
+  "performance_conditions": "TEN_PER_CELL_SAME_ORDERED_STOP_BEFORE_POSTCOMMIT_VERIFIER",
+  "pr_created": false,
+  "profile_summary": [
+    {
+      "current_receipt_bytes_after10": 15756,
+      "current_worker_hold_median_ms": 438.4279759999572,
+      "events": 0,
+      "pg": 18,
+      "snapshot_full_verify_outside_median_ms": 35.54801900008897,
+      "snapshot_publication_hold_max_ms": 22.404325000024983,
+      "snapshot_publication_hold_median_ms": 10.801279499901284,
+      "snapshot_receipt_bytes_after10": 15756,
+      "snapshot_worker_hold_median_ms": 421.59379649956463
+    },
+    {
+      "current_receipt_bytes_after10": 15916,
+      "current_worker_hold_median_ms": 1329.3368195004405,
+      "events": 1000,
+      "pg": 18,
+      "snapshot_full_verify_outside_median_ms": 264.87576249974154,
+      "snapshot_publication_hold_max_ms": 31.533732999832864,
+      "snapshot_publication_hold_median_ms": 22.159331500006374,
+      "snapshot_receipt_bytes_after10": 15916,
+      "snapshot_worker_hold_median_ms": 901.9485829999212
+    },
+    {
+      "current_receipt_bytes_after10": 15936,
+      "current_worker_hold_median_ms": 4934.518765500343,
+      "events": 5000,
+      "pg": 18,
+      "snapshot_full_verify_outside_median_ms": 1347.5885724999443,
+      "snapshot_publication_hold_max_ms": 93.3304870000029,
+      "snapshot_publication_hold_median_ms": 71.63982999986729,
+      "snapshot_receipt_bytes_after10": 15936,
+      "snapshot_worker_hold_median_ms": 3094.061625499762
+    },
+    {
+      "current_receipt_bytes_after10": 15756,
+      "current_worker_hold_median_ms": 476.1079205004535,
+      "events": 0,
+      "pg": 16,
+      "snapshot_full_verify_outside_median_ms": 38.15269849997094,
+      "snapshot_publication_hold_max_ms": 43.50061500008451,
+      "snapshot_publication_hold_median_ms": 11.586710500068875,
+      "snapshot_receipt_bytes_after10": 15756,
+      "snapshot_worker_hold_median_ms": 421.1583920000521
+    },
+    {
+      "current_receipt_bytes_after10": 15916,
+      "current_worker_hold_median_ms": 1356.739994999998,
+      "events": 1000,
+      "pg": 16,
+      "snapshot_full_verify_outside_median_ms": 272.48569249991306,
+      "snapshot_publication_hold_max_ms": 38.416366999626916,
+      "snapshot_publication_hold_median_ms": 24.094017000152235,
+      "snapshot_receipt_bytes_after10": 15916,
+      "snapshot_worker_hold_median_ms": 921.6511090010044
+    },
+    {
+      "current_receipt_bytes_after10": 15936,
+      "current_worker_hold_median_ms": 5275.593511999432,
+      "events": 5000,
+      "pg": 16,
+      "snapshot_full_verify_outside_median_ms": 1332.1796209997956,
+      "snapshot_publication_hold_max_ms": 152.78136699998868,
+      "snapshot_publication_hold_median_ms": 69.24885500006894,
+      "snapshot_receipt_bytes_after10": 15936,
+      "snapshot_worker_hold_median_ms": 3042.5600959995336
+    }
+  ],
+  "railway_command_executed": false,
+  "receipt_format_migration": false,
+  "remote_migration": false,
+  "revision_only_proof": "REJECTED_LOSS_OF_COVERAGE",
+  "runtime_files_modified": [],
+  "scope": "LOCAL_SYNTHETIC_ONLY",
+  "test_runs": {
+    "absence16": {
+      "deselected": 40,
+      "errors": 0,
+      "failures": 0,
+      "passed": 2,
+      "seconds": 3.57,
+      "skipped": 0,
+      "tests": 2,
+      "warnings": 3
+    },
+    "absence18": {
+      "deselected": 40,
+      "errors": 0,
+      "failures": 0,
+      "passed": 2,
+      "seconds": 3.9,
+      "skipped": 0,
+      "tests": 2,
+      "warnings": 3
+    },
+    "offline": {
+      "deselected": 0,
+      "errors": 0,
+      "failures": 0,
+      "passed": 528,
+      "seconds": 37.82,
+      "skipped": 139,
+      "tests": 667,
+      "warnings": 105
+    },
+    "postgres16": {
+      "deselected": 0,
+      "errors": 0,
+      "failures": 0,
+      "passed": 137,
+      "seconds": 727.7,
+      "skipped": 0,
+      "tests": 137,
+      "warnings": 490
+    },
+    "postgres18": {
+      "deselected": 0,
+      "errors": 0,
+      "failures": 0,
+      "passed": 137,
+      "seconds": 717.94,
+      "skipped": 0,
+      "tests": 137,
+      "warnings": 490
+    }
+  },
+  "unresolved": [
+    "broad table lock delays STOP",
+    "financial unit still O(N)",
+    "benign byte-level snapshot conflicts",
+    "retention/receipt epoch compatibility",
+    "application ACL not homologated"
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "cases": {
+    "sigkill": {
+      "fault_type": "REAL_POSTGRES_CONTAINER_SIGKILL_AND_RESTART",
+      "financial_manifest_equal": true,
+      "fsync": "on",
+      "owned_anonymous_volume_retained": true,
+      "server_recovery_excerpt": [
+        "2026-11-12 12:28:33.198 UTC [30] LOG:  database system was interrupted; last known up at 2026-11-12 12:28:29 UTC",
+        "2026-11-12 12:28:33.449 UTC [30] LOG:  database system was not properly shut down; automatic recovery in progress",
+        "2026-11-12 12:28:33.450 UTC [30] LOG:  redo starts at 0/1513EAE0",
+        "2026-11-12 12:28:33.466 UTC [30] LOG:  redo done at 0/155F32B8 system usage: CPU: user: 0.00 s, system: 0.01 s, elapsed: 0.01 s",
+        "2026-11-12 12:28:33.609 UTC [1] LOG:  database system is ready to accept connections"
+      ],
+      "stop_failed_while_server_down": true,
+      "stop_preserved": true,
+      "synchronous_commit": "on",
+      "trades_not_reexecuted": true,
+      "unknown_preserved": true
+    }
+  },
+  "scope": "LOCAL_SYNTHETIC_ONLY"
+}

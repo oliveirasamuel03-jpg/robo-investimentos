@@ -1,0 +1,109 @@
+{
+  "cases": {
+    "cash": {
+      "baseline": "UNKNOWN_COMMIT",
+      "candidate": "UNKNOWN_COMMIT",
+      "financial_rows_unchanged": true,
+      "gate_kept_closed": true,
+      "prototype_integrated": false,
+      "same_outcome": true
+    },
+    "corrupt_receipt": {
+      "baseline": "UNKNOWN_COMMIT",
+      "candidate": "UNKNOWN_COMMIT",
+      "financial_rows_unchanged": true,
+      "gate_kept_closed": true,
+      "prototype_integrated": false,
+      "same_outcome": true
+    },
+    "delete_old": {
+      "baseline": "UNKNOWN_COMMIT",
+      "candidate": "UNKNOWN_COMMIT",
+      "financial_rows_unchanged": true,
+      "gate_kept_closed": true,
+      "prototype_integrated": false,
+      "same_outcome": true
+    },
+    "duplicate_report": {
+      "baseline": "UNKNOWN_COMMIT",
+      "candidate": "UNKNOWN_COMMIT",
+      "financial_rows_unchanged": true,
+      "gate_kept_closed": true,
+      "prototype_integrated": false,
+      "same_outcome": true
+    },
+    "duplicate_trade": {
+      "baseline": "UNKNOWN_COMMIT",
+      "candidate": "UNKNOWN_COMMIT",
+      "financial_rows_unchanged": true,
+      "gate_kept_closed": true,
+      "prototype_integrated": false,
+      "same_outcome": true
+    },
+    "event_order": {
+      "baseline": "UNKNOWN_COMMIT",
+      "candidate": "UNKNOWN_COMMIT",
+      "financial_rows_unchanged": true,
+      "gate_kept_closed": true,
+      "prototype_integrated": false,
+      "same_outcome": true
+    },
+    "insert_unwanted": {
+      "baseline": "UNKNOWN_COMMIT",
+      "candidate": "UNKNOWN_COMMIT",
+      "financial_rows_unchanged": true,
+      "gate_kept_closed": true,
+      "prototype_integrated": false,
+      "same_outcome": true
+    },
+    "intact": {
+      "baseline": "COMMITTED",
+      "candidate": "COMMITTED",
+      "financial_rows_unchanged": true,
+      "gate_kept_closed": true,
+      "prototype_integrated": false,
+      "same_outcome": true
+    },
+    "json": {
+      "baseline": "UNKNOWN_COMMIT",
+      "candidate": "UNKNOWN_COMMIT",
+      "financial_rows_unchanged": true,
+      "gate_kept_closed": true,
+      "prototype_integrated": false,
+      "same_outcome": true
+    },
+    "missing_receipt": {
+      "baseline": "UNKNOWN_COMMIT",
+      "candidate": "UNKNOWN_COMMIT",
+      "financial_rows_unchanged": true,
+      "gate_kept_closed": true,
+      "prototype_integrated": false,
+      "same_outcome": true
+    },
+    "position": {
+      "baseline": "UNKNOWN_COMMIT",
+      "candidate": "UNKNOWN_COMMIT",
+      "financial_rows_unchanged": true,
+      "gate_kept_closed": true,
+      "prototype_integrated": false,
+      "same_outcome": true
+    },
+    "receipt": {
+      "baseline": "UNKNOWN_COMMIT",
+      "candidate": "UNKNOWN_COMMIT",
+      "financial_rows_unchanged": true,
+      "gate_kept_closed": true,
+      "prototype_integrated": false,
+      "same_outcome": true
+    },
+    "same_count_value": {
+      "baseline": "UNKNOWN_COMMIT",
+      "candidate": "UNKNOWN_COMMIT",
+      "financial_rows_unchanged": true,
+      "gate_kept_closed": true,
+      "prototype_integrated": false,
+      "same_outcome": true
+    }
+  },
+  "scope": "LOCAL_SYNTHETIC_ONLY"
+}

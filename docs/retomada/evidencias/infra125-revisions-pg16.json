@@ -1,0 +1,18 @@
+{
+  "cases": {
+    "privileged_bypass": {
+      "ddl_scope": "LOCAL_DISPOSABLE_ONLY",
+      "full_and_snapshot_detected": true,
+      "revision_only_optimization": "REJECTED_LOSS_OF_COVERAGE",
+      "revision_unchanged_despite_tampering": true
+    },
+    "transactional_behavior": {
+      "namespace_move_tracked": true,
+      "remote_migration": false,
+      "rollback_restored_revisions": true,
+      "second_install_refused": true,
+      "truncate_epoch_observed_only_in_rolled_back_savepoint": true
+    }
+  },
+  "scope": "LOCAL_SYNTHETIC_ONLY"
+}

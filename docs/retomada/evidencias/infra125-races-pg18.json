@@ -1,0 +1,72 @@
+{
+  "cases": {
+    "external_sql_table_fence": {
+      "actual_relation_wait_observed": true,
+      "later_tampering_detected": true
+    },
+    "heartbeat": {
+      "financial_retry": false,
+      "heartbeat_false_conflict": true,
+      "no_automatic_reverification": true,
+      "stale_proof_rejected": true
+    },
+    "inflight_commit": {
+      "actual_advisory_wait_observed": true,
+      "financial_committed_on_server": true,
+      "financial_retry": false,
+      "published_outcome": "UNKNOWN_COMMIT",
+      "rollback_fault": null,
+      "snapshot_absence_was_tentative_only": true,
+      "trades": 1
+    },
+    "inflight_rollback": {
+      "actual_advisory_wait_observed": true,
+      "financial_committed_on_server": false,
+      "financial_retry": false,
+      "published_outcome": "NOT_COMMITTED",
+      "rollback_fault": "PYTHON_BODY_INJECTION",
+      "snapshot_absence_was_tentative_only": true,
+      "trades": 0
+    },
+    "old_cycle_identity": {
+      "financial_retry": false,
+      "newer_gate_preserved": true,
+      "newer_receipt_preserved": true
+    },
+    "receipt": {
+      "financial_retry": false,
+      "heartbeat_false_conflict": false,
+      "no_automatic_reverification": true,
+      "stale_proof_rejected": true
+    },
+    "retention": {
+      "financial_retry": false,
+      "heartbeat_false_conflict": false,
+      "no_automatic_reverification": true,
+      "stale_proof_rejected": true
+    },
+    "stop_during_publication": {
+      "actual_advisory_wait_observed": true,
+      "no_new_financial_unit": true,
+      "stop_verified": true
+    },
+    "stop_during_snapshot": {
+      "fresh_explicit_reconciliation_no_trade": true,
+      "old_proof_could_not_clear_gate": true,
+      "old_snapshot_consistent": true,
+      "stop_persisted_without_writer_fence": true
+    },
+    "two_publishers": {
+      "financial_retry": false,
+      "only_one_metadata_commit": true,
+      "stale_publisher_rejected": true
+    },
+    "value": {
+      "financial_retry": false,
+      "heartbeat_false_conflict": false,
+      "no_automatic_reverification": true,
+      "stale_proof_rejected": true
+    }
+  },
+  "scope": "LOCAL_SYNTHETIC_ONLY"
+}

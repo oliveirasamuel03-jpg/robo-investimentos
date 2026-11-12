@@ -1,0 +1,60 @@
+{
+  "cases": {
+    "bookkeeping_rollback": {
+      "all_metadata_rolled_back": true,
+      "fault_type": "PYTHON_INJECTION_BEFORE_METADATA_COMMIT",
+      "financial_retry": false
+    },
+    "financial_reply_lost": {
+      "explicit_candidate_outcome": "COMMITTED",
+      "fault_type": "REAL_LOOPBACK_TCP_SERVER_REPLY_WITHHELD",
+      "financial_retry": false,
+      "fresh_interpreter_blocked": true,
+      "stop_preserved": true,
+      "trades": 3
+    },
+    "metadata_reply_lost": {
+      "application_did_not_claim_resolution_recorded": true,
+      "fault_type": "REAL_LOOPBACK_TCP_SERVER_REPLY_WITHHELD",
+      "financial_retry": false,
+      "proxy_events": [
+        {
+          "backend_pid": 9787,
+          "complete_commit_forwarded": true,
+          "fault": "drop_commit_reply",
+          "monotonic": 2486.877616132
+        },
+        {
+          "backend_pid": 9787,
+          "fault": "server_commit_reply_dropped",
+          "monotonic": 2486.878258454,
+          "real_socket_close": true,
+          "reply_bytes_withheld": 12,
+          "server_command_complete_commit": true
+        }
+      ],
+      "server_gate_release_observed_independently": true
+    },
+    "postgres_restart": {
+      "canonical_capture_equal": true,
+      "fault_type": "REAL_OWNED_POSTGRES_SIGKILL_AND_RESTART",
+      "financial_retry": false,
+      "fresh_explicit_reconciliation": "COMMITTED",
+      "old_snapshot_rejected_by_server_epoch": true,
+      "stop_while_down_unconfirmed": true
+    },
+    "snapshot_tcp_loss": {
+      "fault_type": "REAL_LOOPBACK_TCP_SOCKET_CLOSE",
+      "gate_kept_closed": true,
+      "proxy_events": [
+        {
+          "backend_pid": 9978,
+          "fault": "snapshot_read_failure",
+          "monotonic": 2490.270546916,
+          "real_socket_close": true
+        }
+      ]
+    }
+  },
+  "scope": "LOCAL_SYNTHETIC_ONLY"
+}

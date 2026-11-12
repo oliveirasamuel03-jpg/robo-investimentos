@@ -1,0 +1,18 @@
+{
+  "cases": {
+    "external_unrelated_table_lock": {
+      "baseline_reconciliation_ms": 26.825339999959397,
+      "candidate_error_code": "LockNotAvailable",
+      "candidate_outcome": "UNKNOWN_COMMIT",
+      "financial_retry": false,
+      "integration": "REJECTED_BROAD_LOCK_CONTENTION",
+      "lock_timeout_seconds": 5,
+      "relation_lock_wait_observed": true,
+      "stop_persisted": true,
+      "stop_status": "PERSISTED",
+      "stop_verified_ms": 5037.620108000056
+    }
+  },
+  "provenance": "EXPLORATORY: offline suite overlapped this run; excluded as a whole from final paired performance comparison. Raw samples retained.",
+  "scope": "LOCAL_SYNTHETIC_ONLY"
+}

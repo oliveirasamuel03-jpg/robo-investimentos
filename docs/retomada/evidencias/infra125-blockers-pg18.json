@@ -1,0 +1,24 @@
+{
+  "cases": {
+    "external_unrelated_table_lock": {
+      "baseline_reconciliation_ms": 19.667100999868126,
+      "candidate_error_code": "LockNotAvailable",
+      "candidate_outcome": "UNKNOWN_COMMIT",
+      "financial_retry": false,
+      "integration": "REJECTED_BROAD_LOCK_CONTENTION",
+      "lock_timeout_seconds": 5,
+      "relation_lock_wait_observed": true,
+      "stop_persisted": true,
+      "stop_status": "PERSISTED",
+      "stop_verified_ms": 5043.514868999864
+    },
+    "retention": {
+      "active_gate_rolled_back_maintenance": true,
+      "archive_compatibility": "NOT_PROVEN_FOR_OPERATIONAL_INTEGRATION",
+      "committed_archive_invalidated_old_proof": true,
+      "current_verifier_also_unknown_after_archive": true,
+      "history_preserved_in_archive": true
+    }
+  },
+  "scope": "LOCAL_SYNTHETIC_ONLY"
+}

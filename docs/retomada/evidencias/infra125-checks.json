@@ -1,0 +1,155 @@
+{
+  "scope": "LOCAL_SYNTHETIC_ONLY",
+  "base_commit": "64ca64f25020983546bfbce8427e7adac437ddf1",
+  "unchanged_product_files": [
+    {
+      "path": "core/commit_protocol.py",
+      "sha256": "fbb07c0d62fface93928e7ffd8ad1a2c9345e4a35854847bbfd29b96f02c063a",
+      "identical_to_base": true
+    },
+    {
+      "path": "core/persistence.py",
+      "sha256": "57c4c9e85b319d62f802f6a91743c92a8c0a80b05a7b7e2264f1092d99345075",
+      "identical_to_base": true
+    },
+    {
+      "path": "core/stop_control.py",
+      "sha256": "cbfab8f84425d56cec20dce55972ec5308cdfa1933f0f0853e81f87151615a8e",
+      "identical_to_base": true
+    },
+    {
+      "path": "core/state_store.py",
+      "sha256": "341a3669f919383b9cc24f92d21d7139d79d47846b469fcf51f292ce17cb95ef",
+      "identical_to_base": true
+    },
+    {
+      "path": "core/retention.py",
+      "sha256": "69b95f6312b6b96687283e9c62c87afa88349209d2004da4b67c4c3d0d372cfb",
+      "identical_to_base": true
+    },
+    {
+      "path": "engines/trader_engine.py",
+      "sha256": "09a0df46873ecd497b8d2511cb136ceec0ec9e7c5c4695ec740dd667d706bd73",
+      "identical_to_base": true
+    },
+    {
+      "path": "paper_trading_engine.py",
+      "sha256": "539cbc6bbae7899aa91b654527dcd6d10c76e6e1e27fef548779094c4c28df56",
+      "identical_to_base": true
+    },
+    {
+      "path": "workers/trader_worker.py",
+      "sha256": "265a8b96725e00f8f7f03072ffefb5eee5f34b6ada15c9986332ce414f852b22",
+      "identical_to_base": true
+    }
+  ],
+  "baseline_test_ids_preserved": 619,
+  "final_distinct_case_ids": 667,
+  "new_cases": 48,
+  "checks": [
+    {
+      "command": [
+        ".venv/bin/python",
+        "-m",
+        "compileall",
+        "-q",
+        "core",
+        "engines",
+        "workers",
+        "pages",
+        "scripts",
+        "tests",
+        "paper_trading_engine.py"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        ".venv/bin/python",
+        "-m",
+        "pip",
+        "check"
+      ],
+      "exit_code": 0,
+      "stdout": "No broken requirements found.\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        ".venv/bin/python",
+        "-m",
+        "compileall",
+        "-q",
+        "core",
+        "engines",
+        "workers",
+        "pages",
+        "scripts",
+        "tests",
+        "paper_trading_engine.py"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": "",
+      "scope": "final source including MVCC tests"
+    },
+    {
+      "command": [
+        ".venv/bin/python",
+        "-m",
+        "pip",
+        "check"
+      ],
+      "exit_code": 0,
+      "stdout": "No broken requirements found.\n",
+      "stderr": "",
+      "scope": "final source including MVCC tests"
+    },
+    {
+      "command": [
+        "git",
+        "diff",
+        "64ca64f25020983546bfbce8427e7adac437ddf1",
+        "HEAD",
+        "--check"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": "",
+      "scope": "final source including MVCC tests"
+    },
+    {
+      "command": [
+        "git",
+        "diff",
+        "--cached",
+        "--check"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": "",
+      "scope": "all final documentation/evidence staged"
+    }
+  ],
+  "python_version": "Python 3.12.14",
+  "implementation_commit": "91572f7bb3c4ab3b9b5fc80e05ccbbb5e9bbc664",
+  "mvcc_tests_commit": "c5349161181c692f91d3f637cde653c4081f49e1",
+  "secret_scan": {
+    "candidate_files": 47,
+    "matches": 0,
+    "patterns": "GitHub tokens, URI passwords, password= literal",
+    "limitation": "Pattern scan, not a universal secret detector"
+  }
+}

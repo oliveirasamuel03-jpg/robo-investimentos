@@ -1,0 +1,16 @@
+{"server_version": "18.6 (Debian 18.6-1.pgdg13+2)", "image": ["postgres@sha256:e3d24f6906d0760bf4da0dae872415391ededefad23fd471c47dc53b0ddf3c42"], "scope": "LOCAL_SYNTHETIC_ONLY", "broker_mode": "paper", "broker_provider": "paper", "listener": "127.0.0.1"}
+..                                                                       [100%]
+=============================== warnings summary ===============================
+tests/test_infra125_postgres.py::test_inflight_financial_unit_does_not_publish_tentative_snapshot_absence[True]
+tests/test_infra125_postgres.py::test_inflight_financial_unit_does_not_publish_tentative_snapshot_absence[False]
+  /workspace/robo-investimentos/core/multi_timeframe_swing_audit.py:182: FutureWarning: 'H' is deprecated and will be removed in a future version, please use 'h' instead.
+    resampled = data.resample(rule).agg(agg).dropna(subset=["open", "high", "low", "close"])
+
+tests/test_infra125_postgres.py::test_inflight_financial_unit_does_not_publish_tentative_snapshot_absence[True]
+  /workspace/robo-investimentos/core/state_store.py:2329: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    state_written_at = datetime.utcnow().isoformat()
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+- generated xml file: /workspace/robo-investimentos/docs/retomada/evidencias/infra125-absence18.xml -
+2 passed, 40 deselected, 3 warnings in 3.90s
+Disposable local PostgreSQL container and own volumes removed.
