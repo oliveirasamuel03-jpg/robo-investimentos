@@ -198,7 +198,10 @@ def render_commit_control(*, ui, allow_reconcile=False):
                  'nenhum novo ciclo financeiro está autorizado. Isso não substitui STOP do operador.')
     if ui.button('Verificar reconciliação (sem operar)', disabled=not allow_reconcile):
         result = reconcile(status['cycle_id'])
-        if result['outcome'] == 'COMMITTED' and not result.get('resolution_recorded', False):
+        if result.get('historical'):
+            ui.info('Recibo histórico verificado anteriormente; não é uma reconciliação do estado atual. '
+                    'A intenção atual e sua barreira não foram alteradas. Recarregue os dados.')
+        elif result['outcome'] == 'COMMITTED' and not result.get('resolution_recorded', False):
             ui.warning('COMMITTED verificado; registro/liberação da reconciliação não confirmado. '
                        'Não repita a operação. Recarregue o bloqueio e verifique a conexão.')
         elif result['outcome'] == 'COMMITTED':

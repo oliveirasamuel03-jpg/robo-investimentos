@@ -12,6 +12,7 @@ import json
 import os
 from pathlib import Path
 import secrets
+import socket
 import subprocess
 import sys
 import tempfile
@@ -19,6 +20,21 @@ import time
 
 ROOT = Path(__file__).resolve().parents[1]
 DOCKER = ["docker", "--host=unix:///var/run/docker.sock"]
+
+
+def _loopback_only(event, arguments):
+    """PG tests may open Python TCP sockets only on 127.0.0.1.
+
+    libpq DSNs and Docker endpoints are separately constrained by the runner.
+    This hook is installed only after the owned local server is ready.
+    """
+    if event == 'socket.getaddrinfo':
+        if arguments[0] not in {'127.0.0.1', None}:
+            raise RuntimeError('Local PostgreSQL tests: non-loopback resolution blocked')
+    elif event in {'socket.connect', 'socket.bind', 'socket.sendto'}:
+        address = arguments[-1]
+        if isinstance(address, tuple) and address[0] != '127.0.0.1':
+            raise RuntimeError('Local PostgreSQL tests: non-loopback TCP blocked')
 
 
 def main() -> int:
@@ -58,10 +74,13 @@ def main() -> int:
         # Pulling an image is a local download, never provisioning infrastructure.
         image_info = json.loads(docker("image", "inspect", image).stdout)[0]
         mount = "/var/lib/postgresql" if args.version == "18" else "/var/lib/postgresql/data"
+        with socket.socket() as port_probe:
+            port_probe.bind(('127.0.0.1', 0))
+            published_port = port_probe.getsockname()[1]
         container = docker("create", "--name", name,
                            "--label", "atlas.scope=infra12-local-synthetic",
                            "--memory", "512m", "--cpus", "1",
-                           "--publish", "127.0.0.1::5432", "--tmpfs", mount,
+                           "--publish", f"127.0.0.1:{published_port}:5432", "--volume", mount,
                            "--env", "POSTGRES_PASSWORD", "--env", "POSTGRES_USER=atlas_fixture",
                            image,
                            env={**os.environ, "POSTGRES_PASSWORD": password}).stdout.decode().strip()
@@ -94,8 +113,9 @@ def main() -> int:
         os.chdir(ROOT)
         with tempfile.TemporaryDirectory(prefix="atlas-infra12-storage-") as directory:
             os.environ["ROBO_STORAGE_DIR"] = directory
+            sys.addaudithook(_loopback_only)
             import pytest
-            options = ["-q", "tests/test_infra12_postgres.py", "tests/test_infra12_retention_postgres.py", "tests/test_infra121_postgres.py", "tests/test_infra122_postgres.py"]
+            options = ["-q", "tests/test_infra12_postgres.py", "tests/test_infra12_retention_postgres.py", "tests/test_infra121_postgres.py", "tests/test_infra122_postgres.py", "tests/test_infra123_postgres.py"]
             if args.junitxml:
                 options += [f"--junitxml={args.junitxml.resolve()}"]
             return pytest.main(options)

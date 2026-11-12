@@ -240,6 +240,15 @@ def reconcile(cycle_id=None, *, release=True):
             receipt = _receipt(cycle_id)
             if receipt.get('cycle_id') != cycle_id or not receipt.get('before'):
                 raise ReconciliationRequired(cycle_id, 'MISSING_RECEIPT')
+            if not active and gate.get('last_cycle_id') != cycle_id:
+                # A resolved older receipt is historical evidence, not a claim
+                # about today's manifest and never an authorization to clear it.
+                if receipt.get('resolution') not in {'COMMITTED', 'NOT_COMMITTED', 'LOCAL_ONLY'} or not receipt.get('verified_at'):
+                    raise ReconciliationRequired(cycle_id, 'HISTORICAL_RECEIPT_NOT_VERIFIED')
+                return {'outcome': receipt['resolution'], 'blocked': False, 'cycle_id': cycle_id,
+                        'historical': True, 'current_cycle_id': gate.get('last_cycle_id'),
+                        'evidence': 'PREVIOUSLY_VERIFIED_RECEIPT_NOT_CURRENT_STATE',
+                        'resolution_recorded': True}
             current = manifest()
             status = receipt.get('status')
             if status == 'COMMITTED' and current == receipt.get('after'):
@@ -319,18 +328,24 @@ def reconcile(cycle_id=None, *, release=True):
 
 def post_commit_failure(cycle_id, *, confirmed=False):
     """Presentation failed after the financial commit was positively verified."""
+    stale_diagnostic = False
+    current_cycle_id = None
     try:
         with _scope(), protocol_write():
             gate = _gate()
+            current_cycle_id = gate.get('active_cycle_id') or gate.get('last_cycle_id')
+            stale_diagnostic = current_cycle_id not in {None, cycle_id}
             receipt = _receipt(cycle_id)
             if receipt.get('status') != 'COMMITTED':
                 raise ReconciliationRequired(cycle_id)
             confirmed = True
             receipt['diagnostic_status'] = 'POST_COMMIT_DIAGNOSTIC_FAILURE'
-            receipt['events'].append('POST_COMMIT_DIAGNOSTIC_FAILURE')
+            receipt['events'].append('LATE_DIAGNOSTIC' if stale_diagnostic else 'POST_COMMIT_DIAGNOSTIC_FAILURE')
+            if stale_diagnostic:
+                receipt['superseded_by'] = current_cycle_id
             p.save_json_state(RECEIPT_PREFIX + cycle_id, receipt, _receipt_path(cycle_id))
             # Retain a conservative fence until explicit reconciliation.
-            if gate.get('active_cycle_id') in {None, cycle_id}:
+            if not stale_diagnostic and gate.get('active_cycle_id') in {None, cycle_id}:
                 gate.update(active_cycle_id=cycle_id, reason='POST_COMMIT_DIAGNOSTIC_FAILURE')
                 p.save_json_state(GATE, gate, _GATE_PATH)
     except Exception:
@@ -340,4 +355,5 @@ def post_commit_failure(cycle_id, *, confirmed=False):
     if not confirmed:
         return {'outcome': 'UNKNOWN_COMMIT', 'committed': False, 'cycle_id': cycle_id}
     return {'outcome': 'POST_COMMIT_DIAGNOSTIC_FAILURE' if p.database_enabled() else 'LOCAL_ONLY',
-            'committed': True, 'cycle_id': cycle_id, 'diagnostic_status': 'POST_COMMIT_DIAGNOSTIC_FAILURE'}
+            'committed': True, 'cycle_id': cycle_id, 'diagnostic_status': 'POST_COMMIT_DIAGNOSTIC_FAILURE',
+            'stale_diagnostic': stale_diagnostic, 'current_cycle_id': current_cycle_id}

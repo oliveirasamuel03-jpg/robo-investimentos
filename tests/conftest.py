@@ -96,3 +96,26 @@ def fake_market_result(frames, requested_by="worker_cycle"):
         "source_breakdown": counts, "symbols": list(frames),
         "requested_by": requested_by, "last_error": "",
     }}
+
+
+@pytest.fixture(autouse=True)
+def cleanup_owned_postgres_test_databases():
+    """Bound local durable-volume growth; never connects without runner opt-in."""
+    import os
+    if os.getenv('ATLAS_INFRA12_LOCAL_RUN') != 'synthetic-disposable-only':
+        yield
+        return
+    import psycopg
+    from psycopg import sql
+    from psycopg.conninfo import conninfo_to_dict
+    dsn = os.environ['ATLAS_INFRA12_LOCAL_DSN']
+    params = conninfo_to_dict(dsn)
+    assert params['host'] == '127.0.0.1' and params['dbname'] == 'postgres' and params['user'] == 'atlas_fixture'
+    with psycopg.connect(dsn, autocommit=True) as conn:
+        before = {r[0] for r in conn.execute('SELECT datname FROM pg_database')}
+    yield
+    with psycopg.connect(dsn, autocommit=True) as conn:
+        added = {r[0] for r in conn.execute('SELECT datname FROM pg_database')} - before
+        for name in added:
+            assert name.startswith(('atlas_infra12_', 'atlas_infra123_')), 'Unexpected database: refuse cleanup'
+            conn.execute(sql.SQL('DROP DATABASE {} WITH (FORCE)').format(sql.Identifier(name)))
