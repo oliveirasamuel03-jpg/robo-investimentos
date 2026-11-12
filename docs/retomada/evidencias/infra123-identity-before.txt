@@ -1,0 +1,100 @@
+F.F                                                                      [100%]
+=================================== FAILURES ===================================
+____ test_late_diagnostic_cannot_reopen_old_intent_after_newer_confirmation ____
+
+isolated_storage = PosixPath('/tmp/pytest-of-agent/pytest-53/test_late_diagnostic_cannot_re0/storage')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7fd003bdbb00>
+
+    def test_late_diagnostic_cannot_reopen_old_intent_after_newer_confirmation(isolated_storage, monkeypatch):
+        paper, cfg, q, first, second = _two_cycles(monkeypatch)
+        before = dict(q._gate())
+        result = q.post_commit_failure(first, confirmed=True)
+>       assert dict(q._gate()) == before
+E       AssertionError: assert {'active_cycl...FAILURE', ...} == {'active_cycl...son': '', ...}
+E
+E         Omitting 3 identical items, use -vv to show
+E         Differing items:
+E         {'reason': 'POST_COMMIT_DIAGNOSTIC_FAILURE'} != {'reason': ''}
+E         {'active_cycle_id': 'b51f741c02a4475e938b004cadbbdde9'} != {'active_cycle_id': None}
+E         Use -v to get more diff
+
+tests/test_infra123_identity.py:17: AssertionError
+------------------------------ Captured log call -------------------------------
+ERROR    yfinance:base.py:131 Failed to get ticker 'AAPL' reason: Offline tests: network/process execution blocked
+ERROR    yfinance:multi.py:181
+1 Failed download:
+ERROR    yfinance:multi.py:194 ['AAPL']: RuntimeError('Offline tests: network/process execution blocked')
+ERROR    yfinance:base.py:131 Failed to get ticker 'AAPL' reason: Offline tests: network/process execution blocked
+ERROR    yfinance:multi.py:181
+1 Failed download:
+ERROR    yfinance:multi.py:194 ['AAPL']: RuntimeError('Offline tests: network/process execution blocked')
+ERROR    yfinance:base.py:131 Failed to get ticker 'BTC-USD' reason: Offline tests: network/process execution blocked
+ERROR    yfinance:multi.py:181
+1 Failed download:
+ERROR    yfinance:multi.py:194 ['BTC-USD']: RuntimeError('Offline tests: network/process execution blocked')
+ERROR    yfinance:base.py:131 Failed to get ticker 'AAPL' reason: Offline tests: network/process execution blocked
+ERROR    yfinance:multi.py:181
+1 Failed download:
+ERROR    yfinance:multi.py:194 ['AAPL']: RuntimeError('Offline tests: network/process execution blocked')
+ERROR    yfinance:base.py:131 Failed to get ticker 'AAPL' reason: Offline tests: network/process execution blocked
+ERROR    yfinance:multi.py:181
+1 Failed download:
+ERROR    yfinance:multi.py:194 ['AAPL']: RuntimeError('Offline tests: network/process execution blocked')
+ERROR    yfinance:base.py:131 Failed to get ticker 'BTC-USD' reason: Offline tests: network/process execution blocked
+ERROR    yfinance:multi.py:181
+1 Failed download:
+ERROR    yfinance:multi.py:194 ['BTC-USD']: RuntimeError('Offline tests: network/process execution blocked')
+_________ test_historical_receipt_is_not_reconciled_as_current_intent __________
+
+isolated_storage = PosixPath('/tmp/pytest-of-agent/pytest-53/test_historical_receipt_is_not0/storage')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7fd0033a6f60>
+
+    def test_historical_receipt_is_not_reconciled_as_current_intent(isolated_storage, monkeypatch):
+        paper, cfg, q, first, second = _two_cycles(monkeypatch)
+        before = dict(q._gate())
+        result = q.reconcile(first)
+>       assert result['historical'] is True and result['current_cycle_id'] == second
+E       KeyError: 'historical'
+
+tests/test_infra123_identity.py:39: KeyError
+------------------------------ Captured log call -------------------------------
+ERROR    yfinance:base.py:131 Failed to get ticker 'AAPL' reason: Offline tests: network/process execution blocked
+ERROR    yfinance:multi.py:181
+1 Failed download:
+ERROR    yfinance:multi.py:194 ['AAPL']: RuntimeError('Offline tests: network/process execution blocked')
+ERROR    yfinance:base.py:131 Failed to get ticker 'AAPL' reason: Offline tests: network/process execution blocked
+ERROR    yfinance:multi.py:181
+1 Failed download:
+ERROR    yfinance:multi.py:194 ['AAPL']: RuntimeError('Offline tests: network/process execution blocked')
+ERROR    yfinance:base.py:131 Failed to get ticker 'BTC-USD' reason: Offline tests: network/process execution blocked
+ERROR    yfinance:multi.py:181
+1 Failed download:
+ERROR    yfinance:multi.py:194 ['BTC-USD']: RuntimeError('Offline tests: network/process execution blocked')
+ERROR    yfinance:base.py:131 Failed to get ticker 'AAPL' reason: Offline tests: network/process execution blocked
+ERROR    yfinance:multi.py:181
+1 Failed download:
+ERROR    yfinance:multi.py:194 ['AAPL']: RuntimeError('Offline tests: network/process execution blocked')
+ERROR    yfinance:base.py:131 Failed to get ticker 'AAPL' reason: Offline tests: network/process execution blocked
+ERROR    yfinance:multi.py:181
+1 Failed download:
+ERROR    yfinance:multi.py:194 ['AAPL']: RuntimeError('Offline tests: network/process execution blocked')
+ERROR    yfinance:base.py:131 Failed to get ticker 'BTC-USD' reason: Offline tests: network/process execution blocked
+ERROR    yfinance:multi.py:181
+1 Failed download:
+ERROR    yfinance:multi.py:194 ['BTC-USD']: RuntimeError('Offline tests: network/process execution blocked')
+=============================== warnings summary ===============================
+tests/test_infra123_identity.py::test_late_diagnostic_cannot_reopen_old_intent_after_newer_confirmation
+tests/test_infra123_identity.py::test_late_diagnostic_cannot_reopen_old_intent_after_newer_confirmation
+tests/test_infra123_identity.py::test_old_reconciliation_and_diagnostic_never_release_new_pending_intent
+tests/test_infra123_identity.py::test_old_reconciliation_and_diagnostic_never_release_new_pending_intent
+tests/test_infra123_identity.py::test_historical_receipt_is_not_reconciled_as_current_intent
+tests/test_infra123_identity.py::test_historical_receipt_is_not_reconciled_as_current_intent
+  /workspace/robo-investimentos/core/multi_timeframe_swing_audit.py:182: FutureWarning: 'H' is deprecated and will be removed in a future version, please use 'h' instead.
+    resampled = data.resample(rule).agg(agg).dropna(subset=["open", "high", "low", "close"])
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_infra123_identity.py::test_late_diagnostic_cannot_reopen_old_intent_after_newer_confirmation
+FAILED tests/test_infra123_identity.py::test_historical_receipt_is_not_reconciled_as_current_intent
+2 failed, 1 passed, 6 warnings in 2.22s
+Offline guard: 36 network/process attempts blocked.

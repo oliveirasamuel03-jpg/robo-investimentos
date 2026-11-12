@@ -1,0 +1,94 @@
+Initial expanded run: 8 failed,74 passed,106 warnings. All eight failures: incorrect assumed sequence name.
+Full temporary log SHA256: 9d0e9da68998588b87f3602718314c6d1ef632328e8b8323a0a8f784e58aaa05
+
+{"server_version": "18.6 (Debian 18.6-1.pgdg13+2)", "image": ["postgres@sha256:e3d24f6906d0760bf4da0dae872415391ededefad23fd471c47dc53b0ddf3c42"], "scope": "LOCAL_SYNTHETIC_ONLY", "broker_mode": "paper", "broker_provider": "paper", "listener": "127.0.0.1"}
+........................................................................ [ 87%]
+FFFFF..FFF                                                               [100%]
+=================================== FAILURES ===================================
+___ test_synthetic_backup_restore_preserves_all_state_and_quarantines[clean] ___
+
+pg = (<module 'core.persistence' from '/workspace/robo-investimentos/core/persistence.py'>, <psycopg.Connection [IDLE] (hos...9d6065 host=127.0.0.1 port=55709', PosixPath('/tmp/pytest-of-agent/pytest-56/test_synthetic_backup_restore_0/storage'))
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7fd2661d9490>
+tmp_path = PosixPath('/tmp/pytest-of-agent/pytest-56/test_synthetic_backup_restore_0')
+scenario = 'clean'
+
+    @pytest.mark.parametrize('scenario',['clean','unknown','stopped','missing_receipt','corrupt_receipt'])
+    def test_synthetic_backup_restore_preserves_all_state_and_quarantines(pg, monkeypatch, tmp_path, scenario):
+        import psycopg
+        from scripts.local_synthetic_backup import dump_restore
+        unknown = scenario in {'unknown','missing_receipt','corrupt_receipt'}
+        p,conn,store,control,paper,trader,q,cycle_id = _seed_full_synthetic_history(pg,monkeypatch,unknown=unknown)
+        from core.auth.users_store import create_user
+        create_user('fixture-backup-admin','synthetic-backup-password','admin')
+        if scenario == 'stopped':
+            assert control.request_stop('synthetic-before-backup').persisted
+            assert control.acknowledge_stop('synthetic-worker').acknowledged
+        if scenario == 'missing_receipt':
+            # Deliberate loss of ONE disposable synthetic receipt, never financial history.
+            conn.execute('DELETE FROM app_state WHERE namespace=%s',(q.RECEIPT_PREFIX+cycle_id,))
+        elif scenario == 'corrupt_receipt':
+            conn.execute('UPDATE app_state SET payload_json=%s WHERE namespace=%s',('{',q.RECEIPT_PREFIX+cycle_id))
+        original_stop = store.load_bot_state().get('stop_control',{}).get('request_id')
+>       restored_dsn, proof = dump_restore(pg[2],os.environ['ATLAS_INFRA12_CONTAINER'],tmp_path/'backup')
+
+tests/test_infra123_postgres.py:219:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+scripts/local_synthetic_backup.py:69: in dump_restore
+    before = inventory(source)
+scripts/local_synthetic_backup.py:41: in inventory
+    'sequence': serial(conn.execute('SELECT last_value,is_called FROM app_rows_seq').fetchall()),
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <psycopg.Connection [BAD] at 0x7fd2654b56a0>
+query = 'SELECT last_value,is_called FROM app_rows_seq', params = None
+
+    def execute(
+        self,
+        query: Query,
+        params: Params | None = None,
+        *,
+        prepare: bool | None = None,
+        binary: bool = False,
+    ) -> Cursor[Row]:
+        """Execute a query and return a cursor to read its results."""
+        try:
+            cur = self.cursor()
+            if binary:
+                cur.format = BINARY
+
+            return cur.execute(query, params, prepare=prepare)
+        except e._NO_TRACEBACK as ex:
+>           raise ex.with_traceback(None)
+E           psycopg.errors.UndefinedTable: relation "app_rows_seq" does not exist
+E           LINE 1: SELECT last_value,is_called FROM app_rows_seq
+E                                                    ^
+
+.venv/lib/python3.12/site-packages/psycopg/connection.py:249: UndefinedTable
+__ test_synthetic_backup_restore_preserves_all_state_and_quarantines[unknown] __
+
+pg = (<module 'core.persistence' from '/workspace/robo-investimentos/core/persistence.py'>, <psycopg.Connection [IDLE] (hos...6993d9 host=127.0.0.1 port=55709', PosixPath('/tmp/pytest-of-agent/pytest-56/test_synthetic_backup_restore_1/storage'))
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7fd265464ef0>
+tmp_path = PosixPath('/tmp/pytest-of-agent/pytest-56/test_synthetic_backup_restore_1')
+scenario = 'unknown'
+
+    @pytest.mark.parametrize('scenario',['clean','unknown','stopped','missing_receipt','corrupt_receipt'])
+    def test_synthetic_backup_restore_preserves_all_state_and_quarantines(pg, monkeypatch, tmp_path, scenario):
+        import psycopg
+        from scripts.local_synthetic_backup import dump_restore
+        unknown = scenario in {'unknown','missing_receipt','corrupt_receipt'}
+        p,conn,store,control,paper,trader,q,cycle_id = _seed_full_synthetic_history(pg,monkeypatch,unknown=unknown)
+        from core.auth.users_store import create_user
+        create_user('fixture-backup-admin','synthetic-backup-password','admin')
+
+- generated xml file: /workspace/robo-investimentos/docs/retomada/evidencias/infra123-postgres18.xml -
+=========================== short test summary info ============================
+FAILED tests/test_infra123_postgres.py::test_synthetic_backup_restore_preserves_all_state_and_quarantines[clean]
+FAILED tests/test_infra123_postgres.py::test_synthetic_backup_restore_preserves_all_state_and_quarantines[unknown]
+FAILED tests/test_infra123_postgres.py::test_synthetic_backup_restore_preserves_all_state_and_quarantines[stopped]
+FAILED tests/test_infra123_postgres.py::test_synthetic_backup_restore_preserves_all_state_and_quarantines[missing_receipt]
+FAILED tests/test_infra123_postgres.py::test_synthetic_backup_restore_preserves_all_state_and_quarantines[corrupt_receipt]
+FAILED tests/test_infra123_postgres.py::test_bounded_protocol_measurements_and_stop_contention[0]
+FAILED tests/test_infra123_postgres.py::test_bounded_protocol_measurements_and_stop_contention[1000]
+FAILED tests/test_infra123_postgres.py::test_bounded_protocol_measurements_and_stop_contention[5000]
+8 failed, 74 passed, 106 warnings in 217.79s (0:03:37)
+Disposable local PostgreSQL container and own volumes removed.

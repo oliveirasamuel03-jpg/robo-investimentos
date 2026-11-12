@@ -1,0 +1,106 @@
+{
+  "backup_restore_scenarios_per_version": 5,
+  "base_commit": "e62a3a2be39d70782ce07d50e59027fc2c32e886",
+  "branch": "atlas/infra-1-2-3-falhas-recuperacao",
+  "deploy_command_executed": false,
+  "distinct_cases": 600,
+  "hours72_authorized": false,
+  "implementation_commit": "1a6c67e9b719536102f9794736daa1a93f9177c8",
+  "merge_executed": false,
+  "new_external_paid_service": false,
+  "new_offline_cases": 18,
+  "new_postgres_cases": 16,
+  "not_validated": [
+    "72H",
+    "HOST_POWER_LOSS",
+    "PHYSICAL_DISK_FAILURE",
+    "ENOSPC",
+    "OOM",
+    "WAN_TLS_FAILOVER",
+    "USER_COMPUTER",
+    "LONG_RECEIPT_ACCUMULATION"
+  ],
+  "paper_only": true,
+  "performance_assessment": {
+    "pg16:0": {
+      "classification": "CANDIDATE_SHORT_RETEST_ONLY",
+      "operational_authorization": false,
+      "within_proposed_budget_in_this_sample": true
+    },
+    "pg16:1000": {
+      "classification": "CANDIDATE_SHORT_RETEST_ONLY",
+      "operational_authorization": false,
+      "within_proposed_budget_in_this_sample": true
+    },
+    "pg16:5000": {
+      "classification": "BLOCKED_PERFORMANCE",
+      "operational_authorization": false,
+      "within_proposed_budget_in_this_sample": false
+    },
+    "pg18:0": {
+      "classification": "CANDIDATE_SHORT_RETEST_ONLY",
+      "operational_authorization": false,
+      "within_proposed_budget_in_this_sample": true
+    },
+    "pg18:1000": {
+      "classification": "CANDIDATE_SHORT_RETEST_ONLY",
+      "operational_authorization": false,
+      "within_proposed_budget_in_this_sample": true
+    },
+    "pg18:5000": {
+      "classification": "BLOCKED_PERFORMANCE",
+      "operational_authorization": false,
+      "within_proposed_budget_in_this_sample": false
+    }
+  },
+  "phase_status": "BLOCKED_PROLONGED_HOMOLOGATION",
+  "pr_created": false,
+  "previous_distinct_cases_preserved": 566,
+  "prior_stop_timeout_evidence": "infra123-stop-timeout-pg16.json",
+  "proposed_performance_budgets": {
+    "observed_financial_lock_ms": 1500,
+    "reconciliation_ms": 2000,
+    "stop_ack_ms": 1000,
+    "stop_verified_ms": 2000
+  },
+  "railway_command_executed": false,
+  "real_faults": [
+    "LOOPBACK_TCP_RESET_BEFORE_COMMIT",
+    "LOOPBACK_TCP_PARTIAL_COMMIT_WRITE_AND_RESET",
+    "LOOPBACK_TCP_SERVER_COMMIT_REPLY_WITHHELD_AND_RESET",
+    "LOOPBACK_TCP_RESET_AFTER_KNOWN_ACK",
+    "LOOPBACK_TCP_RESET_IN_POST_COMMIT_DIAGNOSTIC",
+    "POSTGRES_CONTAINER_SIGKILL_AND_RESTART_WITH_OWN_VOLUME",
+    "PYTHON_OS_EXIT_AFTER_UNKNOWN_AND_FRESH_INTERPRETER"
+  ],
+  "scope": "LOCAL_SYNTHETIC_ONLY",
+  "test_runs": {
+    "offline": {
+      "errors": 0,
+      "failures": 0,
+      "passed": 518,
+      "seconds": 58.71,
+      "skipped": 82,
+      "tests": 600,
+      "warnings": 105
+    },
+    "postgres16": {
+      "errors": 0,
+      "failures": 0,
+      "passed": 82,
+      "seconds": 170.14,
+      "skipped": 0,
+      "tests": 82,
+      "warnings": 103
+    },
+    "postgres18": {
+      "errors": 0,
+      "failures": 0,
+      "passed": 82,
+      "seconds": 181.08,
+      "skipped": 0,
+      "tests": 82,
+      "warnings": 103
+    }
+  }
+}
