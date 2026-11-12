@@ -55,3 +55,9 @@ storage/*.log
 bot_logs.jsonl
 bot_state.json
 runtime_config.json
+
+# Prevent future accidental commits of runtime, archive and validation outputs.
+# Existing tracked historical artifacts remain tracked and require separate review.
+storage/**
+!storage/**/
+!storage/**/.gitkeep
