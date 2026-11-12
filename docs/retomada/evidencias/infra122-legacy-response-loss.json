@@ -1,0 +1,7 @@
+{
+  "base": "fc5931254c85d1b36591818fcafa0e204e37c5b3",
+  "fault": "PYTHON_SIMULATED_REPLY_LOSS_AFTER_ACTUAL_POSTGRES_COMMIT",
+  "server_committed_trades_after_exception": 1,
+  "second_cycle_was_allowed": true,
+  "server_trades_after_second_cycle": 2
+}

@@ -1,0 +1,59 @@
+.F..........F.                                                           [100%]
+=================================== FAILURES ===================================
+____________ test_common_actions_cannot_remove_pending_fence[start] ____________
+
+isolated_storage = PosixPath('/tmp/pytest-of-agent/pytest-40/test_common_actions_cannot_rem0/storage')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f8e7e7df530>
+action = 'start'
+
+    @pytest.mark.parametrize('action', ['start', 'reset', 'paper_reset', 'raw_gate', 'raw_finance'])
+    def test_common_actions_cannot_remove_pending_fence(isolated_storage, monkeypatch, action):
+        q, store, paper, cycle_id = _pending(monkeypatch)
+        p = importlib.import_module('core.persistence')
+        stop = importlib.import_module('core.stop_control')
+        snapshot = store.load_bot_state()
+        if action == 'start':
+            operation = lambda: stop.start_robot(snapshot)
+        elif action == 'reset':
+            operation = store.reset_state
+        elif action == 'paper_reset':
+            operation = paper.reset_paper_state
+        elif action == 'raw_finance':
+            operation = lambda: p.replace_json_rows('paper_trades', [], paper.PAPER_TRADES_FILE)
+        else:
+            operation = lambda: p.update_json_state(q.GATE, dict, q._GATE_PATH, lambda _: {'active_cycle_id': None})
+>       with pytest.raises(p.PersistenceConflictError):
+E       Failed: DID NOT RAISE <class 'core.persistence.PersistenceConflictError'>
+
+tests/test_commit_protocol.py:45: Failed
+____________ test_unknown_ui_never_reports_not_committed_or_retries ____________
+
+isolated_storage = PosixPath('/tmp/pytest-of-agent/pytest-40/test_unknown_ui_never_reports_0/storage')
+
+    def test_unknown_ui_never_reports_not_committed_or_retries(isolated_storage):
+        helper = load_module('core.ui_mutations')
+        q = importlib.import_module('core.commit_protocol')
+        ui, attempts = UI(), []
+        def fail():
+            attempts.append(True)
+            raise q.UnknownCommit('synthetic-cycle')
+        result = helper.run_ui_mutation(fail, ui=ui, action='Ciclo PAPER')
+>       assert not result.confirmed and result.error_code == 'UNKNOWN_COMMIT'
+E       AssertionError: assert (not False and 'WRITE_FAILED' == 'UNKNOWN_COMMIT'
+E        +  where False = MutationResult(confirmed=False, value=None, error_code='WRITE_FAILED').confirmed
+E
+E         - UNKNOWN_COMMIT
+E         + WRITE_FAILED)
+
+tests/test_commit_protocol.py:81: AssertionError
+=============================== warnings summary ===============================
+tests/test_commit_protocol.py::test_unknown_intent_survives_reload_and_heartbeat
+  /workspace/robo-investimentos/core/state_store.py:2262: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    state["worker_heartbeat"] = datetime.utcnow().isoformat()
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_commit_protocol.py::test_common_actions_cannot_remove_pending_fence[start]
+FAILED tests/test_commit_protocol.py::test_unknown_ui_never_reports_not_committed_or_retries
+2 failed, 12 passed, 1 warning in 1.40s
+Offline guard: 0 network/process attempts blocked.
