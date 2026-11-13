@@ -1,0 +1,301 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/oliveirasamuel03-jpg/robo-investimentos/blob/main/docs/schemas/atlas_ai_diagnostic_v1.schema.json",
+  "title": "ATLAS AI financial diagnostic, non-operational",
+  "description": "Planning-only study output. Never route this contract into strategy, broker or execution.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "mode",
+    "analysis_status",
+    "action_code",
+    "as_of_utc",
+    "subject",
+    "sample",
+    "observations",
+    "hypotheses",
+    "red_flags",
+    "block_reason",
+    "authorities",
+    "paper_required",
+    "requires_human_review",
+    "next_phase_required"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "atlas-ai-diagnostic-v1"
+    },
+    "mode": {
+      "const": "SHADOW_ONLY"
+    },
+    "analysis_status": {
+      "enum": [
+        "INSUFFICIENT_DATA",
+        "DATA_QUALITY_BLOCKED",
+        "EVIDENCE_READY"
+      ]
+    },
+    "action_code": {
+      "enum": [
+        "NO_CHANGE",
+        "QUARANTINE_ARTIFACT",
+        "RECONCILE_FEED",
+        "OBSERVE_MORE",
+        "AUDIT_REJECTIONS",
+        "PLAN_OFFLINE_BACKTEST"
+      ]
+    },
+    "as_of_utc": {
+      "type": "string",
+      "format": "date-time",
+      "maxLength": 40
+    },
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "dataset_ids",
+        "window_start_utc",
+        "window_end_utc",
+        "symbol",
+        "timeframe"
+      ],
+      "properties": {
+        "dataset_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "maxItems": 100,
+          "items": {
+            "type": "string",
+            "maxLength": 120
+          }
+        },
+        "window_start_utc": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "window_end_utc": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "symbol": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 40
+        },
+        "timeframe": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 24
+        }
+      }
+    },
+    "sample": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "observed_records",
+        "verified_records",
+        "excluded_records"
+      ],
+      "properties": {
+        "observed_records": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "verified_records": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "excluded_records": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "observations": {
+      "type": "array",
+      "maxItems": 30,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "statement",
+          "evidence_refs",
+          "sample_count",
+          "limitations"
+        ],
+        "properties": {
+          "statement": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 600
+          },
+          "evidence_refs": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 20,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 240
+            }
+          },
+          "sample_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "limitations": {
+            "type": "string",
+            "maxLength": 600
+          }
+        }
+      }
+    },
+    "hypotheses": {
+      "type": "array",
+      "maxItems": 12,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "statement",
+          "evidence_refs",
+          "falsification_rule",
+          "uncertainty"
+        ],
+        "properties": {
+          "statement": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 600
+          },
+          "evidence_refs": {
+            "type": "array",
+            "maxItems": 15,
+            "items": {
+              "type": "string",
+              "maxLength": 240
+            }
+          },
+          "falsification_rule": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 600
+          },
+          "uncertainty": {
+            "enum": [
+              "HIGH",
+              "MEDIUM",
+              "LOW",
+              "UNKNOWN"
+            ]
+          }
+        }
+      }
+    },
+    "red_flags": {
+      "type": "array",
+      "maxItems": 30,
+      "items": {
+        "type": "string",
+        "maxLength": 360
+      }
+    },
+    "block_reason": {
+      "type": "string",
+      "maxLength": 900
+    },
+    "authorities": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "trade",
+        "score",
+        "broker",
+        "provider",
+        "threshold",
+        "capital",
+        "ticket",
+        "max_open_positions",
+        "risk",
+        "execution",
+        "database",
+        "railway"
+      ],
+      "properties": {
+        "trade": {
+          "type": "boolean",
+          "const": false
+        },
+        "score": {
+          "type": "boolean",
+          "const": false
+        },
+        "broker": {
+          "type": "boolean",
+          "const": false
+        },
+        "provider": {
+          "type": "boolean",
+          "const": false
+        },
+        "threshold": {
+          "type": "boolean",
+          "const": false
+        },
+        "capital": {
+          "type": "boolean",
+          "const": false
+        },
+        "ticket": {
+          "type": "boolean",
+          "const": false
+        },
+        "max_open_positions": {
+          "type": "boolean",
+          "const": false
+        },
+        "risk": {
+          "type": "boolean",
+          "const": false
+        },
+        "execution": {
+          "type": "boolean",
+          "const": false
+        },
+        "database": {
+          "type": "boolean",
+          "const": false
+        },
+        "railway": {
+          "type": "boolean",
+          "const": false
+        }
+      }
+    },
+    "paper_required": {
+      "type": "boolean",
+      "const": true
+    },
+    "requires_human_review": {
+      "type": "boolean",
+      "const": true
+    },
+    "next_phase_required": {
+      "type": "boolean",
+      "const": true
+    }
+  }
+}
