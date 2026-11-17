@@ -9,6 +9,7 @@ import os
 import subprocess
 import sys
 import threading
+import time
 
 import psycopg
 import pytest
@@ -56,7 +57,10 @@ def test_noop_has_no_write_api_calls_and_preserves_full_evidence(pg, monkeypatch
 def test_identical_financial_duplicates_are_preserved_not_cleaned(pg, monkeypatch):
     p, conn, store, control, paper, trader, q, cycle = _seed_full_synthetic_history(pg, monkeypatch)
     retention = importlib.import_module('core.retention')
-    conn.execute("INSERT INTO app_rows(namespace,row_json) SELECT namespace,row_json FROM app_rows WHERE namespace='table:trade_reports.csv' LIMIT 1")
+    original_report = json.loads(conn.execute("SELECT row_json FROM app_rows WHERE namespace='table:trade_reports.csv' LIMIT 1").fetchone()[0])
+    reordered = dict(reversed(list(original_report.items())))
+    conn.execute("INSERT INTO app_rows(namespace,row_json) VALUES ('table:trade_reports.csv',%s)",
+                 (json.dumps(reordered),))
     before = snapshot(conn)[1]
     result = retention.archive_old_trade_reports(36500)
     assert result['identical_rows_preserved'] == 1 and result['retained_rows'] == 2
@@ -85,13 +89,28 @@ def test_strict_corruption_is_preserved_and_quarantined(pg, monkeypatch, payload
     evidence(conn, 'corruption_' + str(len(payload)), {'source_not_overwritten': True, 'quarantine_independently_observed': True})
 
 
+def restart_blocked():
+    program = """
+import json,sys
+from scripts.test_infra12_postgres import _loopback_only
+sys.addaudithook(_loopback_only)
+from core.commit_protocol import assert_execution_allowed, ReconciliationRequired, gate_status
+try: assert_execution_allowed()
+except ReconciliationRequired: print(json.dumps(gate_status()))
+else: raise AssertionError('unsafe persisted history admitted after restart')
+"""
+    process = subprocess.run([sys.executable, '-c', program], cwd=ROOT, env=dict(os.environ),
+                             capture_output=True, text=True, check=True, timeout=30)
+    return json.loads(process.stdout)
+
+
 def legacy_report():
     return {'trade_id': 'synthetic-unreceipted', 'closed_at': '2026-01-01T00:00:00+00:00',
             'asset': 'FAKE', 'quantity': 1.25, 'entry_price': 10, 'exit_reason': 'synthetic',
             'realized_pnl': 0, 'extra_identity': {'source': 'synthetic', 'version': 1}}
 
 
-def test_valid_unreceipted_archive_preserves_objects_and_catalog_atomically(pg):
+def test_valid_unreceipted_archive_preserves_objects_and_catalog_atomically(pg, monkeypatch):
     p, conn, _, root = pg
     cfg = importlib.import_module('core.config')
     retention = importlib.import_module('core.retention')
@@ -118,17 +137,35 @@ def test_valid_unreceipted_archive_preserves_objects_and_catalog_atomically(pg):
     before = snapshot(conn)
     again = retention.archive_old_trade_reports(60, now=datetime(2026, 4, 20, tzinfo=timezone.utc))
     assert again['files_updated'] == [] and snapshot(conn) == before
-    # A conflicting destination must preserve BOTH original sources and block.
+    # Incompatible SQL writer: introduce an archived-source conflict, then
+    # lose containment through both a failed write and an outer rollback.
     conflicting = {**original, 'entry_price': original['entry_price'] + 1}
-    p.replace_table(cfg.TRADER_REPORTS_FILE, [conflicting])
+    conn.execute('INSERT INTO app_rows(namespace,row_json) VALUES (%s,%s)',
+                 (p._table_namespace(cfg.TRADER_REPORTS_FILE), json.dumps(conflicting)))
     before_conflict = snapshot(conn)[1]
-    conflict = retention.archive_old_trade_reports(60, now=datetime(2026, 4, 20, tzinfo=timezone.utc))
-    assert conflict['blocked'] and conflict['reason'] == 'RETENTION_CONFLICT'
-    assert snapshot(conn)[1] == before_conflict
     q = importlib.import_module('core.commit_protocol')
-    assert q.gate_status()['blocked']
+    save = p.save_json_state
+    with monkeypatch.context() as patch:
+        def unavailable(namespace, *args, **kwargs):
+            if namespace == q.QUARANTINE:
+                raise OSError('PYTHON_INJECTION missing quarantine acknowledgment')
+            return save(namespace, *args, **kwargs)
+        patch.setattr(p, 'save_json_state', unavailable)
+        with pytest.raises(OSError, match='PYTHON_INJECTION'):
+            retention.archive_old_trade_reports(60, now=datetime(2026, 4, 20, tzinfo=timezone.utc))
+    with pytest.raises(ValueError, match='caller rollback'):
+        with p.persistence_transaction():
+            conflict = retention.archive_old_trade_reports(60, now=datetime(2026, 4, 20, tzinfo=timezone.utc))
+            assert conflict['blocked'] and conflict['reason'] == 'RETENTION_CONFLICT'
+            raise ValueError('caller rollback')
+    assert snapshot(conn)[1] == before_conflict and not q._quarantine()['active']
+    assert q.gate_status()['blocked'], 'Persisted archive evidence must block even after containment rollback'
+    restarted = restart_blocked()
+    assert restarted['blocked'] and q._quarantine()['active']
     evidence(conn, 'valid_unreceipted_archive', {'all_fields_preserved': True,
         'non_retention_bot_fields_equal': True, 'archive_conflict_preserved': True,
+        'failed_quarantine_and_outer_rollback_cannot_reopen_finance': True,
+        'new_process_reconstitutes_containment': True,
         'catalog_same_commit': True, 'second_run_no_writes': True, 'receipt_compatibility_claim': False})
 
 
@@ -262,6 +299,44 @@ def test_backup_restore_preserves_quarantine_stop_and_all_financial_rows(pg, mon
         assert snapshot(restored)[1] == before
     evidence(conn, 'backup_quarantine', {'backup': proof, 'quarantine_id_preserved': True,
         'stop_persisted': True, 'heartbeat_reset_start_cannot_clear': True, 'financial_rows_equal': True})
+
+    # Actual crash/restart of THIS test's server only, with quarantine active.
+    from scripts.local_synthetic_backup import owned_container, DOCKER
+    container = os.environ['ATLAS_INFRA12_CONTAINER']
+    owned_container(container)
+    expected_quarantine = dict(q._quarantine())
+    assert conn.execute('SHOW fsync').fetchone()[0] == 'on'
+    assert conn.execute('SHOW synchronous_commit').fetchone()[0] == 'on'
+    subprocess.run(DOCKER + ['kill', '--signal=KILL', container], check=True, capture_output=True, timeout=10)
+    failed_stop = control.request_stop('synthetic-stop-during-quarantine-server-crash')
+    assert failed_stop.status == 'UNCONFIRMED' and not failed_stop.persisted
+    subprocess.run(DOCKER + ['start', container], check=True, capture_output=True, timeout=10)
+    deadline = time.monotonic() + 30
+    while True:
+        try:
+            with psycopg.connect(pg[2], autocommit=True) as recovered:
+                recovered.execute('SELECT 1')
+            break
+        except psycopg.OperationalError:
+            assert time.monotonic() < deadline
+            threading.Event().wait(.05)  # readiness predicate, not fault timing evidence
+    assert dict(q._quarantine()) == expected_quarantine
+    assert q.gate_status()['blocked'] and store.load_bot_state()['bot_status'] == 'STOPPED'
+    with pytest.raises(q.ReconciliationRequired):
+        q.assert_execution_allowed()
+    logs = subprocess.run(DOCKER + ['logs', '--tail', '100', container], check=True,
+                          capture_output=True, text=True, timeout=10)
+    recovery = [line for line in (logs.stdout + logs.stderr).splitlines()
+                if any(word in line for word in ('was interrupted', 'not properly shut down',
+                    'redo starts', 'redo done', 'automatic recovery', 'ready to accept connections'))]
+    assert recovery
+    with psycopg.connect(pg[2], autocommit=True) as recovered:
+        assert snapshot(recovered)[1] == before
+        evidence(recovered, 'quarantine_real_postgres_crash', {
+            'fault': 'REAL_OWNED_POSTGRES_SIGKILL_AND_RESTART', 'quarantine_unchanged': True,
+            'financial_rows_equal': True, 'stop_unconfirmed_while_down': True,
+            'stop_still_persisted_after_recovery': True, 'no_financial_retry': True,
+            'fsync': 'on', 'synchronous_commit': 'on', 'server_recovery_excerpt': recovery[-8:]})
 
 
 def test_two_concurrent_writers_reject_divergence_without_replaying_trades(pg, monkeypatch):
@@ -425,3 +500,37 @@ def test_lost_quarantine_commit_reply_is_unconfirmed_until_independent_read(pg, 
     evidence(conn, 'quarantine_commit_lost_reply', {'fault': 'PYTHON_INJECTION_AFTER_REAL_SERVER_COMMIT',
         'independent_connection_observed_active_quarantine': True, 'false_success_not_reported': True,
         'not_a_real_tcp_failure': True, 'trades_not_replayed': True})
+
+
+@pytest.mark.parametrize('failure', ['quarantine_write', 'outer_rollback'])
+def test_unanchored_runtime_conflict_cannot_reopen_after_failed_quarantine(pg, monkeypatch, failure):
+    p, conn, _, _ = pg
+    cfg = importlib.import_module('core.config')
+    retention = importlib.import_module('core.retention')
+    q = importlib.import_module('core.commit_protocol')
+    first = legacy_report()
+    p.replace_table(cfg.TRADER_REPORTS_FILE, [first, {**first, 'entry_price': first['entry_price'] + 1}])
+    before = snapshot(conn)[1]
+    if failure == 'quarantine_write':
+        save = p.save_json_state
+        with monkeypatch.context() as patch:
+            def unavailable(namespace, *args, **kwargs):
+                if namespace == q.QUARANTINE:
+                    raise OSError('PYTHON_INJECTION unavailable quarantine')
+                return save(namespace, *args, **kwargs)
+            patch.setattr(p, 'save_json_state', unavailable)
+            with pytest.raises(OSError, match='PYTHON_INJECTION'):
+                retention.archive_old_trade_reports(36500)
+    else:
+        with pytest.raises(ValueError, match='caller rollback'):
+            with p.persistence_transaction():
+                result = retention.archive_old_trade_reports(36500)
+                assert result['blocked'] and result['reason'] == 'RETENTION_CONFLICT'
+                raise ValueError('caller rollback')
+    assert not q._quarantine()['active'] and snapshot(conn)[1] == before
+    assert q.gate_status()['blocked'], 'Unanchored conflicting history must not be admitted'
+    assert restart_blocked()['blocked'] and q._quarantine()['active']
+    assert snapshot(conn)[1] == before
+    evidence(conn, 'unanchored_conflict_' + failure, {'persisted_data_enforces_block': True,
+        'new_python_process_refused_finance': True, 'original_rows_equal': True,
+        'no_prior_receipt_assumed': True, 'financial_retry': False})

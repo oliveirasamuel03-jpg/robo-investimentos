@@ -25,6 +25,10 @@ RECEIPT_PREFIX = 'paper_cycle_receipt:'
 _GATE_PATH = RUNTIME_DIR / 'paper_commit_control.json'
 _PROTOCOL_WRITE = ContextVar('atlas_commit_protocol_write', default=False)
 FINANCIAL_ROWS = {'paper_trades', 'table:trader_orders.csv', 'table:trade_reports.csv'}
+FINANCIAL_ROW_KEYS = {
+    'table:trade_reports.csv': ('trade_id', 'closed_at', 'asset', 'exit_reason', 'realized_pnl', 'quantity'),
+    'table:trader_orders.csv': ('timestamp', 'asset', 'side', 'quantity', 'price', 'gross_value', 'source'),
+}
 
 
 class ReconciliationRequired(p.PersistenceConflictError):
@@ -211,6 +215,72 @@ def _previous_evidence_error(gate, current, observed_rows):
     return None
 
 
+def _archive_evidence(conn):
+    """V1 financial receipts do not prove custody of monthly financial archives."""
+    row = conn.execute("SELECT namespace FROM app_rows WHERE namespace ~ %s LIMIT 1",
+                       (r'^table:(trade_reports|trader_orders)_[0-9]{4}_[0-9]{2}[.]csv$',)).fetchone()
+    if row:
+        return {'reason': 'UNVERIFIED_FINANCIAL_ARCHIVE', 'namespace': row[0]}
+    row = conn.execute("SELECT payload_json FROM app_state WHERE namespace='bot_state'").fetchone()
+    if row:
+        state = p._decode_json(row[0], dict, 'financial archive catalog')
+        retention = state.get('retention', {})
+        catalog = retention.get('archive_catalog', {})
+        for kind in ('reports', 'orders'):
+            if catalog.get(kind):
+                return {'reason': 'UNVERIFIED_FINANCIAL_ARCHIVE_CATALOG', 'kind': kind}
+    return None
+
+
+def _persisted_integrity_evidence(gate):
+    """Read COMMITTED data, including when a caller owns a write transaction.
+
+    This independent RR read cannot mistake a half-built, uncommitted unit for
+    a corrupt committed preimage. It is never a cache or financial permission.
+    """
+    if not p.database_enabled():
+        return None
+    with p._connect() as conn, conn.transaction():
+        conn.execute('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY')
+        conn.execute("SET LOCAL lock_timeout='5s'")
+        conn.execute("SET LOCAL statement_timeout='5s'")
+        archive = _archive_evidence(conn)
+        if archive:
+            return archive
+        # The control and the data must belong to the SAME MVCC snapshot.
+        # A gate read before a concurrent first commit is only a preflight hint.
+        row = conn.execute('SELECT payload_json FROM app_state WHERE namespace=%s', (GATE,)).fetchone()
+        committed_gate = p._decode_json(row[0], dict, 'financial control snapshot') if row else {}
+        if committed_gate.get('last_cycle_id') or committed_gate.get('active_cycle_id'):
+            return None  # current signed financial preimage is checked separately
+        seen = {}
+        for namespace, seq, raw in conn.execute(
+                'SELECT namespace,seq,row_json FROM app_rows WHERE namespace=ANY(%s) ORDER BY seq',
+                (list(FINANCIAL_ROW_KEYS),)):
+            try:
+                row = p._decode_json(raw, dict, 'unanchored financial record')
+            except p.PersistenceDataError:
+                return {'reason': 'INVALID_UNANCHORED_FINANCIAL_JSON', 'namespace': namespace,
+                        'origin_ids': [seq], 'raw_payload_sha256': hashlib.sha256(raw.encode()).hexdigest()}
+            key = (namespace, tuple(str(row.get(k, '')).strip() for k in FINANCIAL_ROW_KEYS[namespace]))
+            fingerprint = _hash(row)
+            if key in seen:
+                previous_id, previous_hash = seen[key]
+                return {'reason': 'DUPLICATE_UNANCHORED_FINANCIAL_RECORD' if previous_hash == fingerprint
+                        else 'CONFLICTING_UNANCHORED_FINANCIAL_RECORD', 'namespace': namespace,
+                        'key': list(key[1]), 'origin_ids': [previous_id, seq],
+                        'payload_sha256': [previous_hash, fingerprint]}
+            seen[key] = (seq, fingerprint)
+        orphan = conn.execute('SELECT EXISTS(SELECT 1 FROM app_state WHERE left(namespace,%s)=%s)',
+                              (len(RECEIPT_PREFIX), RECEIPT_PREFIX)).fetchone()[0]
+        if orphan:
+            return {'reason': 'ORPHAN_FINANCIAL_RECEIPTS'}
+        row = conn.execute("SELECT payload_json FROM app_state WHERE namespace='paper_state'").fetchone()
+        if row and p._decode_json(row[0], dict, 'financial cycle identity').get('last_cycle_id'):
+            return {'reason': 'MISSING_PREVIOUS_CYCLE_CONTROL'}
+    return None
+
+
 def _receipt(cycle_id):
     path = _receipt_path(cycle_id)
     namespace = RECEIPT_PREFIX + cycle_id
@@ -235,6 +305,12 @@ def gate_status():
         return {'blocked': True, 'cycle_id': cycle_id or quarantine.get('cycle_id'),
                 'outcome': 'UNKNOWN_COMMIT', 'reason': 'INTEGRITY_QUARANTINE',
                 'quarantine_id': quarantine['quarantine_id']}
+    if not cycle_id:
+        persisted = _persisted_integrity_evidence(gate)
+        if persisted:
+            return {'blocked': True, 'cycle_id': gate.get('last_cycle_id'), 'outcome': 'UNKNOWN_COMMIT',
+                    'reason': 'PERSISTED_INTEGRITY_EVIDENCE', 'integrity_evidence': persisted,
+                    'quarantine_persistence': 'REVALIDATED_FROM_PERSISTED_DATA'}
     return {'blocked': bool(cycle_id), 'cycle_id': cycle_id,
             'outcome': ('POST_COMMIT_DIAGNOSTIC_FAILURE' if gate.get('reason') == 'POST_COMMIT_DIAGNOSTIC_FAILURE'
                         else 'UNKNOWN_COMMIT') if cycle_id else gate.get('last_outcome', 'NONE'),
@@ -248,7 +324,10 @@ def assert_execution_allowed():
         raise ReconciliationRequired(reason='POSTGRES_REQUIRED_FOR_PRODUCTION')
     status = gate_status()
     if status['blocked']:
-        raise ReconciliationRequired(status['cycle_id'])
+        if status['reason'] == 'PERSISTED_INTEGRITY_EVIDENCE':
+            quarantine_integrity('PERSISTED_INTEGRITY_EVIDENCE', cycle_id=status['cycle_id'],
+                                 evidence=status['integrity_evidence'])
+        raise ReconciliationRequired(status['cycle_id'], status['reason'])
     # Also closes the restart gap if a previous containment write/read failed.
     # Guard callbacks may run inside a larger transaction; they never claim a
     # staged quarantine survived that caller's rollback.
@@ -256,9 +335,13 @@ def assert_execution_allowed():
         failure = None
         with _scope():
             gate = _gate()
-            if gate.get('active_cycle_id') or _quarantine().get('active'):
+            fenced = gate_status()
+            if fenced['blocked'] and fenced['reason'] == 'PERSISTED_INTEGRITY_EVIDENCE':
+                failure = fenced['reason']
+                _quarantine_locked(failure, cycle_id=fenced['cycle_id'], evidence=fenced['integrity_evidence'])
+            elif fenced['blocked']:
                 raise ReconciliationRequired(gate.get('active_cycle_id'))
-            if gate.get('last_cycle_id'):
+            if not failure and gate.get('last_cycle_id'):
                 try:
                     observed = {}
                     current = manifest(_observed_rows=observed)
@@ -269,7 +352,7 @@ def assert_execution_allowed():
                     _quarantine_locked('RECONCILIATION_DIVERGENCE', cycle_id=gate['last_cycle_id'],
                                        evidence={'reason': failure})
         if failure:
-            raise ReconciliationRequired(gate['last_cycle_id'], failure)
+            raise ReconciliationRequired(gate.get('last_cycle_id'), failure)
 
 
 def financial_projection(state):
@@ -339,18 +422,21 @@ def begin_intent(state, trades, reports, *, require_platform=False):
     failure = None
     with _scope(), protocol_write():
         gate = _gate()
-        if _quarantine().get('active'):
-            raise ReconciliationRequired(reason='INTEGRITY_QUARANTINE')
-        if gate.get('active_cycle_id'):
-            raise ReconciliationRequired(gate['active_cycle_id'])
-        observed = {}
-        before = manifest(_observed_rows=observed)
-        failure = _previous_evidence_error(gate, before, observed) if p.database_enabled() else None
-        if failure:
-            _quarantine_locked('RECONCILIATION_DIVERGENCE', cycle_id=gate.get('last_cycle_id'),
-                               evidence={'reason': failure})
+        fenced = gate_status()
+        if fenced['blocked']:
+            if fenced['reason'] != 'PERSISTED_INTEGRITY_EVIDENCE':
+                raise ReconciliationRequired(fenced['cycle_id'], fenced['reason'])
+            failure = fenced['reason']
+            _quarantine_locked(failure, cycle_id=fenced['cycle_id'], evidence=fenced['integrity_evidence'])
         else:
-            _create_intent(gate, cycle_id, before, state, trades, reports, require_platform)
+            observed = {}
+            before = manifest(_observed_rows=observed)
+            failure = _previous_evidence_error(gate, before, observed) if p.database_enabled() else None
+            if failure:
+                _quarantine_locked('RECONCILIATION_DIVERGENCE', cycle_id=gate.get('last_cycle_id'),
+                                   evidence={'reason': failure})
+            else:
+                _create_intent(gate, cycle_id, before, state, trades, reports, require_platform)
     if failure:
         raise ReconciliationRequired(gate.get('last_cycle_id'), failure)
     # Any error from this commit/read remains conservative; no financial tx began.
@@ -434,7 +520,11 @@ def reconcile(cycle_id=None, *, release=True, release_quarantine=False, expected
                 # about today's manifest and never an authorization to clear it.
                 if receipt.get('resolution') not in {'COMMITTED', 'NOT_COMMITTED', 'LOCAL_ONLY'} or not receipt.get('verified_at'):
                     raise ReconciliationRequired(cycle_id, 'HISTORICAL_RECEIPT_NOT_VERIFIED')
-                return {'outcome': receipt['resolution'], 'blocked': bool(quarantine.get('active')), 'cycle_id': cycle_id,
+                historical_block = bool(quarantine.get('active'))
+                if not historical_block and p.database_enabled():
+                    with p._reader() as conn:
+                        historical_block = bool(_archive_evidence(conn))
+                return {'outcome': receipt['resolution'], 'blocked': historical_block, 'cycle_id': cycle_id,
                         'historical': True, 'current_cycle_id': gate.get('last_cycle_id'),
                         'evidence': 'PREVIOUSLY_VERIFIED_RECEIPT_NOT_CURRENT_STATE',
                         'resolution_recorded': True}
@@ -453,6 +543,12 @@ def reconcile(cycle_id=None, *, release=True, release_quarantine=False, expected
             else:
                 raise ReconciliationRequired(cycle_id, 'FINANCIAL_DIVERGENCE_OR_INSUFFICIENT_EVIDENCE')
             verified_outcome = outcome
+            if p.database_enabled():
+                with p._reader() as conn:
+                    archived = _archive_evidence(conn)
+                if archived:
+                    _quarantine_locked('PERSISTED_INTEGRITY_EVIDENCE', cycle_id=cycle_id, evidence=archived)
+                    quarantine = _quarantine()
             receipt.update(resolution=outcome, verified_at=_now())
             receipt['events'].append('VERIFIED_' + outcome)
             p.save_json_state(RECEIPT_PREFIX + cycle_id, receipt, _receipt_path(cycle_id))

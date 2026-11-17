@@ -227,8 +227,10 @@ def _archive_old_rows(
             with persistence._reader() as conn:
                 controls = conn.execute('SELECT namespace FROM app_state WHERE namespace IN (%s,%s)',
                                         (protocol.GATE, protocol.QUARANTINE)).fetchall()
-            if controls and protocol.gate_status()['blocked']:
-                raise protocol.ReconciliationRequired(reason='RETENTION_BLOCKED_BY_FINANCIAL_CONTROL')
+            if controls:
+                status = protocol.gate_status()
+                if status['blocked'] and status['reason'] != 'PERSISTED_INTEGRITY_EVIDENCE':
+                    raise protocol.ReconciliationRequired(reason='RETENTION_BLOCKED_BY_FINANCIAL_CONTROL')
         elif protocol._GATE_PATH.exists() or protocol._QUARANTINE_PATH.exists():
             if protocol.gate_status()['blocked']:
                 raise protocol.ReconciliationRequired(reason='RETENTION_BLOCKED_BY_FINANCIAL_CONTROL')
@@ -256,9 +258,10 @@ def _archive_old_rows(
                     'retained_rows': len(raw) if persistence.database_enabled() else None,
                     'files_updated': [], 'oldest_runtime_at': '', **marked}
         seen, conflicts, identical = {}, [], 0
+        key_columns = list(protocol.FINANCIAL_ROW_KEYS.get(namespace, key_columns))
         for identity, record in source:
             # Hash the complete original object, including cycle_id/extra fields.
-            content_hash = hashlib.sha256(persistence._encode(record).encode()).hexdigest()
+            content_hash = protocol._hash(record)
             key = tuple(str(record.get(field, '')).strip() for field in key_columns)
             if key in seen:
                 previous_id, previous_hash = seen[key]
@@ -327,7 +330,7 @@ def _archive_old_rows(
             by_key = {}
             for record in existing + selected:
                 key = tuple(str(record.get(field, '')).strip() for field in key_columns)
-                fingerprint = hashlib.sha256(persistence._encode(record).encode()).hexdigest()
+                fingerprint = protocol._hash(record)
                 if key in by_key and by_key[key] != fingerprint:
                     marked = protocol._quarantine_locked('RETENTION_CONFLICT',
                         cycle_id=protocol._gate().get('active_cycle_id') or protocol._gate().get('last_cycle_id'),

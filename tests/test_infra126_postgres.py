@@ -158,10 +158,14 @@ def test_nonadmin_raw_table_writer_bypasses_global_advisory_and_gate(pg, monkeyp
             raw.execute("SET lock_timeout='500ms'")
             # Own synthetic gate only; no historical data or trade is removed.
             raw.execute("UPDATE app_state SET payload_json=%s WHERE namespace='paper_commit_control'", ('{}',))
-    assert not q.gate_status()['blocked']
-    evidence(conn, 'ordinary_dml_bypasses_guard', {'superuser': False,
+    assert q.gate_status()['blocked']  # missing control is reconstituted from durable evidence
+    with pytest.raises(q.ReconciliationRequired):
+        q.assert_execution_allowed()
+    assert q._quarantine()['active']
+    evidence(conn, 'ordinary_dml_control_change_detected', {'superuser': False,
         'advisory_lock_held': True, 'raw_update_succeeded': True,
-        'pending_gate_cleared_outside_protocol': True, 'financial_cycle_executed_after_bypass': False})
+        'pending_gate_cleared_outside_protocol': True, 'persistent_integrity_evidence_blocks_finance': True,
+        'financial_cycle_executed_after_bypass': False, 'sql_permissions_not_changed': True})
 
 
 @contextmanager
