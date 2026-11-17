@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+from copy import deepcopy
 import hashlib
 import json
 from pathlib import Path
@@ -14,6 +15,7 @@ from core.config import (
     ARCHIVE_WEEKLY_REPORTS_DIR,
     BOT_LOG_COLUMNS,
     BOT_LOG_FILE,
+    BOT_STATE_FILE,
     RETENTION_ARCHIVE_TRADER_ORDERS,
     RETENTION_DAYS,
     RETENTION_ENABLED,
@@ -112,13 +114,20 @@ def _publish_archive_paths(prefix, paths):
     """Same PostgreSQL unit as copy/removal, including direct API callers."""
     if not paths:
         return
-    from core.state_store import update_bot_state
+    from core.state_store import DEFAULT_STATE
     kind = {'trade_reports': 'reports', 'trader_orders': 'orders', 'bot_log': 'logs'}[prefix]
     def publish(state):
         catalog = state.setdefault('retention', {}).setdefault('archive_catalog', {})
         catalog[kind] = sorted(set(catalog.get(kind, [])) | set(paths))
         return state
-    update_bot_state(publish)
+    # Patch the persisted document without invoking configuration migrations.
+    # Standard persistence still enforces CAS and STOP/financial guards.
+    persistence.update_json_state('bot_state', lambda: deepcopy(DEFAULT_STATE), BOT_STATE_FILE, publish)
+
+
+def _check_archive_namespace(runtime_path, archive_path):
+    if persistence._table_namespace(runtime_path) == persistence._table_namespace(archive_path):
+        raise persistence.PersistenceDataError('Retention namespace collision; source and archive must be distinct.')
 
 
 def _catalog_paths(kind: str) -> list[str]:
@@ -228,8 +237,9 @@ def _archive_old_rows(
                 with persistence._reader() as conn:
                     raw = conn.execute('SELECT seq,row_json FROM app_rows WHERE namespace=%s ORDER BY seq',
                                        (namespace,)).fetchall()
-                source = [(seq, persistence._decode_json(text, dict, 'retention financial source'))
-                          for seq, text in raw]
+                source = []
+                for seq, text in raw:
+                    source.append((seq, persistence._decode_json(text, dict, f'retention financial source seq={seq}')))
                 records = [row for _, row in source]
                 current_df = pd.DataFrame(records)
             else:
@@ -239,7 +249,9 @@ def _archive_old_rows(
         except persistence.PersistenceDataError:
             marked = protocol._quarantine_locked('RETENTION_CORRUPTION',
                 cycle_id=protocol._gate().get('active_cycle_id') or protocol._gate().get('last_cycle_id'),
-                evidence={'namespace': namespace, 'reason': 'STRICT_SOURCE_DECODING_FAILED'})
+                evidence={'namespace': namespace, 'reason': 'STRICT_SOURCE_DECODING_FAILED',
+                          **({'origin_id': seq, 'raw_payload_sha256': hashlib.sha256(text.encode()).hexdigest()}
+                             if persistence.database_enabled() else {})})
             return {'blocked': True, 'reason': 'RETENTION_CORRUPTION', 'archived_rows': 0,
                     'retained_rows': len(raw) if persistence.database_enabled() else None,
                     'files_updated': [], 'oldest_runtime_at': '', **marked}
@@ -308,6 +320,7 @@ def _archive_old_rows(
         plans = []
         for period_value in sorted(timestamp_series[archive_mask].dt.tz_localize(None).dt.to_period('M').unique()):
             path = archive_dir / _archive_file_name(prefix, period_value)
+            _check_archive_namespace(runtime_path, path)
             existing = persistence.load_json_rows(persistence._table_namespace(path), path.with_suffix('.csv.json'))
             selected = [row for (_, row), stamp in zip(source, timestamp_series)
                         if pd.notna(stamp) and stamp < cutoff and stamp.tz_localize(None).to_period('M') == period_value]
@@ -343,6 +356,7 @@ def _archive_old_rows(
         for period_value in sorted(month_series.dropna().unique()):
             month_chunk = archive_df.loc[month_series == period_value].copy()
             archive_path = archive_dir / _archive_file_name(prefix, period_value)
+            _check_archive_namespace(runtime_path, archive_path)
             existing_df = read_table(archive_path)
             merged_df = pd.concat([existing_df, month_chunk], ignore_index=True)
             merged_df = _dedupe_rows(merged_df, key_columns=key_columns, sort_column=timestamp_column)

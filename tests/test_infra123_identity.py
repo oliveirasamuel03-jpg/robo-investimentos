@@ -78,6 +78,28 @@ def test_historical_ui_receipt_is_not_a_current_financial_success(isolated_stora
     assert any('histórico' in message for _,message in ui.messages)
     assert not any(kind=='success' for kind,_ in ui.messages)
 
+    # A verified financial outcome does not confirm bookkeeping or a latch.
+    ui.messages.clear()
+    monkeypatch.setattr(q, 'reconcile', lambda *_: {
+        'outcome': 'COMMITTED', 'blocked': True, 'resolution_recorded': False})
+    helper.render_commit_control(ui=ui, allow_reconcile=True)
+    assert any('não confirmado' in message for kind, message in ui.messages if kind == 'warning')
+    assert not any(kind == 'success' for kind, _ in ui.messages)
+    assert not any('quarentena financeira continua ativa' in message for _, message in ui.messages)
+
+    ui.messages.clear()
+    monkeypatch.setattr(q, 'gate_status', lambda: {
+        'blocked': True, 'cycle_id': 'current', 'reason': 'INTEGRITY_QUARANTINE', 'quarantine_id': 'synthetic'})
+    calls = []
+    def still_blocked(cycle_id, **options):
+        calls.append((cycle_id, options))
+        return {'outcome': 'COMMITTED', 'blocked': True, 'resolution_recorded': True}
+    monkeypatch.setattr(q, 'reconcile', still_blocked)
+    helper.render_commit_control(ui=ui, allow_reconcile=True)
+    assert calls == [('current', {'release_quarantine': True, 'expected_quarantine_id': 'synthetic'})]
+    assert any('continua recusada' in message for kind, message in ui.messages if kind == 'warning')
+    assert not any(kind == 'success' for kind, _ in ui.messages)
+
 
 @pytest.mark.parametrize('dsn',[
     'host=remote.invalid port=5432 dbname=atlas_infra123_fixture user=atlas_fixture',

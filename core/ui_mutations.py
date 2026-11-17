@@ -205,12 +205,12 @@ def render_commit_control(*, ui, allow_reconcile=False):
         if result.get('historical'):
             ui.info('Recibo histórico verificado anteriormente; não é uma reconciliação do estado atual. '
                     'A intenção atual e sua barreira não foram alteradas. Recarregue os dados.')
-        elif result['outcome'] == 'COMMITTED' and result.get('blocked'):
-            ui.warning('COMMITTED verificado; quarentena financeira continua ativa. '
-                       'A evidência de integridade não foi liberada. Não repita operações.')
         elif result['outcome'] == 'COMMITTED' and not result.get('resolution_recorded', False):
             ui.warning('COMMITTED verificado; registro/liberação da reconciliação não confirmado. '
                        'Não repita a operação. Recarregue o bloqueio e verifique a conexão.')
+        elif result['outcome'] == 'COMMITTED' and result.get('blocked'):
+            ui.warning('COMMITTED verificado; execução financeira continua recusada. '
+                       'Confira o controle de integridade persistido antes de liberar. Não repita operações.')
         elif result['outcome'] == 'COMMITTED':
             ui.success('COMMITTED: estado, saldo, posições, eventos e recibo confirmados no PostgreSQL. '
                        'A reconciliação não executou operações financeiras.')

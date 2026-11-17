@@ -1,6 +1,7 @@
 """Deterministic retention, containment and recovery on synthetic local data."""
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
+from copy import deepcopy
 from datetime import datetime, timezone
 import importlib
 import json
@@ -95,18 +96,39 @@ def test_valid_unreceipted_archive_preserves_objects_and_catalog_atomically(pg):
     cfg = importlib.import_module('core.config')
     retention = importlib.import_module('core.retention')
     original = legacy_report()
+    store = importlib.import_module('core.state_store')
+    untouched_bot = deepcopy(store.DEFAULT_STATE)
+    untouched_bot.update(cash=cfg.LEGACY_VALIDATION_INITIAL_CAPITAL_BRL,
+                         wallet_value=cfg.LEGACY_VALIDATION_INITIAL_CAPITAL_BRL,
+                         positions=[], realized_pnl=0, last_run_at='')
+    untouched_bot['validation'].update(validation_started_at='', last_report={})
+    untouched_bot['trader']['max_open_positions'] = 3
+    p._ensure_db_schema()
+    conn.execute("INSERT INTO app_state(namespace,payload_json) VALUES ('bot_state',%s) ON CONFLICT(namespace) DO UPDATE SET payload_json=EXCLUDED.payload_json",
+                 (json.dumps(untouched_bot),))
     p.replace_table(cfg.TRADER_REPORTS_FILE, [original])
     result = retention.archive_old_trade_reports(60, now=datetime(2026, 4, 20, tzinfo=timezone.utc))
     assert result['archived_rows'] == 1 and result['retained_rows'] == 0
     archive = result['files_updated'][0]
     assert p.load_json_rows(p._table_namespace(archive), root / 'unused.json') == [original]
     assert p.load_json_rows(p._table_namespace(cfg.TRADER_REPORTS_FILE), root / 'unused.json') == []
-    store = importlib.import_module('core.state_store')
-    assert archive in store.load_bot_state()['retention']['archive_catalog']['reports']
+    persisted_bot = json.loads(conn.execute("SELECT payload_json FROM app_state WHERE namespace='bot_state'").fetchone()[0])
+    assert archive in persisted_bot['retention']['archive_catalog']['reports']
+    assert {k:v for k,v in persisted_bot.items() if k != 'retention'} == {k:v for k,v in untouched_bot.items() if k != 'retention'}
     before = snapshot(conn)
     again = retention.archive_old_trade_reports(60, now=datetime(2026, 4, 20, tzinfo=timezone.utc))
     assert again['files_updated'] == [] and snapshot(conn) == before
+    # A conflicting destination must preserve BOTH original sources and block.
+    conflicting = {**original, 'entry_price': original['entry_price'] + 1}
+    p.replace_table(cfg.TRADER_REPORTS_FILE, [conflicting])
+    before_conflict = snapshot(conn)[1]
+    conflict = retention.archive_old_trade_reports(60, now=datetime(2026, 4, 20, tzinfo=timezone.utc))
+    assert conflict['blocked'] and conflict['reason'] == 'RETENTION_CONFLICT'
+    assert snapshot(conn)[1] == before_conflict
+    q = importlib.import_module('core.commit_protocol')
+    assert q.gate_status()['blocked']
     evidence(conn, 'valid_unreceipted_archive', {'all_fields_preserved': True,
+        'non_retention_bot_fields_equal': True, 'archive_conflict_preserved': True,
         'catalog_same_commit': True, 'second_run_no_writes': True, 'receipt_compatibility_claim': False})
 
 
@@ -125,6 +147,21 @@ def test_failure_after_archive_copy_rolls_back_runtime_archive_and_catalog(pg, m
     with pytest.raises(OSError, match='PYTHON_INJECTION'):
         retention.archive_old_trade_reports(60, now=datetime(2026, 4, 20, tzinfo=timezone.utc))
     assert snapshot(conn) == before
+    collision_source = pg[3] / 'bot_log_2026_01.csv'
+    p.replace_table(collision_source, [{'timestamp': '2026-01-01T00:00:00+00:00', 'message': 'synthetic-evidence'}])
+    before_collision = snapshot(conn)
+    collision_error = None
+    try:
+        retention._archive_old_rows(runtime_path=collision_source, archive_dir=pg[3]/'other',
+            prefix='bot_log', columns=['timestamp','message'], timestamp_column='timestamp',
+            key_columns=['timestamp','message'], retention_days=60,
+            now=datetime(2026, 4, 20, tzinfo=timezone.utc))
+    except p.PersistenceDataError as exc:
+        collision_error = str(exc)
+    remaining = conn.execute('SELECT count(*) FROM app_rows WHERE namespace=%s', (p._table_namespace(collision_source),)).fetchone()[0]
+    evidence(conn, 'namespace_collision', {'source_rows_before': 1, 'source_rows_after': remaining, 'refused': collision_error is not None})
+    assert collision_error and 'namespace' in collision_error
+    assert snapshot(conn) == before_collision
     evidence(conn, 'archive_rollback', {'fault': 'PYTHON_INJECTION', 'all_rows_catalog_rolled_back': True})
 
 
