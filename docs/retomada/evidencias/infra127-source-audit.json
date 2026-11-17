@@ -1,0 +1,60 @@
+{
+  "scope": "INFRA127_SOURCE_AUDIT",
+  "base_commit": "faf3fa26b6d8c9d8edf45e8b8e8177b54dcdad05",
+  "branch": "atlas/infra-1-2-7-retencao-quarentena",
+  "worktree_was_clean_at_creation": true,
+  "original_worktree_prior_edits_preserved": true,
+  "financial_verification_body_ast_identical_to_original": true,
+  "unchanged_strategy_configuration_and_controls": [
+    {
+      "path": "paper_trading_engine.py",
+      "sha256": "539cbc6bbae7899aa91b654527dcd6d10c76e6e1e27fef548779094c4c28df56",
+      "identical_to_base": true
+    },
+    {
+      "path": "engines/trader_engine.py",
+      "sha256": "09a0df46873ecd497b8d2511cb136ceec0ec9e7c5c4695ec740dd667d706bd73",
+      "identical_to_base": true
+    },
+    {
+      "path": "core/config.py",
+      "sha256": "4b08cf34faff35025e6a99bf9b322ce9f8220ac1facba177e48f6be17e36dae7",
+      "identical_to_base": true
+    },
+    {
+      "path": "core/stop_control.py",
+      "sha256": "cbfab8f84425d56cec20dce55972ec5308cdfa1933f0f0853e81f87151615a8e",
+      "identical_to_base": true
+    },
+    {
+      "path": "core/state_store.py",
+      "sha256": "341a3669f919383b9cc24f92d21d7139d79d47846b469fcf51f292ce17cb95ef",
+      "identical_to_base": true
+    },
+    {
+      "path": "core/persistence.py",
+      "sha256": "57c4c9e85b319d62f802f6a91743c92a8c0a80b05a7b7e2264f1092d99345075",
+      "identical_to_base": true
+    },
+    {
+      "path": "core/integrity_diagnostics.py",
+      "sha256": "089b744c22db57a2ac3533daf6cbf3d42cd5481f91203c1e9f4043a76a752022",
+      "identical_to_base": true
+    },
+    {
+      "path": "core/broker.py",
+      "sha256": "97c8c574f525914211ff74a5ebf7746408593c68e8268c43ef3576497ce58100",
+      "identical_to_base": true
+    }
+  ],
+  "schema_migration_files_added_or_changed": false,
+  "rejected_snapshot_integrated": false,
+  "broker_mode": "paper",
+  "broker_provider": "paper",
+  "implementation_commits": [
+    "6d33fd766bb3b4aba4f6f5712436d0ffed9a4c17",
+    "27871043b66a6a60cd28a40ad07f5d6c98e7bf9d",
+    "abcfadbb5cdf4ca4b8af2c57bbaba33a0fc36f57"
+  ],
+  "last_runtime_tree": "e704304be8deca2a8145ea750258a1d730ae789b"
+}

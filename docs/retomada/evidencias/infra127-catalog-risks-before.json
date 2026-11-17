@@ -1,0 +1,13 @@
+{
+  "scope": "OWNED_SYNTHETIC_POSTGRES_ONLY",
+  "implementation_before_fix": "6d33fd766bb3b4aba4f6f5712436d0ffed9a4c17",
+  "namespace_collision": {
+    "refused": false,
+    "source_rows_after": 0,
+    "source_rows_before": 1
+  },
+  "normalization_failure_observed_in": "infra127-normalization-before-fix18.xml",
+  "synthetic_wallet_before": 10000.0,
+  "synthetic_wallet_after": 1000.0,
+  "real_data_touched": false
+}

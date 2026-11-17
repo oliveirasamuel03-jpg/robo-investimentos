@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites><testsuite name="pytest" errors="0" failures="2" skipped="0" tests="2" time="1.957" timestamp="2026-11-17T19:43:00.411512+00:00" hostname="0fd3647af28d"><testcase classname="tests.test_infra127_postgres" name="test_valid_unreceipted_archive_preserves_objects_and_catalog_atomically" time="1.277"><failure message="psycopg.errors.UndefinedTable: relation &quot;app_state&quot; does not exist&#10;LINE 1: INSERT INTO app_state(namespace,payload_json) VALUES ('bot_s...&#10;                    ^">pg = (&lt;module 'core.persistence' from '/workspace/robo-investimentos-infra127/core/persistence.py'&gt;, &lt;psycopg.Connection [I...278f09 host=127.0.0.1 port=36213', PosixPath('/tmp/pytest-of-agent/pytest-96/test_valid_unreceipted_archive0/storage'))
+
+    def test_valid_unreceipted_archive_preserves_objects_and_catalog_atomically(pg):
+        p, conn, _, root = pg
+        cfg = importlib.import_module('core.config')
+        retention = importlib.import_module('core.retention')
+        original = legacy_report()
+        store = importlib.import_module('core.state_store')
+        untouched_bot = deepcopy(store.DEFAULT_STATE)
+        untouched_bot.update(cash=cfg.LEGACY_VALIDATION_INITIAL_CAPITAL_BRL,
+                             wallet_value=cfg.LEGACY_VALIDATION_INITIAL_CAPITAL_BRL,
+                             positions=[], realized_pnl=0, last_run_at='')
+        untouched_bot['validation'].update(validation_started_at='', last_report={})
+        untouched_bot['trader']['max_open_positions'] = 3
+&gt;       conn.execute("INSERT INTO app_state(namespace,payload_json) VALUES ('bot_state',%s) ON CONFLICT(namespace) DO UPDATE SET payload_json=EXCLUDED.payload_json",
+                     (json.dumps(untouched_bot),))
+
+tests/test_infra127_postgres.py:106:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = &lt;psycopg.Connection [IDLE] (host=127.0.0.1 port=36213 user=atlas_fixture database=atlas_infra12_d42d7fb865278f09) at 0x7f10909509b0&gt;
+query = "INSERT INTO app_state(namespace,payload_json) VALUES ('bot_state',%s) ON CONFLICT(namespace) DO UPDATE SET payload_json=EXCLUDED.payload_json"
+params = ('{"wallet_value": 10000.0, "cash": 10000.0, "bot_status": "PAUSED", "bot_mode": "Automatico", "realized_pnl": 0, "pos...lding_minutes": 60, "max_open_positions": 3, "watchlist": ["BTC-USD", "ETH-USD", "BNB-USD", "SOL-USD", "LINK-USD"]}}',)
+
+    def execute(
+        self,
+        query: Query,
+        params: Params | None = None,
+        *,
+        prepare: bool | None = None,
+        binary: bool = False,
+    ) -&gt; Cursor[Row]:
+        """Execute a query and return a cursor to read its results."""
+        try:
+            cur = self.cursor()
+            if binary:
+                cur.format = BINARY
+
+            return cur.execute(query, params, prepare=prepare)
+        except e._NO_TRACEBACK as ex:
+&gt;           raise ex.with_traceback(None)
+E           psycopg.errors.UndefinedTable: relation "app_state" does not exist
+E           LINE 1: INSERT INTO app_state(namespace,payload_json) VALUES ('bot_s...
+E                               ^
+
+../robo-investimentos/.venv/lib/python3.12/site-packages/psycopg/connection.py:249: UndefinedTable</failure></testcase><testcase classname="tests.test_infra127_postgres" name="test_failure_after_archive_copy_rolls_back_runtime_archive_and_catalog" time="0.437"><failure message="KeyError: 'namespace_collision'">pg = (&lt;module 'core.persistence' from '/workspace/robo-investimentos-infra127/core/persistence.py'&gt;, &lt;psycopg.Connection [I...d04393 host=127.0.0.1 port=36213', PosixPath('/tmp/pytest-of-agent/pytest-96/test_failure_after_archive_cop0/storage'))
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x7f10909c4c80&gt;
+
+    def test_failure_after_archive_copy_rolls_back_runtime_archive_and_catalog(pg, monkeypatch):
+        p, conn, _, _ = pg
+        cfg = importlib.import_module('core.config')
+        retention = importlib.import_module('core.retention')
+        p.replace_table(cfg.TRADER_REPORTS_FILE, [legacy_report()])
+        before = snapshot(conn)
+        original = p.replace_json_rows
+        def fail(namespace, *args, **kwargs):
+            if namespace == p._table_namespace(cfg.TRADER_REPORTS_FILE):
+                raise OSError('PYTHON_INJECTION after synthetic archive copy')
+            return original(namespace, *args, **kwargs)
+        monkeypatch.setattr(p, 'replace_json_rows', fail)
+        with pytest.raises(OSError, match='PYTHON_INJECTION'):
+            retention.archive_old_trade_reports(60, now=datetime(2026, 4, 20, tzinfo=timezone.utc))
+        assert snapshot(conn) == before
+        collision_source = pg[3] / 'namespace_collision_2026_01.csv'
+        p.replace_table(collision_source, [{'timestamp': '2026-01-01T00:00:00+00:00', 'message': 'synthetic-evidence'}])
+        before_collision = snapshot(conn)
+        collision_error = None
+        try:
+&gt;           retention._archive_old_rows(runtime_path=collision_source, archive_dir=pg[3]/'other',
+                prefix='namespace_collision', columns=['timestamp','message'], timestamp_column='timestamp',
+                key_columns=['timestamp','message'], retention_days=60,
+                now=datetime(2026, 4, 20, tzinfo=timezone.utc))
+
+tests/test_infra127_postgres.py:154:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+core/persistence.py:171: in wrapped
+    return function(*args, **kwargs)
+core/retention.py:357: in _archive_old_rows
+    _publish_archive_paths(prefix, files_updated)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+prefix = 'namespace_collision'
+paths = ['/tmp/pytest-of-agent/pytest-96/test_failure_after_archive_cop0/storage/other/namespace_collision_2026_01.csv']
+
+    def _publish_archive_paths(prefix, paths):
+        """Same PostgreSQL unit as copy/removal, including direct API callers."""
+        if not paths:
+            return
+        from core.state_store import update_bot_state
+&gt;       kind = {'trade_reports': 'reports', 'trader_orders': 'orders', 'bot_log': 'logs'}[prefix]
+E       KeyError: 'namespace_collision'
+
+core/retention.py:116: KeyError</failure></testcase></testsuite></testsuites>

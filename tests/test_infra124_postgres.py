@@ -304,10 +304,22 @@ def test_empty_plan_does_not_bypass_strict_historical_json_validation(pg,monkeyp
     conn.execute("UPDATE app_rows SET row_json=%s WHERE seq=(SELECT min(seq) FROM app_rows WHERE namespace=%s)",
                  ('{"duplicate":1,"duplicate":2}',namespace))
     count=conn.execute("SELECT count(*) FROM app_rows WHERE namespace='paper_trades'").fetchone()[0]
-    with pytest.raises(p.PersistenceDataError):
+    before=conn.execute('SELECT seq,namespace,row_json FROM app_rows ORDER BY seq').fetchall()
+    # Retention namespaces now have an earlier durable containment check. A
+    # parser error must not bypass that fence or be converted into permission.
+    expected=p.PersistenceDataError if namespace=='paper_trades' else q.ReconciliationRequired
+    with pytest.raises(expected):
         q.begin_intent(paper.load_paper_state(),[],[])
+    assert conn.execute('SELECT seq,namespace,row_json FROM app_rows ORDER BY seq').fetchall()==before
     assert conn.execute("SELECT count(*) FROM app_rows WHERE namespace='paper_trades'").fetchone()[0]==count
     assert conn.execute("SELECT count(*) FROM app_state WHERE namespace LIKE 'paper_cycle_receipt:%%'").fetchone()[0]==0
+    if namespace!='paper_trades':
+        assert q.gate_status()['blocked']
+        # This fixture connection independently observes the committed latch.
+        quarantine=json.loads(conn.execute('SELECT payload_json FROM app_state WHERE namespace=%s',
+                                          (q.QUARANTINE,)).fetchone()[0])
+        assert quarantine['active']
+        assert quarantine['evidence'][0]['source']['reason']=='INVALID_UNANCHORED_FINANCIAL_JSON'
 
 
 def test_save_still_refuses_corrupt_current_json_even_with_matching_cas(pg):

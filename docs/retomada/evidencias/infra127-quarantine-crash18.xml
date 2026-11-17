@@ -1,0 +1,1 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites><testsuite name="pytest" errors="0" failures="0" skipped="0" tests="1" time="8.939" timestamp="2026-11-17T20:14:55.769942+00:00" hostname="0fd3647af28d"><testcase classname="tests.test_infra127_postgres" name="test_backup_restore_preserves_quarantine_stop_and_all_financial_rows" time="8.783" /></testsuite></testsuites>

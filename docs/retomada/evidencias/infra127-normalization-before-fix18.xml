@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites><testsuite name="pytest" errors="0" failures="1" skipped="0" tests="1" time="1.617" timestamp="2026-11-17T19:44:59.965621+00:00" hostname="0fd3647af28d"><testcase classname="tests.test_infra127_postgres" name="test_valid_unreceipted_archive_preserves_objects_and_catalog_atomically" time="1.440"><failure message="AssertionError: assert {'bos_confirm...'PAUSED', ...} == {'bos_confirm...'PAUSED', ...}&#10;  &#10;  Omitting 38 identical items, use -vv to show&#10;  Differing items:&#10;  {'wallet_value': 1000.0} != {'wallet_value': 10000.0}&#10;  {'multi_timeframe_swing_audit': {'bos_pivot_dominant_missing_piece': '', 'bos_pivot_top_bos_state': 'INSUFFICIENT_DATA', 'bos_pivot_top_pivot_state': 'INSUFFICIENT_DATA', 'bos_pivot_trace_relationship': 'INSUFFICIENT_DATA', ...}} != {'multi_timeframe_swing_audit': {'cache_status': 'cycle_data_resample_only', 'cache_ttl_seconds': 900, 'candidates_count': 0, 'conflict_count': 0, ...}}&#10;  {'reversal_blocker_routing_audit': {'candidates': [], 'current_feed_is_clean':...&#10;  &#10;  ...Full output truncated (4 lines hidden), use '-vv' to show">pg = (&lt;module 'core.persistence' from '/workspace/robo-investimentos-infra127/core/persistence.py'&gt;, &lt;psycopg.Connection [I...7f1c89 host=127.0.0.1 port=46855', PosixPath('/tmp/pytest-of-agent/pytest-98/test_valid_unreceipted_archive0/storage'))
+
+    def test_valid_unreceipted_archive_preserves_objects_and_catalog_atomically(pg):
+        p, conn, _, root = pg
+        cfg = importlib.import_module('core.config')
+        retention = importlib.import_module('core.retention')
+        original = legacy_report()
+        store = importlib.import_module('core.state_store')
+        untouched_bot = deepcopy(store.DEFAULT_STATE)
+        untouched_bot.update(cash=cfg.LEGACY_VALIDATION_INITIAL_CAPITAL_BRL,
+                             wallet_value=cfg.LEGACY_VALIDATION_INITIAL_CAPITAL_BRL,
+                             positions=[], realized_pnl=0, last_run_at='')
+        untouched_bot['validation'].update(validation_started_at='', last_report={})
+        untouched_bot['trader']['max_open_positions'] = 3
+        p._ensure_db_schema()
+        conn.execute("INSERT INTO app_state(namespace,payload_json) VALUES ('bot_state',%s) ON CONFLICT(namespace) DO UPDATE SET payload_json=EXCLUDED.payload_json",
+                     (json.dumps(untouched_bot),))
+        p.replace_table(cfg.TRADER_REPORTS_FILE, [original])
+        result = retention.archive_old_trade_reports(60, now=datetime(2026, 4, 20, tzinfo=timezone.utc))
+        assert result['archived_rows'] == 1 and result['retained_rows'] == 0
+        archive = result['files_updated'][0]
+        assert p.load_json_rows(p._table_namespace(archive), root / 'unused.json') == [original]
+        assert p.load_json_rows(p._table_namespace(cfg.TRADER_REPORTS_FILE), root / 'unused.json') == []
+        persisted_bot = json.loads(conn.execute("SELECT payload_json FROM app_state WHERE namespace='bot_state'").fetchone()[0])
+        assert archive in persisted_bot['retention']['archive_catalog']['reports']
+&gt;       assert {k:v for k,v in persisted_bot.items() if k != 'retention'} == {k:v for k,v in untouched_bot.items() if k != 'retention'}
+E       AssertionError: assert {'bos_confirm...'PAUSED', ...} == {'bos_confirm...'PAUSED', ...}
+E
+E         Omitting 38 identical items, use -vv to show
+E         Differing items:
+E         {'wallet_value': 1000.0} != {'wallet_value': 10000.0}
+E         {'multi_timeframe_swing_audit': {'bos_pivot_dominant_missing_piece': '', 'bos_pivot_top_bos_state': 'INSUFFICIENT_DATA', 'bos_pivot_top_pivot_state': 'INSUFFICIENT_DATA', 'bos_pivot_trace_relationship': 'INSUFFICIENT_DATA', ...}} != {'multi_timeframe_swing_audit': {'cache_status': 'cycle_data_resample_only', 'cache_ttl_seconds': 900, 'candidates_count': 0, 'conflict_count': 0, ...}}
+E         {'reversal_blocker_routing_audit': {'candidates': [], 'current_feed_is_clean':...
+E
+E         ...Full output truncated (4 lines hidden), use '-vv' to show
+
+tests/test_infra127_postgres.py:117: AssertionError</failure></testcase></testsuite></testsuites>

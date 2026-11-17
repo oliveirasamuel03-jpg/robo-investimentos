@@ -1,0 +1,99 @@
+{
+  "cases": {
+    "basename_namespace_collision": {
+      "contract": "reserve canonical basenames; directory is not namespace isolation",
+      "different_paths_same_namespace": true
+    },
+    "concurrent_marker_cas": {
+      "automatic_retry": false,
+      "barrier_synchronized": true,
+      "stale_writers": 1,
+      "successful_writers": 1
+    },
+    "least_privilege_marker_gateway": {
+      "financial_implementation": false,
+      "raw_dml_ddl_truncate_role_escalation_denied": true,
+      "reader_write_denied": true,
+      "real_restricted_logins": true,
+      "security_definer_search_path_fixed": true
+    },
+    "noop_retention_preserves_proof": {
+      "cycle_id_preserved": true,
+      "manifest_equal": true,
+      "outcome": "COMMITTED",
+      "rows_equal": true
+    },
+    "ordinary_dml_control_change_detected": {
+      "advisory_lock_held": true,
+      "financial_cycle_executed_after_bypass": false,
+      "pending_gate_cleared_outside_protocol": true,
+      "persistent_integrity_evidence_blocks_finance": true,
+      "raw_update_succeeded": true,
+      "sql_permissions_not_changed": true,
+      "superuser": false
+    },
+    "privileged_sql_not_proven_by_revision": {
+      "changed_content": true,
+      "requires_independent_content_audit": true,
+      "same_revision": true,
+      "universal_integrity_claim": false
+    },
+    "readonly_parser_duplicate_keys": {
+      "read_only_audit_is_not_financial_authority": true,
+      "readonly_tool_counts_as_valid": true,
+      "strict_runtime_rejects": true
+    },
+    "readonly_parser_nonfinite": {
+      "read_only_audit_is_not_financial_authority": true,
+      "readonly_tool_counts_as_valid": true,
+      "strict_runtime_rejects": true
+    },
+    "retained_conflicting_reports": {
+      "archived_rows": 0,
+      "conflict_quarantine_persisted": true,
+      "reports_preserved": 2
+    },
+    "retention_backup_restore": {
+      "all_rows_equal": true,
+      "backup": {
+        "all_rows_equal_before_quarantine": true,
+        "backup_writer_lock_seconds": 0.323730867001359,
+        "dump_bytes": 21823,
+        "dump_seconds": 0.3052342190003401,
+        "dump_sha256": "20625a4414c44efe5655f1ecc51d8b8aed06984306b0f26b3876891f2a8e015e",
+        "gate_blocked_after_quarantine": true,
+        "indexes_equal": true,
+        "pending_intent_preserved": true,
+        "restore_seconds": 0.15296431000024313,
+        "restored_inventory_sha256": "b18ca346eab69df07e572340e5a611c1527a00c16502f5061fcf2e4c71b6b014",
+        "rows": 7,
+        "scope": "LOCAL_SYNTHETIC_ONLY",
+        "sequence_equal": true,
+        "source_inventory_sha256": "b18ca346eab69df07e572340e5a611c1527a00c16502f5061fcf2e4c71b6b014",
+        "source_previous_bot_status": "RUNNING",
+        "source_stop_verified_before_snapshot": true,
+        "state_namespaces": 7,
+        "stop_quarantine_verified": true,
+        "total_seconds": 0.8873449200000323
+      },
+      "bad_receipt_keeps_quarantine": true,
+      "financial_retry": false,
+      "restored_stopped": true,
+      "unsafe_archival_refused": true
+    },
+    "unknown_retention_atomic_rollback": {
+      "financial_retry": false,
+      "runtime_archive_catalog_unchanged": true,
+      "stop_persisted": true,
+      "unknown_preserved": true
+    },
+    "version_and_pending_marker_contract": {
+      "migration_rollback_local_only": true,
+      "old_version_rejected": true,
+      "pending_not_cleared": true,
+      "rollback_atomic": true
+    }
+  },
+  "former_counterexamples_converted": true,
+  "scope": "LOCAL_SYNTHETIC_STUDY_ONLY"
+}

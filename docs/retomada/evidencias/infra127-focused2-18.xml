@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites><testsuite name="pytest" errors="0" failures="1" skipped="0" tests="37" time="126.166" timestamp="2026-11-17T19:13:20.956995+00:00" hostname="0fd3647af28d"><testcase classname="tests.test_infra12_retention_postgres" name="test_retention_read_replace_serializes_with_concurrent_append" time="1.407" /><testcase classname="tests.test_infra12_retention_postgres" name="test_retention_failure_rolls_back_archive_copy_and_runtime_removal" time="0.275" /><testcase classname="tests.test_infra12_retention_postgres" name="test_weekly_summary_can_be_recomputed_without_unversioned_overwrite" time="0.175"><failure message="psycopg.errors.UndefinedTable: relation &quot;app_state&quot; does not exist&#10;LINE 1: SELECT payload_json FROM app_state WHERE namespace=$1&#10;                                 ^">pg = (&lt;module 'core.persistence' from '/workspace/robo-investimentos-infra127/core/persistence.py'&gt;, &lt;psycopg.Connection [I...0dbf03 host=127.0.0.1 port=39287', PosixPath('/tmp/pytest-of-agent/pytest-93/test_weekly_summary_can_be_rec0/storage'))
+
+    def test_weekly_summary_can_be_recomputed_without_unversioned_overwrite(pg):
+        _, _, _, _ = pg
+        retention = importlib.import_module("core.retention")
+&gt;       retention._save_weekly_summary({"synthetic": "first"}, week_key="2026_W16", archived=False)
+
+tests/test_infra12_retention_postgres.py:77:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+core/retention.py:165: in _save_weekly_summary
+    row = conn.execute('SELECT payload_json FROM app_state WHERE namespace=%s', (namespace,)).fetchone()
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = &lt;psycopg.Connection [BAD] at 0x7fbd9422eba0&gt;
+query = 'SELECT payload_json FROM app_state WHERE namespace=%s'
+params = ('weekly_validation_summary:runtime:2026_W16',)
+
+    def execute(
+        self,
+        query: Query,
+        params: Params | None = None,
+        *,
+        prepare: bool | None = None,
+        binary: bool = False,
+    ) -&gt; Cursor[Row]:
+        """Execute a query and return a cursor to read its results."""
+        try:
+            cur = self.cursor()
+            if binary:
+                cur.format = BINARY
+
+            return cur.execute(query, params, prepare=prepare)
+        except e._NO_TRACEBACK as ex:
+&gt;           raise ex.with_traceback(None)
+E           psycopg.errors.UndefinedTable: relation "app_state" does not exist
+E           LINE 1: SELECT payload_json FROM app_state WHERE namespace=$1
+E                                            ^
+
+../robo-investimentos/.venv/lib/python3.12/site-packages/psycopg/connection.py:249: UndefinedTable</failure></testcase><testcase classname="tests.test_infra126_postgres" name="test_noop_retention_changes_current_receipt_without_persisting_a_gate" time="4.446" /><testcase classname="tests.test_infra126_postgres" name="test_retained_conflicting_reports_collapse_without_archive" time="4.233" /><testcase classname="tests.test_infra126_postgres" name="test_unknown_rolls_back_retention_and_catalog_unit" time="4.219" /><testcase classname="tests.test_infra126_postgres" name="test_backup_of_retained_history_is_exact_but_does_not_repair_receipts" time="5.748" /><testcase classname="tests.test_infra126_postgres" name="test_table_namespaces_alias_different_directories" time="0.234" /><testcase classname="tests.test_infra126_postgres" name="test_readonly_inventory_is_not_strict_integrity_evidence[{&quot;value&quot;:NaN}]" time="0.305" /><testcase classname="tests.test_infra126_postgres" name="test_readonly_inventory_is_not_strict_integrity_evidence[{&quot;value&quot;:1,&quot;value&quot;:2}]" time="0.234" /><testcase classname="tests.test_infra126_postgres" name="test_nonadmin_raw_table_writer_bypasses_global_advisory_and_gate" time="1.701" /><testcase classname="tests.test_infra126_postgres" name="test_gateway_actual_login_has_minimum_privileges_and_safe_search_path" time="0.240" /><testcase classname="tests.test_infra126_postgres" name="test_gateway_versions_rollback_and_pending_fence" time="0.250" /><testcase classname="tests.test_infra126_postgres" name="test_gateway_concurrent_writers_have_one_cas_winner_without_retry" time="0.240" /><testcase classname="tests.test_infra126_postgres" name="test_privileged_sql_can_change_content_without_revision_even_with_gateway" time="0.227" /><testcase classname="tests.test_infra127_postgres" name="test_noop_has_no_write_api_calls_and_preserves_full_evidence" time="4.542" /><testcase classname="tests.test_infra127_postgres" name="test_identical_financial_duplicates_are_preserved_not_cleaned" time="4.413" /><testcase classname="tests.test_infra127_postgres" name="test_strict_corruption_is_preserved_and_quarantined[{]" time="4.186" /><testcase classname="tests.test_infra127_postgres" name="test_strict_corruption_is_preserved_and_quarantined[{&quot;cash&quot;:NaN}]" time="4.162" /><testcase classname="tests.test_infra127_postgres" name="test_strict_corruption_is_preserved_and_quarantined[{&quot;trade_id&quot;:&quot;one&quot;,&quot;trade_id&quot;:&quot;two&quot;}]" time="5.650" /><testcase classname="tests.test_infra127_postgres" name="test_valid_unreceipted_archive_preserves_objects_and_catalog_atomically" time="0.597" /><testcase classname="tests.test_infra127_postgres" name="test_failure_after_archive_copy_rolls_back_runtime_archive_and_catalog" time="0.484" /><testcase classname="tests.test_infra127_postgres" name="test_receipted_archival_is_refused_without_touching_manifest_or_receipts" time="5.109" /><testcase classname="tests.test_infra127_postgres" name="test_failed_containment_never_allows_finance_after_python_restart[quarantine_write]" time="5.583" /><testcase classname="tests.test_infra127_postgres" name="test_failed_containment_never_allows_finance_after_python_restart[outer_rollback]" time="5.740" /><testcase classname="tests.test_infra127_postgres" name="test_explicit_proof_and_quarantine_generation_are_required_to_release" time="4.631" /><testcase classname="tests.test_infra127_postgres" name="test_backup_restore_preserves_quarantine_stop_and_all_financial_rows" time="8.564" /><testcase classname="tests.test_infra127_postgres" name="test_two_concurrent_writers_reject_divergence_without_replaying_trades" time="6.586" /><testcase classname="tests.test_infra127_postgres" name="test_quarantine_during_feed_fences_pending_draft" time="5.282" /><testcase classname="tests.test_infra127_postgres" name="test_repeated_complete_retention_job_has_no_storage_changes" time="4.716" /><testcase classname="tests.test_infra127_postgres" name="test_current_receipt_tampering_cannot_be_laundered_into_a_new_cycle" time="4.516" /><testcase classname="tests.test_infra127_postgres" name="test_quarantine_after_durable_intent_rolls_back_entire_financial_unit" time="5.256" /><testcase classname="tests.test_infra127_postgres" name="test_late_cycle_a_diagnostic_never_clears_newer_quarantine_b" time="4.462" /><testcase classname="tests.test_infra127_postgres" name="test_unreadable_quarantine_is_not_reset_or_ignored[{}]" time="4.364" /><testcase classname="tests.test_infra127_postgres" name="test_unreadable_quarantine_is_not_reset_or_ignored[{]" time="4.486" /><testcase classname="tests.test_infra127_postgres" name="test_unreadable_quarantine_is_not_reset_or_ignored[{&quot;active&quot;:false,&quot;evidence&quot;:null}]" time="4.492" /><testcase classname="tests.test_infra127_postgres" name="test_lost_quarantine_commit_reply_is_unconfirmed_until_independent_read" time="4.202" /></testsuite></testsuites>

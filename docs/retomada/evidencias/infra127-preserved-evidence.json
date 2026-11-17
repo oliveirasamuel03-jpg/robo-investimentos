@@ -1,0 +1,174 @@
+{
+  "base_commit": "faf3fa26b6d8c9d8edf45e8b8e8177b54dcdad05",
+  "copies": [
+    {
+      "base_restored": true,
+      "base_sha256": "2575a0b1a9cbeb1f468aa7d742bc408cc1d144fadad345b91b3b0dd9de939b0f",
+      "regression_copy": "docs/retomada/evidencias/infra127-regression-123-backup-pg18.json",
+      "regression_sha256": "ffb3b032beba8a6d972ac1c61b191fd7112e9a2214a421bdfa7f7491ceead361",
+      "source": "docs/retomada/evidencias/infra123-backup-pg18.json"
+    },
+    {
+      "base_restored": true,
+      "base_sha256": "81fabe5ead66f96778fdde3d53799a2fca0656018ad0f834c6e0120a7240dd50",
+      "regression_copy": "docs/retomada/evidencias/infra127-regression-123-performance-pg18.json",
+      "regression_sha256": "fde94ef0041ea18a61f52cd55383c7eb41c52023611945fdb77a4db97d6dbebd",
+      "source": "docs/retomada/evidencias/infra123-performance-pg18.json"
+    },
+    {
+      "base_restored": true,
+      "base_sha256": "5a166573d2e17d877f725950bbbb2e72bd1cd4768a18640f0a34cd431befc0d4",
+      "regression_copy": "docs/retomada/evidencias/infra127-regression-123-recovery-pg18.json",
+      "regression_sha256": "b83d2cb270b256a86fc59fb7d7a53464683a36117f8b3b3720abc0f8411ea7c2",
+      "source": "docs/retomada/evidencias/infra123-recovery-pg18.json"
+    },
+    {
+      "base_restored": true,
+      "base_sha256": "4b430ee9c1f66cf60749f526e85ca21b4b9ee64b7ed5167df3dfce85b1cb8eb1",
+      "regression_copy": "docs/retomada/evidencias/infra127-regression-123-tcp-pg18.json",
+      "regression_sha256": "fc7c42eea93f9077720a8465e43a5b5b1cb0bab8054e7dc703e15c8baf345946",
+      "source": "docs/retomada/evidencias/infra123-tcp-pg18.json"
+    },
+    {
+      "base_restored": true,
+      "base_sha256": "fbf718034a4ba672101e769a167165738b0442961093ec2f4b778ae15f7469f3",
+      "regression_copy": "docs/retomada/evidencias/infra127-regression-124-performance-after-pg18.json",
+      "regression_sha256": "32c9e6348dd9bdc04b1a57657ec0ed4a9336c863b5993d04218fe3424824a532",
+      "source": "docs/retomada/evidencias/infra124-performance-after-pg18.json"
+    },
+    {
+      "base_restored": true,
+      "base_sha256": "06d4e14da0c46eba00c0a8006332a32d8f804bd25a1d7bf952ef573ffcfb4929",
+      "regression_copy": "docs/retomada/evidencias/infra127-regression-124-receipts-after-pg18.json",
+      "regression_sha256": "b0da762fb7a0349cae53d9eb53f628fad2782caecd67463fae53e6bbcdbfce6f",
+      "source": "docs/retomada/evidencias/infra124-receipts-after-pg18.json"
+    },
+    {
+      "base_restored": true,
+      "base_sha256": "528850ee350c7cc07f128210624defd81b8132763b195688d0d08f16b031ab59",
+      "regression_copy": "docs/retomada/evidencias/infra127-regression-125-backup-pg18.json",
+      "regression_sha256": "94c6965c1d0d5ceee1e9d6ecc57033e456b0ed3101088d9a30ae1b1148e64e75",
+      "source": "docs/retomada/evidencias/infra125-backup-pg18.json"
+    },
+    {
+      "base_restored": true,
+      "base_sha256": "5c0cda5fa34741d87de609d45e5f891e6e5057641b928bc6416c0e2c87d83be2",
+      "regression_copy": "docs/retomada/evidencias/infra127-regression-125-benchmark-pg18.json",
+      "regression_sha256": "8c805ee232f298ca930b65ea9438bb108864b29cb7b68e07db93cf67031d8ad3",
+      "source": "docs/retomada/evidencias/infra125-benchmark-pg18.json"
+    },
+    {
+      "base_restored": true,
+      "base_sha256": "438bad87c98f82c4316829cabbf1adcb86d8762c93fa8e069fdd8ea0b85f5a19",
+      "regression_copy": "docs/retomada/evidencias/infra127-regression-125-blockers-pg18.json",
+      "regression_sha256": "bd7ead659baa832df8d8990eb722b19fbc84338f97868f362fb32f45cb5b1e84",
+      "source": "docs/retomada/evidencias/infra125-blockers-pg18.json"
+    },
+    {
+      "base_restored": true,
+      "base_sha256": "801912d833a8cec46e7ce32a55d8748faac0a2b3d2f75b92215070ad6041110e",
+      "regression_copy": "docs/retomada/evidencias/infra127-regression-125-recovery-pg18.json",
+      "regression_sha256": "a9fd72f4d0197b4aa053e2489589c1ba6b9678ca2b7e54e1b814de392ad68c2c",
+      "source": "docs/retomada/evidencias/infra125-recovery-pg18.json"
+    },
+    {
+      "base_restored": true,
+      "base_sha256": "2575a0b1a9cbeb1f468aa7d742bc408cc1d144fadad345b91b3b0dd9de939b0f",
+      "regression_copy": "docs/retomada/evidencias/infra127-final-regression-123-backup-pg18.json",
+      "regression_sha256": "30a3f59e6bd61fff8bcf671ae4ab9d1b56c89c7299685f9b087dc332dcdce21f",
+      "run": "FINAL_FULL_RUNTIME_REGRESSION",
+      "runtime_commit": "abcfadbb5cdf4ca4b8af2c57bbaba33a0fc36f57",
+      "source": "docs/retomada/evidencias/infra123-backup-pg18.json"
+    },
+    {
+      "base_restored": true,
+      "base_sha256": "81fabe5ead66f96778fdde3d53799a2fca0656018ad0f834c6e0120a7240dd50",
+      "regression_copy": "docs/retomada/evidencias/infra127-final-regression-123-performance-pg18.json",
+      "regression_sha256": "46e7b117b22466a43567602999f0b18b1a36234186f56db0a28f4e4c945600cb",
+      "run": "FINAL_FULL_RUNTIME_REGRESSION",
+      "runtime_commit": "abcfadbb5cdf4ca4b8af2c57bbaba33a0fc36f57",
+      "source": "docs/retomada/evidencias/infra123-performance-pg18.json"
+    },
+    {
+      "base_restored": true,
+      "base_sha256": "5a166573d2e17d877f725950bbbb2e72bd1cd4768a18640f0a34cd431befc0d4",
+      "regression_copy": "docs/retomada/evidencias/infra127-final-regression-123-recovery-pg18.json",
+      "regression_sha256": "d6fb9a54622d709055f1f69d60fc18402fd2b62403d56c79a04e1e411e37eff3",
+      "run": "FINAL_FULL_RUNTIME_REGRESSION",
+      "runtime_commit": "abcfadbb5cdf4ca4b8af2c57bbaba33a0fc36f57",
+      "source": "docs/retomada/evidencias/infra123-recovery-pg18.json"
+    },
+    {
+      "base_restored": true,
+      "base_sha256": "4b430ee9c1f66cf60749f526e85ca21b4b9ee64b7ed5167df3dfce85b1cb8eb1",
+      "regression_copy": "docs/retomada/evidencias/infra127-final-regression-123-tcp-pg18.json",
+      "regression_sha256": "ee9c248291dd63000bd60dbe89acfb29ccfa685f408497e722e71864724286b6",
+      "run": "FINAL_FULL_RUNTIME_REGRESSION",
+      "runtime_commit": "abcfadbb5cdf4ca4b8af2c57bbaba33a0fc36f57",
+      "source": "docs/retomada/evidencias/infra123-tcp-pg18.json"
+    },
+    {
+      "base_restored": true,
+      "base_sha256": "fbf718034a4ba672101e769a167165738b0442961093ec2f4b778ae15f7469f3",
+      "regression_copy": "docs/retomada/evidencias/infra127-final-regression-124-performance-after-pg18.json",
+      "regression_sha256": "49bf979a622e475ad88e1a8d2d269138b578b5184ee93a419c76c91facde7064",
+      "run": "FINAL_FULL_RUNTIME_REGRESSION",
+      "runtime_commit": "abcfadbb5cdf4ca4b8af2c57bbaba33a0fc36f57",
+      "source": "docs/retomada/evidencias/infra124-performance-after-pg18.json"
+    },
+    {
+      "base_restored": true,
+      "base_sha256": "06d4e14da0c46eba00c0a8006332a32d8f804bd25a1d7bf952ef573ffcfb4929",
+      "regression_copy": "docs/retomada/evidencias/infra127-final-regression-124-receipts-after-pg18.json",
+      "regression_sha256": "c3c25ed1db66af12843fd13d897b26fe9fbd616d69e10cb64c6859e18b8dce61",
+      "run": "FINAL_FULL_RUNTIME_REGRESSION",
+      "runtime_commit": "abcfadbb5cdf4ca4b8af2c57bbaba33a0fc36f57",
+      "source": "docs/retomada/evidencias/infra124-receipts-after-pg18.json"
+    },
+    {
+      "base_restored": true,
+      "base_sha256": "528850ee350c7cc07f128210624defd81b8132763b195688d0d08f16b031ab59",
+      "regression_copy": "docs/retomada/evidencias/infra127-final-regression-125-backup-pg18.json",
+      "regression_sha256": "94e72650aa1d40bd684b65d78f5764625175de8b9907b2f13e82e07ec16a11f9",
+      "run": "FINAL_FULL_RUNTIME_REGRESSION",
+      "runtime_commit": "abcfadbb5cdf4ca4b8af2c57bbaba33a0fc36f57",
+      "source": "docs/retomada/evidencias/infra125-backup-pg18.json"
+    },
+    {
+      "base_restored": true,
+      "base_sha256": "5c0cda5fa34741d87de609d45e5f891e6e5057641b928bc6416c0e2c87d83be2",
+      "regression_copy": "docs/retomada/evidencias/infra127-final-regression-125-benchmark-pg18.json",
+      "regression_sha256": "e3573362fa6b233652a7525cc9676d0d06da58085bd959bfa7e5df443d6a17d7",
+      "run": "FINAL_FULL_RUNTIME_REGRESSION",
+      "runtime_commit": "abcfadbb5cdf4ca4b8af2c57bbaba33a0fc36f57",
+      "source": "docs/retomada/evidencias/infra125-benchmark-pg18.json"
+    },
+    {
+      "base_restored": true,
+      "base_sha256": "438bad87c98f82c4316829cabbf1adcb86d8762c93fa8e069fdd8ea0b85f5a19",
+      "regression_copy": "docs/retomada/evidencias/infra127-final-regression-125-blockers-pg18.json",
+      "regression_sha256": "54b99ec8337b7ceeaac7b207dfd4673afe0e7e62b236bda5a97628ce887306c2",
+      "run": "FINAL_FULL_RUNTIME_REGRESSION",
+      "runtime_commit": "abcfadbb5cdf4ca4b8af2c57bbaba33a0fc36f57",
+      "source": "docs/retomada/evidencias/infra125-blockers-pg18.json"
+    },
+    {
+      "base_restored": true,
+      "base_sha256": "801912d833a8cec46e7ce32a55d8748faac0a2b3d2f75b92215070ad6041110e",
+      "regression_copy": "docs/retomada/evidencias/infra127-final-regression-125-recovery-pg18.json",
+      "regression_sha256": "00662c2024edbbda8e6287c57146b2ae757c04c49290d2840c878e08b4958d3c",
+      "run": "FINAL_FULL_RUNTIME_REGRESSION",
+      "runtime_commit": "abcfadbb5cdf4ca4b8af2c57bbaba33a0fc36f57",
+      "source": "docs/retomada/evidencias/infra125-recovery-pg18.json"
+    },
+    {
+      "base_restored": true,
+      "base_sha256": "06d4e14da0c46eba00c0a8006332a32d8f804bd25a1d7bf952ef573ffcfb4929",
+      "regression_copy": "docs/retomada/evidencias/infra127-safety-regression-124-receipts-after-pg18.json",
+      "regression_sha256": "8485c2524626e7431ec1b8c73cfef9674fa5fc60814f7cb91d7fffd71ec7240f",
+      "run": "FINAL_SAFETY_RERUN",
+      "runtime_commit": "abcfadbb5cdf4ca4b8af2c57bbaba33a0fc36f57",
+      "source": "docs/retomada/evidencias/infra124-receipts-after-pg18.json"
+    }
+  ]
+}

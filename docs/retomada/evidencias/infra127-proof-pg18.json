@@ -1,0 +1,184 @@
+{
+  "cases": {
+    "archive_rollback": {
+      "all_rows_catalog_rolled_back": true,
+      "fault": "PYTHON_INJECTION"
+    },
+    "backup_quarantine": {
+      "backup": {
+        "all_rows_equal_before_quarantine": true,
+        "backup_writer_lock_seconds": 0.2706271729985019,
+        "dump_bytes": 22211,
+        "dump_seconds": 0.25447190900013084,
+        "dump_sha256": "a23df564982c146b43247aee09a6f6ba99c21d63ac3ea0bf3f04a8c9acd53590",
+        "gate_blocked_after_quarantine": true,
+        "indexes_equal": true,
+        "pending_intent_preserved": true,
+        "restore_seconds": 0.11622363500100619,
+        "restored_inventory_sha256": "e7908782ec744469ff3f77ec2899c7ed1af1d330ff2e919b0244235589d9712e",
+        "rows": 7,
+        "scope": "LOCAL_SYNTHETIC_ONLY",
+        "sequence_equal": true,
+        "source_inventory_sha256": "e7908782ec744469ff3f77ec2899c7ed1af1d330ff2e919b0244235589d9712e",
+        "source_previous_bot_status": "STOPPED",
+        "source_stop_verified_before_snapshot": true,
+        "state_namespaces": 7,
+        "stop_quarantine_verified": true,
+        "total_seconds": 0.8353810059998068
+      },
+      "financial_rows_equal": true,
+      "heartbeat_reset_start_cannot_clear": true,
+      "quarantine_id_preserved": true,
+      "stop_persisted": true
+    },
+    "complete_job_noop": {
+      "all_state_rows_timestamps_equal": true,
+      "write_api_calls": 0
+    },
+    "concurrent_containment": {
+      "barrier": true,
+      "stop_and_ack_confirmed": true,
+      "trades_not_replayed": true,
+      "writers_rejected": 2
+    },
+    "containment_failure_outer_rollback": {
+      "failure_type": "PYTHON_INJECTION_OR_CALLER_ROLLBACK",
+      "fresh_preimage_recheck_recreated_durable_quarantine": true,
+      "new_python_process_refused_finance": true,
+      "no_false_persistence_claim": true,
+      "trades_unchanged": 3
+    },
+    "containment_failure_quarantine_write": {
+      "failure_type": "PYTHON_INJECTION_OR_CALLER_ROLLBACK",
+      "fresh_preimage_recheck_recreated_durable_quarantine": true,
+      "new_python_process_refused_finance": true,
+      "no_false_persistence_claim": true,
+      "trades_unchanged": 3
+    },
+    "corrupt_quarantine_1": {
+      "corrupt_record_preserved": true,
+      "execution_refused": true,
+      "stop_still_persists": true
+    },
+    "corrupt_quarantine_2": {
+      "corrupt_record_preserved": true,
+      "execution_refused": true,
+      "stop_still_persists": true
+    },
+    "corrupt_quarantine_32": {
+      "corrupt_record_preserved": true,
+      "execution_refused": true,
+      "stop_still_persists": true
+    },
+    "corruption_1": {
+      "quarantine_independently_observed": true,
+      "source_not_overwritten": true
+    },
+    "corruption_12": {
+      "quarantine_independently_observed": true,
+      "source_not_overwritten": true
+    },
+    "corruption_35": {
+      "quarantine_independently_observed": true,
+      "source_not_overwritten": true
+    },
+    "feed_quarantine_stop": {
+      "deterministic_events": true,
+      "draft_not_committed": true,
+      "financial_rows_equal": true,
+      "stop_available": true
+    },
+    "identical_duplicates": {
+      "new_finance_rejected_by_fresh_proof": true,
+      "no_cleanup": true,
+      "original_rows_preserved": 2
+    },
+    "intent_to_commit_quarantine": {
+      "entire_financial_unit_rolled_back": true,
+      "intent_committed_before_intervention": true,
+      "no_automatic_retry": true
+    },
+    "late_a_vs_quarantine_b": {
+      "gate_quarantine_new_receipt_equal": true,
+      "historical_receipt_cannot_release_current_quarantine": true
+    },
+    "namespace_collision": {
+      "refused": true,
+      "source_rows_after": 1,
+      "source_rows_before": 1
+    },
+    "noop": {
+      "all_bytes_seq_timestamps_equal": true,
+      "cycle_id_preserved": true,
+      "manifest_equal": true,
+      "repetitions": 3,
+      "write_api_calls": 0
+    },
+    "prior_receipt_tamper": {
+      "financial_rows_equal": true,
+      "full_receipt_validation_reused": true,
+      "new_intent_rejected": true
+    },
+    "quarantine_commit_lost_reply": {
+      "false_success_not_reported": true,
+      "fault": "PYTHON_INJECTION_AFTER_REAL_SERVER_COMMIT",
+      "independent_connection_observed_active_quarantine": true,
+      "not_a_real_tcp_failure": true,
+      "trades_not_replayed": true
+    },
+    "quarantine_real_postgres_crash": {
+      "fault": "REAL_OWNED_POSTGRES_SIGKILL_AND_RESTART",
+      "financial_rows_equal": true,
+      "fsync": "on",
+      "no_financial_retry": true,
+      "quarantine_unchanged": true,
+      "server_recovery_excerpt": [
+        "2026-11-17 21:41:57.977 UTC [32] LOG:  database system was interrupted; last known up at 2026-11-17 21:41:51 UTC",
+        "2026-11-17 21:41:58.795 UTC [32] LOG:  database system was not properly shut down; automatic recovery in progress",
+        "2026-11-17 21:41:58.797 UTC [32] LOG:  redo starts at 0/C0484C0",
+        "2026-11-17 21:41:58.830 UTC [32] LOG:  redo done at 0/C98C0C8 system usage: CPU: user: 0.00 s, system: 0.01 s, elapsed: 0.03 s",
+        "2026-11-17 21:41:59.126 UTC [1] LOG:  database system is ready to accept connections"
+      ],
+      "stop_still_persisted_after_recovery": true,
+      "stop_unconfirmed_while_down": true,
+      "synchronous_commit": "on"
+    },
+    "receipted_archival_refused": {
+      "financial_archive_requires_future_protocol": true,
+      "maintenance_not_financial_quarantine": true,
+      "manifest_receipts_rows_unchanged": true
+    },
+    "release_contract": {
+      "full_proof_and_matching_generation_required": true,
+      "no_financial_retry": true,
+      "retention_conflict_not_cleared_by_financial_receipt_alone": true
+    },
+    "unanchored_conflict_outer_rollback": {
+      "financial_retry": false,
+      "new_python_process_refused_finance": true,
+      "no_prior_receipt_assumed": true,
+      "original_rows_equal": true,
+      "persisted_data_enforces_block": true
+    },
+    "unanchored_conflict_quarantine_write": {
+      "financial_retry": false,
+      "new_python_process_refused_finance": true,
+      "no_prior_receipt_assumed": true,
+      "original_rows_equal": true,
+      "persisted_data_enforces_block": true
+    },
+    "valid_unreceipted_archive": {
+      "all_fields_preserved": true,
+      "archive_conflict_preserved": true,
+      "catalog_same_commit": true,
+      "failed_quarantine_and_outer_rollback_cannot_reopen_finance": true,
+      "new_process_reconstitutes_containment": true,
+      "non_retention_bot_fields_equal": true,
+      "receipt_compatibility_claim": false,
+      "second_run_no_writes": true
+    }
+  },
+  "evidence_run_junit": "infra127-safety-final18.xml",
+  "runtime_commit": "abcfadbb5cdf4ca4b8af2c57bbaba33a0fc36f57",
+  "scope": "LOCAL_SYNTHETIC_PAPER_ONLY"
+}

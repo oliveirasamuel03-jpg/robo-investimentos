@@ -1,0 +1,147 @@
+{
+  "decision": "BLOQUEADO",
+  "not_a_72h_authorization": true,
+  "regressions": [
+    {
+      "cases": {
+        "tests/test_infra126_postgres.py::test_noop_retention_changes_current_receipt_without_persisting_a_gate": "passed",
+        "tests/test_infra127_postgres.py::test_noop_has_no_write_api_calls_and_preserves_full_evidence": "passed",
+        "tests/test_infra127_postgres.py::test_repeated_complete_retention_job_has_no_storage_changes": "passed"
+      },
+      "postgres16": "NAO_EXECUTADO",
+      "postgres18": "PASSOU",
+      "regression": "1-retencao-sem-alteracoes"
+    },
+    {
+      "cases": {
+        "tests/test_infra127_postgres.py::test_receipted_archival_is_refused_without_touching_manifest_or_receipts": "passed",
+        "tests/test_infra127_postgres.py::test_valid_unreceipted_archive_preserves_objects_and_catalog_atomically": "passed"
+      },
+      "postgres16": "NAO_EXECUTADO",
+      "postgres18": "PASSOU",
+      "regression": "2-arquivo-valido"
+    },
+    {
+      "cases": {
+        "tests/test_infra127_postgres.py::test_identical_financial_duplicates_are_preserved_not_cleaned": "passed"
+      },
+      "postgres16": "NAO_EXECUTADO",
+      "postgres18": "PASSOU",
+      "regression": "3-duplicatas-identicas"
+    },
+    {
+      "cases": {
+        "tests/test_infra126_postgres.py::test_retained_conflicting_reports_collapse_without_archive": "passed",
+        "tests/test_infra127_postgres.py::test_unanchored_runtime_conflict_cannot_reopen_after_failed_quarantine[outer_rollback]": "passed",
+        "tests/test_infra127_postgres.py::test_unanchored_runtime_conflict_cannot_reopen_after_failed_quarantine[quarantine_write]": "passed"
+      },
+      "postgres16": "NAO_EXECUTADO",
+      "postgres18": "PASSOU",
+      "regression": "4-conflitos-financeiros"
+    },
+    {
+      "cases": {
+        "tests/test_infra127_postgres.py::test_failed_containment_never_allows_finance_after_python_restart[outer_rollback]": "passed",
+        "tests/test_infra127_postgres.py::test_failed_containment_never_allows_finance_after_python_restart[quarantine_write]": "passed",
+        "tests/test_infra127_postgres.py::test_unanchored_runtime_conflict_cannot_reopen_after_failed_quarantine[outer_rollback]": "passed",
+        "tests/test_infra127_postgres.py::test_unanchored_runtime_conflict_cannot_reopen_after_failed_quarantine[quarantine_write]": "passed",
+        "tests/test_infra127_postgres.py::test_unreadable_quarantine_is_not_reset_or_ignored[{\"active\":false,\"evidence\":null}]": "passed",
+        "tests/test_infra127_postgres.py::test_unreadable_quarantine_is_not_reset_or_ignored[{]": "passed",
+        "tests/test_infra127_postgres.py::test_unreadable_quarantine_is_not_reset_or_ignored[{}]": "passed"
+      },
+      "postgres16": "NAO_EXECUTADO",
+      "postgres18": "PASSOU",
+      "regression": "5-quarentena-persistente"
+    },
+    {
+      "cases": {
+        "tests/test_infra126_postgres.py::test_unknown_rolls_back_retention_and_catalog_unit": "passed",
+        "tests/test_infra127_postgres.py::test_failure_after_archive_copy_rolls_back_runtime_archive_and_catalog": "passed"
+      },
+      "postgres16": "NAO_EXECUTADO",
+      "postgres18": "PASSOU",
+      "regression": "6-falha-retencao"
+    },
+    {
+      "cases": {
+        "tests/test_infra123_postgres.py::test_real_socket_cut_at_financial_commit_boundary[before_commit]": "passed",
+        "tests/test_infra123_postgres.py::test_real_socket_cut_at_financial_commit_boundary[drop_commit_reply]": "passed",
+        "tests/test_infra123_postgres.py::test_real_socket_cut_at_financial_commit_boundary[partial_commit]": "passed",
+        "tests/test_infra127_postgres.py::test_lost_quarantine_commit_reply_is_unconfirmed_until_independent_read": "passed"
+      },
+      "postgres16": "NAO_EXECUTADO",
+      "postgres18": "PASSOU",
+      "regression": "7-commit-incerto"
+    },
+    {
+      "cases": {
+        "tests/test_infra123_postgres.py::test_real_postgres_sigkill_restart_preserves_unknown_stop_and_financial_data": "passed",
+        "tests/test_infra127_postgres.py::test_backup_restore_preserves_quarantine_stop_and_all_financial_rows": "passed",
+        "tests/test_infra127_postgres.py::test_failed_containment_never_allows_finance_after_python_restart[outer_rollback]": "passed",
+        "tests/test_infra127_postgres.py::test_failed_containment_never_allows_finance_after_python_restart[quarantine_write]": "passed"
+      },
+      "postgres16": "NAO_EXECUTADO",
+      "postgres18": "PASSOU",
+      "regression": "8-reinicio-reconciliacao"
+    },
+    {
+      "cases": {
+        "tests/test_infra127_postgres.py::test_backup_restore_preserves_quarantine_stop_and_all_financial_rows": "passed",
+        "tests/test_infra127_postgres.py::test_quarantine_during_feed_fences_pending_draft": "passed",
+        "tests/test_infra127_postgres.py::test_two_concurrent_writers_reject_divergence_without_replaying_trades": "passed"
+      },
+      "postgres16": "NAO_EXECUTADO",
+      "postgres18": "PASSOU",
+      "regression": "9-stop-durante-falhas"
+    },
+    {
+      "cases": {
+        "tests/test_infra126_postgres.py::test_backup_of_retained_history_is_exact_but_does_not_repair_receipts": "passed",
+        "tests/test_infra127_postgres.py::test_backup_restore_preserves_quarantine_stop_and_all_financial_rows": "passed"
+      },
+      "postgres16": "NAO_EXECUTADO",
+      "postgres18": "PASSOU",
+      "regression": "10-backup-restore"
+    },
+    {
+      "cases": {
+        "tests/test_infra127_postgres.py::test_two_concurrent_writers_reject_divergence_without_replaying_trades": "passed"
+      },
+      "postgres16": "NAO_EXECUTADO",
+      "postgres18": "PASSOU",
+      "regression": "11-concorrencia"
+    },
+    {
+      "cases": {
+        "tests/test_infra127_postgres.py::test_current_receipt_tampering_cannot_be_laundered_into_a_new_cycle": "passed",
+        "tests/test_infra127_postgres.py::test_noop_has_no_write_api_calls_and_preserves_full_evidence": "passed",
+        "tests/test_infra127_postgres.py::test_receipted_archival_is_refused_without_touching_manifest_or_receipts": "passed"
+      },
+      "postgres16": "NAO_EXECUTADO",
+      "postgres18": "PASSOU",
+      "regression": "12-recibos-manifests"
+    },
+    {
+      "cases": {
+        "tests/test_infra123_postgres.py::test_real_socket_cut_at_financial_commit_boundary[before_commit]": "passed",
+        "tests/test_infra123_postgres.py::test_real_socket_cut_at_financial_commit_boundary[drop_commit_reply]": "passed",
+        "tests/test_infra123_postgres.py::test_real_socket_cut_at_financial_commit_boundary[partial_commit]": "passed",
+        "tests/test_infra124_postgres.py::test_duplicate_buy_sell_and_report_still_rejected": "passed",
+        "tests/test_infra127_postgres.py::test_quarantine_after_durable_intent_rolls_back_entire_financial_unit": "passed"
+      },
+      "postgres16": "NAO_EXECUTADO",
+      "postgres18": "PASSOU",
+      "regression": "13-ausencia-repeticao"
+    },
+    {
+      "all_preserved": true,
+      "baseline_case_ids": 685,
+      "current_case_ids": 709,
+      "offline_passed": 534,
+      "postgres16": "NAO_EXECUTADO",
+      "postgres18_distinct_passed": 175,
+      "regression": "14-compatibilidade-testes-anteriores",
+      "runtime_unchanged_during_expectation_conversion": true
+    }
+  ]
+}

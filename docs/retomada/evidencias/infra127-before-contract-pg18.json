@@ -1,0 +1,83 @@
+{
+  "cases": {
+    "basename_namespace_collision": {
+      "contract": "reserve canonical basenames; directory is not namespace isolation",
+      "different_paths_same_namespace": true
+    },
+    "concurrent_marker_cas": {
+      "automatic_retry": false,
+      "barrier_synchronized": true,
+      "stale_writers": 1,
+      "successful_writers": 1
+    },
+    "least_privilege_marker_gateway": {
+      "financial_implementation": false,
+      "raw_dml_ddl_truncate_role_escalation_denied": true,
+      "reader_write_denied": true,
+      "real_restricted_logins": true,
+      "security_definer_search_path_fixed": true
+    },
+    "noop_retention_and_unpersisted_block": {
+      "archived_rows": 0,
+      "classification": "CRITICAL_OPEN_DEFECT_NOT_FIXED_IN_STUDY",
+      "cycle_id_removed_from_report": true,
+      "execution_guard_still_allows": true,
+      "manifest_changed": true,
+      "persisted_gate_blocked": false,
+      "reconcile_result": "UNKNOWN_COMMIT",
+      "returned_blocked": true
+    },
+    "ordinary_dml_bypasses_guard": {
+      "advisory_lock_held": true,
+      "financial_cycle_executed_after_bypass": false,
+      "pending_gate_cleared_outside_protocol": true,
+      "raw_update_succeeded": true,
+      "superuser": false
+    },
+    "privileged_sql_not_proven_by_revision": {
+      "changed_content": true,
+      "requires_independent_content_audit": true,
+      "same_revision": true,
+      "universal_integrity_claim": false
+    },
+    "readonly_parser_duplicate_keys": {
+      "read_only_audit_is_not_financial_authority": true,
+      "readonly_tool_counts_as_valid": true,
+      "strict_runtime_rejects": true
+    },
+    "readonly_parser_nonfinite": {
+      "read_only_audit_is_not_financial_authority": true,
+      "readonly_tool_counts_as_valid": true,
+      "strict_runtime_rejects": true
+    },
+    "retained_conflicting_reports": {
+      "archived_rows": 0,
+      "classification": "HIGH_LOSS_OF_EVIDENCE_NOT_FIXED",
+      "different_payload_same_dedupe_key": true,
+      "reports_after": 1,
+      "synthetic_reports_before": 2
+    },
+    "retention_backup_restore": {
+      "all_rows_equal": true,
+      "archived_reports": 1,
+      "backup_is_not_integrity_repair": true,
+      "financial_retry": false,
+      "receipt_still_unknown": true,
+      "restored_stopped": true
+    },
+    "unknown_retention_atomic_rollback": {
+      "financial_retry": false,
+      "runtime_archive_catalog_unchanged": true,
+      "stop_persisted": true,
+      "unknown_preserved": true
+    },
+    "version_and_pending_marker_contract": {
+      "migration_rollback_local_only": true,
+      "old_version_rejected": true,
+      "pending_not_cleared": true,
+      "rollback_atomic": true
+    }
+  },
+  "runtime_changed": false,
+  "scope": "LOCAL_SYNTHETIC_STUDY_ONLY"
+}

@@ -1,0 +1,96 @@
+{
+  "reason": "Initial staged git diff --check rejected trailing whitespace emitted by pytest tracebacks. Only end-of-line spaces/tabs in new phase TXT/XML artifacts were removed. No line, test result, assertion, failure or warning was removed. Prior-phase artifacts remain byte-identical.",
+  "initial_staged_diff_check_exit_code": 2,
+  "files": [
+    {
+      "path": "docs/retomada/evidencias/infra127-catalog-before-fix18.txt",
+      "raw_sha256": "a0c21eabc70359e58d45bff5731f81774d1eab8a29a427c615746974377fff09",
+      "normalized_sha256": "1781a98f47579090e3ee8438ca833445a350282e90e387f26b5f9a55cdf30eae",
+      "trailing_whitespace_bytes_removed": 9
+    },
+    {
+      "path": "docs/retomada/evidencias/infra127-catalog-before-fix18.xml",
+      "raw_sha256": "eb6a3314a01d3a83ec26b51c3e72cfe681d2e55b2539a3d3d62c05a358ee6feb",
+      "normalized_sha256": "5f9595d0e1e1884df261c3ab584a4ec125100e8e97615d1bab4ac04465ca3c67",
+      "trailing_whitespace_bytes_removed": 9
+    },
+    {
+      "path": "docs/retomada/evidencias/infra127-durable-focused18.txt",
+      "raw_sha256": "7623ea3ac722011394202a147db6012d0d630e0b7e53bafd3336c107b1baafd5",
+      "normalized_sha256": "d4b27f7ee69e515a9100e5c2858199540b4391d34a4b43aca60e6c526650b127",
+      "trailing_whitespace_bytes_removed": 3
+    },
+    {
+      "path": "docs/retomada/evidencias/infra127-focused2-18.txt",
+      "raw_sha256": "8ef66518a3728e623f0dae923f74581541ffdd7971fbfeac54c6e562a1068b3f",
+      "normalized_sha256": "27e2015b48123cb133854f65491a1859a756de2f82a9679fbb61695052516353",
+      "trailing_whitespace_bytes_removed": 7
+    },
+    {
+      "path": "docs/retomada/evidencias/infra127-focused2-18.xml",
+      "raw_sha256": "095ee825dfae0808a89f40ffb2e8b800a0f3aab92b17d8ba732c0c2bdb1080ea",
+      "normalized_sha256": "86fd1aaecd6255d2cf5530beea6d041ce2ea66d9d2a285178d78ad2298011033",
+      "trailing_whitespace_bytes_removed": 7
+    },
+    {
+      "path": "docs/retomada/evidencias/infra127-normalization-before-fix18.txt",
+      "raw_sha256": "4a25fa615b593090b15466268aefa3cc81f0efcab66efa0c79a3b90bab014f01",
+      "normalized_sha256": "1c729e4417f34f6b0db4faa225487fa8173f233f4c314e1c538b4f15f0e7adf5",
+      "trailing_whitespace_bytes_removed": 18
+    },
+    {
+      "path": "docs/retomada/evidencias/infra127-normalization-before-fix18.xml",
+      "raw_sha256": "4ad723d3bdb9ccc62609c1baf8baa0c9cbedbca9461d5fcc6b67dacf8a81c027",
+      "normalized_sha256": "bfdc026f6a0c05918d31f52873214033f45c5afef32e42772814d804996e5a0d",
+      "trailing_whitespace_bytes_removed": 18
+    },
+    {
+      "path": "docs/retomada/evidencias/infra127-offline-complete.txt",
+      "raw_sha256": "9dbb48e367362388324b7d7b31f4de316f40b99f73c1ee1c8f0f0840600f2416",
+      "normalized_sha256": "28a155e29b9074d83b1552d85116be9b5af1a6bacbf5ec3bdeba0f144804c8f2",
+      "trailing_whitespace_bytes_removed": 12
+    },
+    {
+      "path": "docs/retomada/evidencias/infra127-offline-final.txt",
+      "raw_sha256": "d4acde967fbd4f7be57b178f11d485207aba056723f51b43522e7f593851bbab",
+      "normalized_sha256": "693829b93bc4bfd7a7d2a8fa5fe36f6b25e7af8b057295a462934e3fa7f64e68",
+      "trailing_whitespace_bytes_removed": 12
+    },
+    {
+      "path": "docs/retomada/evidencias/infra127-offline-release.txt",
+      "raw_sha256": "8d4e449f833e860d9882dc25ec31fab330ebefea036e5468e76715772caeb84b",
+      "normalized_sha256": "71bd6288895534f93f42ce842a7a7cca2c3fb7aaabcf6ad5710515eab392a37b",
+      "trailing_whitespace_bytes_removed": 12
+    },
+    {
+      "path": "docs/retomada/evidencias/infra127-offline.txt",
+      "raw_sha256": "a279d0517865ab70c1bed9123d9fc86bf3e8a212d90cd2e164eb93819e3ebfc4",
+      "normalized_sha256": "3b3ae8eccacf64033f8290583f478f869b6b67b3d36d4c2d30f1e7bf7a2c3e49",
+      "trailing_whitespace_bytes_removed": 14
+    },
+    {
+      "path": "docs/retomada/evidencias/infra127-offline.xml",
+      "raw_sha256": "bbc83970d0b7471094108a54dcd8db871ac3723bb2fd97cae08cee60ac3f9556",
+      "normalized_sha256": "ae2f5689f1327f3a92045891f8ec4a2ba496f00b747da640ecddd62c977eb5c8",
+      "trailing_whitespace_bytes_removed": 2
+    },
+    {
+      "path": "docs/retomada/evidencias/infra127-postgres18-release.txt",
+      "raw_sha256": "fb65593840227d9badb68f3dc17393726782a0c8c3e4cf6f424959c1002ecb75",
+      "normalized_sha256": "db261adb53b7763d4ed7765c904aa11297a00fb49eaa5d4777b38b2b30a22ce1",
+      "trailing_whitespace_bytes_removed": 6
+    },
+    {
+      "path": "docs/retomada/evidencias/infra127-postgres18-release.xml",
+      "raw_sha256": "8446c51d24d668e068049f0d14acb1a12665660709cd0472bca30b2f1e973327",
+      "normalized_sha256": "7d659cb937aac249467eb3ab9391f90bd1d11be98c8b499a06618ff42e2e268f",
+      "trailing_whitespace_bytes_removed": 6
+    },
+    {
+      "path": "docs/retomada/evidencias/infra127-ui-final.txt",
+      "raw_sha256": "fa3261e4beb2cfa7bd965931e43c131babde81fd0db9fc2c5580cdaff3c242ac",
+      "normalized_sha256": "82c8860d47ecc529c8567683171a78ddd9b03a9091116fab9a3edf1a047fd89d",
+      "trailing_whitespace_bytes_removed": 2
+    }
+  ]
+}

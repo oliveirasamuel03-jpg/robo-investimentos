@@ -1,0 +1,45 @@
+{"server_version": "18.6", "image": ["postgres@sha256:9ba53c7d41ea093baf5c1ba635ba5434c4f979880527d49bb7d9237d3193085b"], "scope": "LOCAL_SYNTHETIC_ONLY", "broker_mode": "paper", "broker_provider": "paper", "listener": "127.0.0.1"}
+F                                                                        [100%]
+=================================== FAILURES ===================================
+____ test_failure_after_archive_copy_rolls_back_runtime_archive_and_catalog ____
+
+pg = (<module 'core.persistence' from '/workspace/robo-investimentos-infra127/core/persistence.py'>, <psycopg.Connection [I...4ede50 host=127.0.0.1 port=45701', PosixPath('/tmp/pytest-of-agent/pytest-97/test_failure_after_archive_cop0/storage'))
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f85591c7410>
+
+    def test_failure_after_archive_copy_rolls_back_runtime_archive_and_catalog(pg, monkeypatch):
+        p, conn, _, _ = pg
+        cfg = importlib.import_module('core.config')
+        retention = importlib.import_module('core.retention')
+        p.replace_table(cfg.TRADER_REPORTS_FILE, [legacy_report()])
+        before = snapshot(conn)
+        original = p.replace_json_rows
+        def fail(namespace, *args, **kwargs):
+            if namespace == p._table_namespace(cfg.TRADER_REPORTS_FILE):
+                raise OSError('PYTHON_INJECTION after synthetic archive copy')
+            return original(namespace, *args, **kwargs)
+        monkeypatch.setattr(p, 'replace_json_rows', fail)
+        with pytest.raises(OSError, match='PYTHON_INJECTION'):
+            retention.archive_old_trade_reports(60, now=datetime(2026, 4, 20, tzinfo=timezone.utc))
+        assert snapshot(conn) == before
+        collision_source = pg[3] / 'bot_log_2026_01.csv'
+        p.replace_table(collision_source, [{'timestamp': '2026-01-01T00:00:00+00:00', 'message': 'synthetic-evidence'}])
+        before_collision = snapshot(conn)
+        collision_error = None
+        try:
+            retention._archive_old_rows(runtime_path=collision_source, archive_dir=pg[3]/'other',
+                prefix='bot_log', columns=['timestamp','message'], timestamp_column='timestamp',
+                key_columns=['timestamp','message'], retention_days=60,
+                now=datetime(2026, 4, 20, tzinfo=timezone.utc))
+        except p.PersistenceDataError as exc:
+            collision_error = str(exc)
+        remaining = conn.execute('SELECT count(*) FROM app_rows WHERE namespace=%s', (p._table_namespace(collision_source),)).fetchone()[0]
+        evidence(conn, 'namespace_collision', {'source_rows_before': 1, 'source_rows_after': remaining, 'refused': collision_error is not None})
+>       assert collision_error and 'namespace' in collision_error
+E       assert (None)
+
+tests/test_infra127_postgres.py:162: AssertionError
+- generated xml file: /workspace/robo-investimentos-infra127/docs/retomada/evidencias/infra127-namespace-before-fix18.xml -
+=========================== short test summary info ============================
+FAILED tests/test_infra127_postgres.py::test_failure_after_archive_copy_rolls_back_runtime_archive_and_catalog
+1 failed in 1.83s
+Disposable local PostgreSQL container and own volumes removed.

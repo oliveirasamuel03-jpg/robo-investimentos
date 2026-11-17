@@ -1,0 +1,65 @@
+{"server_version": "18.6", "image": ["postgres@sha256:9ba53c7d41ea093baf5c1ba635ba5434c4f979880527d49bb7d9237d3193085b"], "scope": "LOCAL_SYNTHETIC_ONLY", "broker_mode": "paper", "broker_provider": "paper", "listener": "127.0.0.1"}
+..F..................................                                    [100%]
+=================================== FAILURES ===================================
+_____ test_weekly_summary_can_be_recomputed_without_unversioned_overwrite ______
+
+pg = (<module 'core.persistence' from '/workspace/robo-investimentos-infra127/core/persistence.py'>, <psycopg.Connection [I...0dbf03 host=127.0.0.1 port=39287', PosixPath('/tmp/pytest-of-agent/pytest-93/test_weekly_summary_can_be_rec0/storage'))
+
+    def test_weekly_summary_can_be_recomputed_without_unversioned_overwrite(pg):
+        _, _, _, _ = pg
+        retention = importlib.import_module("core.retention")
+>       retention._save_weekly_summary({"synthetic": "first"}, week_key="2026_W16", archived=False)
+
+tests/test_infra12_retention_postgres.py:77:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+core/retention.py:165: in _save_weekly_summary
+    row = conn.execute('SELECT payload_json FROM app_state WHERE namespace=%s', (namespace,)).fetchone()
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <psycopg.Connection [BAD] at 0x7fbd9422eba0>
+query = 'SELECT payload_json FROM app_state WHERE namespace=%s'
+params = ('weekly_validation_summary:runtime:2026_W16',)
+
+    def execute(
+        self,
+        query: Query,
+        params: Params | None = None,
+        *,
+        prepare: bool | None = None,
+        binary: bool = False,
+    ) -> Cursor[Row]:
+        """Execute a query and return a cursor to read its results."""
+        try:
+            cur = self.cursor()
+            if binary:
+                cur.format = BINARY
+
+            return cur.execute(query, params, prepare=prepare)
+        except e._NO_TRACEBACK as ex:
+>           raise ex.with_traceback(None)
+E           psycopg.errors.UndefinedTable: relation "app_state" does not exist
+E           LINE 1: SELECT payload_json FROM app_state WHERE namespace=$1
+E                                            ^
+
+../robo-investimentos/.venv/lib/python3.12/site-packages/psycopg/connection.py:249: UndefinedTable
+=============================== warnings summary ===============================
+tests/test_infra126_postgres.py: 13 warnings
+tests/test_infra127_postgres.py: 62 warnings
+  /workspace/robo-investimentos-infra127/core/multi_timeframe_swing_audit.py:182: FutureWarning: 'H' is deprecated and will be removed in a future version, please use 'h' instead.
+    resampled = data.resample(rule).agg(agg).dropna(subset=["open", "high", "low", "close"])
+
+tests/test_infra126_postgres.py: 13 warnings
+tests/test_infra127_postgres.py: 60 warnings
+  /workspace/robo-investimentos-infra127/core/state_store.py:2329: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    state_written_at = datetime.utcnow().isoformat()
+
+tests/test_infra127_postgres.py::test_backup_restore_preserves_quarantine_stop_and_all_financial_rows
+  /workspace/robo-investimentos-infra127/core/state_store.py:2262: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    state["worker_heartbeat"] = datetime.utcnow().isoformat()
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+- generated xml file: /workspace/robo-investimentos-infra127/docs/retomada/evidencias/infra127-focused2-18.xml -
+=========================== short test summary info ============================
+FAILED tests/test_infra12_retention_postgres.py::test_weekly_summary_can_be_recomputed_without_unversioned_overwrite
+1 failed, 36 passed, 149 warnings in 126.17s (0:02:06)
+Disposable local PostgreSQL container and own volumes removed.

@@ -1,0 +1,22 @@
+{
+  "scope": "LOCAL_TEST_RESOURCE_BOUND",
+  "postgres16_tests_executed": false,
+  "postgres16_cases_not_executed": 175,
+  "server_version_observed": null,
+  "candidate_image": "postgres:16.15-alpine",
+  "image": {
+    "id": "sha256:4278d7b1e3deb3193ddc803158f6532963f059fc25a2eefaee4b5a9e71741873",
+    "bytes": 294298690,
+    "digests": [
+      "postgres@sha256:aa6cb33cf4c19c765cefcf48d96176258800870a9a1e930ad126200f9d825139"
+    ]
+  },
+  "docker_storage_driver": "vfs",
+  "available_bytes_before_test_container": 324292608,
+  "benchmark_min_free_bytes": 268435456,
+  "reason": "Insufficient disk for an additional VFS container layer, PostgreSQL data and the unchanged free-space guard. Prior stopped container pins PG18; it and its volume were preserved.",
+  "prior_container_preserved": "9fb2a800a365",
+  "forced_removal": false,
+  "global_prune": false,
+  "skip_counted_as_pass": false
+}

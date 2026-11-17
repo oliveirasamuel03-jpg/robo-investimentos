@@ -1,0 +1,36 @@
+{"server_version": "18.6", "image": ["postgres@sha256:9ba53c7d41ea093baf5c1ba635ba5434c4f979880527d49bb7d9237d3193085b"], "scope": "LOCAL_SYNTHETIC_ONLY", "broker_mode": "paper", "broker_provider": "paper", "listener": "127.0.0.1"}
+........................................................................ [ 41%]
+........................................................................ [ 83%]
+.............................                                            [100%]
+=============================== warnings summary ===============================
+tests/test_infra12_postgres.py: 1 warning
+tests/test_infra121_postgres.py: 11 warnings
+tests/test_infra122_postgres.py: 20 warnings
+tests/test_infra123_postgres.py: 33 warnings
+tests/test_infra124_postgres.py: 36 warnings
+tests/test_infra125_postgres.py: 162 warnings
+tests/test_infra126_postgres.py: 13 warnings
+tests/test_infra127_postgres.py: 62 warnings
+  /workspace/robo-investimentos-infra127/core/multi_timeframe_swing_audit.py:182: FutureWarning: 'H' is deprecated and will be removed in a future version, please use 'h' instead.
+    resampled = data.resample(rule).agg(agg).dropna(subset=["open", "high", "low", "close"])
+
+tests/test_infra121_postgres.py::test_stop_and_heartbeat_preserve_each_other
+tests/test_infra125_postgres.py::test_snapshot_recheck_refuses_any_intervening_relevant_write[heartbeat]
+tests/test_infra127_postgres.py::test_backup_restore_preserves_quarantine_stop_and_all_financial_rows
+  /workspace/robo-investimentos-infra127/core/state_store.py:2262: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    state["worker_heartbeat"] = datetime.utcnow().isoformat()
+
+tests/test_infra121_postgres.py: 6 warnings
+tests/test_infra122_postgres.py: 4 warnings
+tests/test_infra123_postgres.py: 27 warnings
+tests/test_infra124_postgres.py: 32 warnings
+tests/test_infra125_postgres.py: 157 warnings
+tests/test_infra126_postgres.py: 13 warnings
+tests/test_infra127_postgres.py: 60 warnings
+  /workspace/robo-investimentos-infra127/core/state_store.py:2329: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    state_written_at = datetime.utcnow().isoformat()
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+- generated xml file: /workspace/robo-investimentos-infra127/docs/retomada/evidencias/infra127-postgres18.xml -
+173 passed, 640 warnings in 1418.44s (0:23:38)
+Disposable local PostgreSQL container and own volumes removed.

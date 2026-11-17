@@ -1,0 +1,147 @@
+{
+  "cases": {
+    "archive_rollback": {
+      "all_rows_catalog_rolled_back": true,
+      "fault": "PYTHON_INJECTION"
+    },
+    "backup_quarantine": {
+      "backup": {
+        "all_rows_equal_before_quarantine": true,
+        "backup_writer_lock_seconds": 0.2990613199999643,
+        "dump_bytes": 22208,
+        "dump_seconds": 0.2791096240002844,
+        "dump_sha256": "142bf6bb6ec0a92c7ea556f946db579dfe8ecb4b74b6939b50e6e983d82aef9e",
+        "gate_blocked_after_quarantine": true,
+        "indexes_equal": true,
+        "pending_intent_preserved": true,
+        "restore_seconds": 0.13020089199972062,
+        "restored_inventory_sha256": "77870043c5c82c8e8d15418d78ff622a242855e717297467933cfa7e30c089f3",
+        "rows": 7,
+        "scope": "LOCAL_SYNTHETIC_ONLY",
+        "sequence_equal": true,
+        "source_inventory_sha256": "77870043c5c82c8e8d15418d78ff622a242855e717297467933cfa7e30c089f3",
+        "source_previous_bot_status": "STOPPED",
+        "source_stop_verified_before_snapshot": true,
+        "state_namespaces": 7,
+        "stop_quarantine_verified": true,
+        "total_seconds": 0.9599163059997409
+      },
+      "financial_rows_equal": true,
+      "heartbeat_reset_start_cannot_clear": true,
+      "quarantine_id_preserved": true,
+      "stop_persisted": true
+    },
+    "complete_job_noop": {
+      "all_state_rows_timestamps_equal": true,
+      "write_api_calls": 0
+    },
+    "concurrent_containment": {
+      "barrier": true,
+      "stop_and_ack_confirmed": true,
+      "trades_not_replayed": true,
+      "writers_rejected": 2
+    },
+    "containment_failure_outer_rollback": {
+      "failure_type": "PYTHON_INJECTION_OR_CALLER_ROLLBACK",
+      "fresh_preimage_recheck_recreated_durable_quarantine": true,
+      "new_python_process_refused_finance": true,
+      "no_false_persistence_claim": true,
+      "trades_unchanged": 3
+    },
+    "containment_failure_quarantine_write": {
+      "failure_type": "PYTHON_INJECTION_OR_CALLER_ROLLBACK",
+      "fresh_preimage_recheck_recreated_durable_quarantine": true,
+      "new_python_process_refused_finance": true,
+      "no_false_persistence_claim": true,
+      "trades_unchanged": 3
+    },
+    "corrupt_quarantine_1": {
+      "corrupt_record_preserved": true,
+      "execution_refused": true,
+      "stop_still_persists": true
+    },
+    "corrupt_quarantine_2": {
+      "corrupt_record_preserved": true,
+      "execution_refused": true,
+      "stop_still_persists": true
+    },
+    "corrupt_quarantine_32": {
+      "corrupt_record_preserved": true,
+      "execution_refused": true,
+      "stop_still_persists": true
+    },
+    "corruption_1": {
+      "quarantine_independently_observed": true,
+      "source_not_overwritten": true
+    },
+    "corruption_12": {
+      "quarantine_independently_observed": true,
+      "source_not_overwritten": true
+    },
+    "corruption_35": {
+      "quarantine_independently_observed": true,
+      "source_not_overwritten": true
+    },
+    "feed_quarantine_stop": {
+      "deterministic_events": true,
+      "draft_not_committed": true,
+      "financial_rows_equal": true,
+      "stop_available": true
+    },
+    "identical_duplicates": {
+      "new_finance_rejected_by_fresh_proof": true,
+      "no_cleanup": true,
+      "original_rows_preserved": 2
+    },
+    "intent_to_commit_quarantine": {
+      "entire_financial_unit_rolled_back": true,
+      "intent_committed_before_intervention": true,
+      "no_automatic_retry": true
+    },
+    "late_a_vs_quarantine_b": {
+      "gate_quarantine_new_receipt_equal": true,
+      "historical_receipt_cannot_release_current_quarantine": true
+    },
+    "namespace_collision": {
+      "refused": false,
+      "source_rows_after": 0,
+      "source_rows_before": 1
+    },
+    "noop": {
+      "all_bytes_seq_timestamps_equal": true,
+      "cycle_id_preserved": true,
+      "manifest_equal": true,
+      "repetitions": 3,
+      "write_api_calls": 0
+    },
+    "prior_receipt_tamper": {
+      "financial_rows_equal": true,
+      "full_receipt_validation_reused": true,
+      "new_intent_rejected": true
+    },
+    "quarantine_commit_lost_reply": {
+      "false_success_not_reported": true,
+      "fault": "PYTHON_INJECTION_AFTER_REAL_SERVER_COMMIT",
+      "independent_connection_observed_active_quarantine": true,
+      "not_a_real_tcp_failure": true,
+      "trades_not_replayed": true
+    },
+    "receipted_archival_refused": {
+      "financial_archive_requires_future_protocol": true,
+      "maintenance_not_financial_quarantine": true,
+      "manifest_receipts_rows_unchanged": true
+    },
+    "release_contract": {
+      "full_proof_and_matching_generation_required": true,
+      "no_financial_retry": true,
+      "retention_conflict_not_cleared_by_financial_receipt_alone": true
+    },
+    "valid_unreceipted_archive": {
+      "all_fields_preserved": true,
+      "catalog_same_commit": true,
+      "receipt_compatibility_claim": false,
+      "second_run_no_writes": true
+    }
+  },
+  "scope": "LOCAL_SYNTHETIC_PAPER_ONLY"
+}

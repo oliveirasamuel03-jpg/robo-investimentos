@@ -1,0 +1,61 @@
+{"server_version": "18.6", "image": ["postgres@sha256:9ba53c7d41ea093baf5c1ba635ba5434c4f979880527d49bb7d9237d3193085b"], "scope": "LOCAL_SYNTHETIC_ONLY", "broker_mode": "paper", "broker_provider": "paper", "listener": "127.0.0.1"}
+..........F............................                                  [100%]
+=================================== FAILURES ===================================
+_______ test_nonadmin_raw_table_writer_bypasses_global_advisory_and_gate _______
+
+pg = (<module 'core.persistence' from '/workspace/robo-investimentos-infra127/core/persistence.py'>, <psycopg.Connection [I...776a4 host=127.0.0.1 port=50069', PosixPath('/tmp/pytest-of-agent/pytest-104/test_nonadmin_raw_table_writer0/storage'))
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f6bbed601a0>
+
+    def test_nonadmin_raw_table_writer_bypasses_global_advisory_and_gate(pg, monkeypatch):
+        p, conn, store, control, paper, trader, q = _setup(pg, monkeypatch)
+        cycle = trader.run_trader_cycle()['cycle_id']
+        q.post_commit_failure(cycle, confirmed=True)
+        name, password = 'infra126_raw_' + secrets.token_hex(5), secrets.token_urlsafe(24)
+        conn.execute(sql.SQL('CREATE ROLE {} LOGIN PASSWORD {} NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS').format(sql.Identifier(name), sql.Literal(password)))
+        conn.execute(sql.SQL('GRANT USAGE ON SCHEMA public TO {}').format(sql.Identifier(name)))
+        conn.execute(sql.SQL('GRANT SELECT,UPDATE ON app_state TO {}').format(sql.Identifier(name)))
+        params = make_conninfo(pg[2], user=name, password=password)
+        with p.persistence_transaction():
+            with psycopg.connect(params, autocommit=True) as raw:
+                assert raw.execute("SELECT rolsuper FROM pg_roles WHERE rolname=current_user").fetchone()[0] is False
+                raw.execute("SET lock_timeout='500ms'")
+                # Own synthetic gate only; no historical data or trade is removed.
+                raw.execute("UPDATE app_state SET payload_json=%s WHERE namespace='paper_commit_control'", ('{}',))
+>       assert not q.gate_status()['blocked']
+E       assert not True
+
+tests/test_infra126_postgres.py:161: AssertionError
+------------------------------ Captured log call -------------------------------
+ERROR    yfinance:base.py:131 Failed to get ticker 'AAPL' reason: Local PostgreSQL tests: non-loopback resolution blocked
+ERROR    yfinance:multi.py:181
+1 Failed download:
+ERROR    yfinance:multi.py:194 ['AAPL']: RuntimeError('Local PostgreSQL tests: non-loopback resolution blocked')
+ERROR    yfinance:base.py:131 Failed to get ticker 'AAPL' reason: Local PostgreSQL tests: non-loopback resolution blocked
+ERROR    yfinance:multi.py:181
+1 Failed download:
+ERROR    yfinance:multi.py:194 ['AAPL']: RuntimeError('Local PostgreSQL tests: non-loopback resolution blocked')
+ERROR    yfinance:base.py:131 Failed to get ticker 'BTC-USD' reason: Local PostgreSQL tests: non-loopback resolution blocked
+ERROR    yfinance:multi.py:181
+1 Failed download:
+ERROR    yfinance:multi.py:194 ['BTC-USD']: RuntimeError('Local PostgreSQL tests: non-loopback resolution blocked')
+=============================== warnings summary ===============================
+tests/test_infra126_postgres.py: 13 warnings
+tests/test_infra127_postgres.py: 62 warnings
+  /workspace/robo-investimentos-infra127/core/multi_timeframe_swing_audit.py:182: FutureWarning: 'H' is deprecated and will be removed in a future version, please use 'h' instead.
+    resampled = data.resample(rule).agg(agg).dropna(subset=["open", "high", "low", "close"])
+
+tests/test_infra126_postgres.py: 13 warnings
+tests/test_infra127_postgres.py: 60 warnings
+  /workspace/robo-investimentos-infra127/core/state_store.py:2329: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    state_written_at = datetime.utcnow().isoformat()
+
+tests/test_infra127_postgres.py::test_backup_restore_preserves_quarantine_stop_and_all_financial_rows
+  /workspace/robo-investimentos-infra127/core/state_store.py:2262: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    state["worker_heartbeat"] = datetime.utcnow().isoformat()
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+- generated xml file: /workspace/robo-investimentos-infra127/docs/retomada/evidencias/infra127-durable-focused18.xml -
+=========================== short test summary info ============================
+FAILED tests/test_infra126_postgres.py::test_nonadmin_raw_table_writer_bypasses_global_advisory_and_gate
+1 failed, 38 passed, 149 warnings in 138.83s (0:02:18)
+Disposable local PostgreSQL container and own volumes removed.

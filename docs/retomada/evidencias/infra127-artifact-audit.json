@@ -1,0 +1,957 @@
+{
+  "scope": "INFRA127_LOCAL_ARTIFACT_AUDIT",
+  "runtime_commit": "abcfadbb5cdf4ca4b8af2c57bbaba33a0fc36f57",
+  "json_and_xml_parse": true,
+  "artifact_count_before_this_manifest": 77,
+  "secret_pattern_hits": [],
+  "inspected_false_positive_files": [
+    "infra127-durable-focused18.txt",
+    "infra127-durable-focused18.xml"
+  ],
+  "false_positive_explanation": "Traceback contains tuple assignment name,password = role_prefix + random_suffix, random_password() and password=name fixture variable reference. No generated password value is logged.",
+  "prior_phase_evidence_files_unchanged": 137,
+  "prior_phase_evidence_sha256": [
+    {
+      "path": "docs/retomada/evidencias/banco-novo-pytest.txt",
+      "sha256": "789e916a14a01a801c29a7047c2e3765147f9f1c1b099bac414800f3548b3278"
+    },
+    {
+      "path": "docs/retomada/evidencias/baseline-collection.txt",
+      "sha256": "69648d967b70f25856525e1f951456b2815c4bd0bb7853ae05761553ca7fb192"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra11-postgres.json",
+      "sha256": "3b12774200892aff7872ca6dcd67ca79344c5a7d224e36c786b50ea1fa356b72"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra11-pytest.txt",
+      "sha256": "b3a81878395b59eed005a8cabbe3ed8d6e9b70b3ab051b48a7347599ac47519f"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra12-baseline-environment-failure.txt",
+      "sha256": "15fc6d4b0b4db44d0d2cf2c7bcae38aa8d8b6c6eee23791cab1c75827b171ccd"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra12-baseline.txt",
+      "sha256": "53b2c779e7c48458389d99f05bf2610fa0dd6eb8a36d050264774b2ca5e7b79d"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra12-checks.txt",
+      "sha256": "564e2b53fb853078fc35ce938a9cf9c5b983a778a29561412dd93dbc6a65cc95"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra12-legacy-reproductions.json",
+      "sha256": "a9bc80affc2f3cedb0808b5f0208b8ff598a1933c38222aa48e8fc2a155408a7"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra12-offline.txt",
+      "sha256": "4db769b7e5a384f7c312baee7583effcf4c9e8040f93dd1e5ee302e623a1375c"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra12-offline.xml",
+      "sha256": "dab77dba94fc84bbef40e3431560b569ca3ab8692fc0c47576fa8faa24fb7a07"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra12-postgres16.txt",
+      "sha256": "1a8d6044c80851f062f5e434f4000fe3eff310f0f8b06644ed7c83b7fd424f9c"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra12-postgres16.xml",
+      "sha256": "349e3ff46218750ba3aa73be59ae18124355fe72ccff0e408ba36e0402a5c333"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra12-postgres18.txt",
+      "sha256": "80eb9db0e98cb8792b94a9ab7b9da29a0ea221e3ba0346c1d2ec0cc54657b008"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra12-postgres18.xml",
+      "sha256": "679efe6be9ed8c465e746883bac630a9dd8a4e6acc0052aef5f4b721154a4ab4"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra121-checks.txt",
+      "sha256": "02bc90a68b21543b4ee2e7d433c299939ab9e4e917b1de6fd074d2d278b5701b"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra121-concurrency-before.md",
+      "sha256": "ee42b65bf6aed7baa4f7a85384852a235853d068d7c3cb3cd46d5c1a27c9c94b"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra121-legacy-stop.json",
+      "sha256": "810ffb2ab14a8ce17d381fde6a0a54af5c2b0feb717f59f9a089bfb4f28f3d75"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra121-legacy-stop.txt",
+      "sha256": "42e6e6461e526e1a4896c887568f84ef8ad5a00b23d0283790d3b569f71101d8"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra121-offline.txt",
+      "sha256": "f05ab8dbdb6d0e9c69539913c082ff70e07186ef3d88d631b50f318eb88a5db1"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra121-offline.xml",
+      "sha256": "08e3631d8a4ad75502e98d75f65f481e936d70b285cec7318f30b69442ce6125"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra121-postgres16.txt",
+      "sha256": "84e787ed0058940e68c1e7cf42fc010b83f76fd51cdd0ba608b17d4e0e6be4f4"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra121-postgres16.xml",
+      "sha256": "063f9a29868da6256f1d646957bb5c32cdc4257419c4f4a3b2d8b07962709ed7"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra121-postgres18.txt",
+      "sha256": "0f2de208dd3e5f7b223a4fb52733c6c5e362df885acdfcdecef8ab04c0aae991"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra121-postgres18.xml",
+      "sha256": "a2c1364d1c6647b08880b2c11ec7786e285dd932e9a37ab8aa6313f28820b4ee"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra121-strategy-equivalence.json",
+      "sha256": "b4f022de030cffdcdef788d4618e99f96b8406bc249ce5280f501b7665b359e6"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra122-checks.txt",
+      "sha256": "02bc90a68b21543b4ee2e7d433c299939ab9e4e917b1de6fd074d2d278b5701b"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra122-development-failures.txt",
+      "sha256": "8678182c1fa2afd884f11bfa7146433c4daa487c3588cb69999ccda25bd68899"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra122-legacy-response-loss.json",
+      "sha256": "1c43f9eb7b30f674ff56b8ebc95a86f1149d6cff6204cb715264346dab1bf084"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra122-offline.txt",
+      "sha256": "868e9eaa20d4b4b4f0a47fd1b1d35e6544f295e68f7f737f2c8fb8040d73fd65"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra122-offline.xml",
+      "sha256": "9323959102a8be87501f8c76bef427b0bb748e5fc8a486da754afcb3951e8a40"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra122-postgres16.txt",
+      "sha256": "e2d4b5d94ed848b6451b37ef880e47532e71021b24ebb92851ab369bc4d669f7"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra122-postgres16.xml",
+      "sha256": "8efc9b9c86abbbf6fe3557fb1b07cf02e46a5ada8da670c0aba508935cfed008"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra122-postgres18.txt",
+      "sha256": "5b294383f1976f24c28c3317171aa98d255873f946eb9424e593e89b2b654dc9"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra122-postgres18.xml",
+      "sha256": "17466c68ae9b5b2b33be83d8fc858d74befdc02f02142dfdb7a163fbd5715cc7"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra122-strategy-equivalence.json",
+      "sha256": "8d21d3b850af6d4b9f8592e9e30329bd570d53a6dfc44cbda956e7eb9a227372"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra123-audit-before.md",
+      "sha256": "9c16c5e666b56ad30521459c2e6ee4adc37f55e89deb583cf83907b31bbd6183"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra123-backup-helper-before.txt",
+      "sha256": "9549e0e9a39f02ee43aff8df0d650f6ffe9e661013654414459283cc98b73dd3"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra123-backup-pg16.json",
+      "sha256": "dd23b4d4aeff36cd4ee5cb47baf8c1bc10a09f0cc0ebc9f6fd89b5da613c6192"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra123-backup-pg18.json",
+      "sha256": "2575a0b1a9cbeb1f468aa7d742bc408cc1d144fadad345b91b3b0dd9de939b0f"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra123-checks.json",
+      "sha256": "b27a017e02f8ae587a11240cf7a9118b2940e2a6051f736035d406724227482a"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra123-identity-before.txt",
+      "sha256": "e7527a81a3d21013f7a3e9375101fd3ceedff8ff272db210ab20a091b4c1055a"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra123-offline.txt",
+      "sha256": "d93c2485f19a6b0181a4814c2336130c48d038a9bd18b5277364e2dedcbd21f1"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra123-offline.xml",
+      "sha256": "0a9e5ac713ffbed553e2c15b18449d029ab58607c0e217d17aacde2c084bb31a"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra123-ordering-pg16.json",
+      "sha256": "560395818cf950f465809693e0c0689578033a73d301859f37d42d1b801c9d94"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra123-ordering-pg18.json",
+      "sha256": "560395818cf950f465809693e0c0689578033a73d301859f37d42d1b801c9d94"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra123-performance-pg16.json",
+      "sha256": "6d2a22dc70cf3251806d9e43ebda41ae4cc6d1474b1383d62cc643e68a829745"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra123-performance-pg18.json",
+      "sha256": "81fabe5ead66f96778fdde3d53799a2fca0656018ad0f834c6e0120a7240dd50"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra123-postgres16-stop-timeout.txt",
+      "sha256": "2f7781473a50179b7995cd0dc9a3f229c40c5443dd5c9db8e86c39653926ec50"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra123-postgres16.txt",
+      "sha256": "dc666c865b36de4e343cf70cd436fd07555818d02028cc196bba2cc6f233baab"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra123-postgres16.xml",
+      "sha256": "0904e3079a17e255218b0aafee0cf4b716fe478548138017e3d9c7bd80fda20a"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra123-postgres18.txt",
+      "sha256": "42c95155e3d1d24fa63ebc681004f6f8a0502cc8aa064ecaa96eddb1b3e56454"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra123-postgres18.xml",
+      "sha256": "54d2faeeb1eaf06f30aee1de4ccb31c45271f7472fc4946a980038723f2279b4"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra123-recovery-pg16.json",
+      "sha256": "3c94a4da7b3556760d5605b704a58a0b342bf4353a2e127e3ca83cc9847ce247"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra123-recovery-pg18.json",
+      "sha256": "5a166573d2e17d877f725950bbbb2e72bd1cd4768a18640f0a34cd431befc0d4"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra123-stop-timeout-pg16.json",
+      "sha256": "c52199271f80af37afb6f2e0784319aba191fa5e93eb2e3c03eb80f17394a1ab"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra123-summary.json",
+      "sha256": "0913f38eb157135f0e80b4a5017145e5fdc7df10c74caa0d16ef41044af5a943"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra123-tcp-pg16.json",
+      "sha256": "a8a9404357be35e6a7b44a1d1243994139cf76dbcb5ac0aceb0a093e6f7fe8fe"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra123-tcp-pg18.json",
+      "sha256": "4b430ee9c1f66cf60749f526e85ca21b4b9ee64b7ed5167df3dfce85b1cb8eb1"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra124-audit-before.md",
+      "sha256": "28d18d5743498f3669876d36f6fb5bc7040da28b108ad5e68282cb1b2bfc0b43"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra124-before-pg16.txt",
+      "sha256": "f500d0ac94058c345e466f820b8da731a90915fecc6f043b276c6312f8c24bcc"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra124-before-pg18.txt",
+      "sha256": "0faaa1849349b2cc1340e173577d8cb99d3e719299e492eeb46a0c70dc993439"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra124-checks.json",
+      "sha256": "08f8c5875aa5b52b1452b56885e84895bd9aec23d5ef47d122fa67d438f631c5"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra124-offline.txt",
+      "sha256": "418e72e6b89d8b8c271a7fe837a1a182fb97fb2c832e4170e027cf3db45a498a"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra124-offline.xml",
+      "sha256": "335dc2b890b0ebd7c9b14ae5c07ace8fde8262e5e49c865156996f7d6684ed4a"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra124-performance-after-pg16.json",
+      "sha256": "0afb3bce46a396c7c6c1ee2c7ed88bfbe63be47c174250bf85160b15a52771a1"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra124-performance-after-pg18.json",
+      "sha256": "fbf718034a4ba672101e769a167165738b0442961093ec2f4b778ae15f7469f3"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra124-performance-before-pg16.json",
+      "sha256": "27396ce471b44029cba828d0de75ce8adc6c606f08ffe359fd76546bdc6d0ccf"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra124-performance-before-pg18.json",
+      "sha256": "1a4cb76146158bf5ebd2a4ee1fbc64906281dd975be34c498176911305d5df10"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra124-performance-increment1-pg18.json",
+      "sha256": "5e953750dc561526353c689f70bb032f2c2710576658c34f9a79c373f222fd83"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra124-postgres16.txt",
+      "sha256": "a0c1a0b453f79c55a56615e2285f40a6c7ec7b3f859cd87b8acfaf43504e31f8"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra124-postgres16.xml",
+      "sha256": "58faeba4c0a03734380490615b25a264d8f976d0c557e68ee59754d6c8f0c6ca"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra124-postgres18-increment1.txt",
+      "sha256": "5d3ec6de5ce9c3040efd10717d01f304ec8e8954b6543526881e6f96cee971ab"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra124-postgres18-increment1.xml",
+      "sha256": "5623c51461921479247c136907867e99f503bf49676da7dea8a32340784677a8"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra124-postgres18.txt",
+      "sha256": "6da4463a12449b8e646c4e4c26ebcca0745f31ac1dd7e5b0fd81b45cd1506ab6"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra124-postgres18.xml",
+      "sha256": "871d8caf8e12c45909799db830897cc660db0f218c2c9cd7e8cd58535507d180"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra124-receipts-after-pg16.json",
+      "sha256": "8091befca101ca018b1a1dd4a47a66fc50ee10e5cc49e0791576fd12cf640fd0"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra124-receipts-after-pg18.json",
+      "sha256": "06d4e14da0c46eba00c0a8006332a32d8f804bd25a1d7bf952ef573ffcfb4929"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra124-receipts-before-pg16.json",
+      "sha256": "666ddc7313dbdfa7638587bf3336647db4d4af6b4eb022a947852a8af8e3012b"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra124-regression-backup-pg16.json",
+      "sha256": "a7c619314c4621ba113af5ab30c5d5c25908e2cac36cb2b9982805bbbccd317f"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra124-regression-backup-pg18.json",
+      "sha256": "044218ebc8c78305f9414e446d69cc72095660bcf09e755e9280dbbc4493179e"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra124-regression-ordering-pg16.json",
+      "sha256": "560395818cf950f465809693e0c0689578033a73d301859f37d42d1b801c9d94"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra124-regression-ordering-pg18.json",
+      "sha256": "560395818cf950f465809693e0c0689578033a73d301859f37d42d1b801c9d94"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra124-regression-performance-pg16.json",
+      "sha256": "668e00bddcdee2b9bf4995eddfd635dd7995b19cbd4c390570141625861a9b97"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra124-regression-performance-pg18.json",
+      "sha256": "4b24f1120f926195a053e3f529bc6f529521f5e1006b54d33c22ce24de066a67"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra124-regression-recovery-pg16.json",
+      "sha256": "d2de049e7cd0dd32f69cfb298dea10e9f664c4e4dcf61503eab395a4ad01e17a"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra124-regression-recovery-pg18.json",
+      "sha256": "39a4e119d554b6cf8ef72d7c1649f41d406834a46e5f0aa3ec63c01d251ee91e"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra124-regression-tcp-pg16.json",
+      "sha256": "287c068a66a9aff3bcd2690d103ecd6145bc147692e13737e93b28dbf7387e8d"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra124-regression-tcp-pg18.json",
+      "sha256": "bb5ef5be35f0a3f4bf512797c8914ee2174b7ef9cd7a271e91fdcd4d60371561"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra124-reproduction-before-pg16.txt",
+      "sha256": "9990c6ecf4513d9f29d5923741d9090442b164cfff75e33e86dbff33f936f0b2"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra124-summary.json",
+      "sha256": "3fe3448e4a30c512edf894088da0c8ea0fdc85a137c723e77869cfd92766e776"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra125-absence16.txt",
+      "sha256": "5b5ab6fa6ca6253ab35ffc5ac390b5cf7365e85968cb22c8d5a70f62f43bb9da"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra125-absence16.xml",
+      "sha256": "15939499a6363d84d3c63160c55464aea3d24089c8d8644febda83a3124c3be9"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra125-absence18.txt",
+      "sha256": "7f3a9797dbac27716d79fc945d3f169eee6911f8018ba687a760157eed53f846"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra125-absence18.xml",
+      "sha256": "efb63777ef07ab7db9b024a72e138e6b3971c35badd628a09901de77b80167d2"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra125-audit-before.md",
+      "sha256": "4c6e62cbbd01903e70409288a8b2eaad86675b54d8740ccb8559cb40287283a8"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra125-backup-pg16.json",
+      "sha256": "8e04e542283a1bffe200a06734abb1e3e6b210c0d4d44a314d6a8d0c48eaa0cd"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra125-backup-pg18.json",
+      "sha256": "528850ee350c7cc07f128210624defd81b8132763b195688d0d08f16b031ab59"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra125-benchmark-exploratory-pg16.json",
+      "sha256": "f003a92f97f63b3c5071ba2e87ba3b97b00d6ec6b770fdaa113818c2f556581f"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra125-benchmark-pg16.json",
+      "sha256": "3f6d9bfb21d1eed31849dd72cee7bdae9c814b82201e65281142685ca1ec5f17"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra125-benchmark-pg18.json",
+      "sha256": "5c0cda5fa34741d87de609d45e5f891e6e5057641b928bc6416c0e2c87d83be2"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra125-blockers-exploratory-pg16.json",
+      "sha256": "586b4f03c54f8e736fe15142ea6053b8f4cbf8a1658f8e34b31595f701599a58"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra125-blockers-pg16.json",
+      "sha256": "4651524c97f6982b1c1e887bd7bd5af44aad9ec8a841cfd23b8b0a127ce21c78"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra125-blockers-pg18.json",
+      "sha256": "438bad87c98f82c4316829cabbf1adcb86d8762c93fa8e069fdd8ea0b85f5a19"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra125-checks.json",
+      "sha256": "9d6330115e78b3c55aa49f3f0172fc6e01733c80baba2af10ee3c57a01bd0bde"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra125-equivalence-pg16.json",
+      "sha256": "eefcdfa9dde3779c8c2725a3f32891d6f261c38ad6c92de72f6ea56a7acc43a4"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra125-equivalence-pg18.json",
+      "sha256": "eefcdfa9dde3779c8c2725a3f32891d6f261c38ad6c92de72f6ea56a7acc43a4"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra125-offline.txt",
+      "sha256": "dde501ab4327354b0269be110bca65f4bc057194e32c9d0c421606b7bacfd0f6"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra125-offline.xml",
+      "sha256": "508b0ef418c34cb96cfe016018636e200da0acc35181914fb2bc11b7839b9d36"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra125-postgres16.txt",
+      "sha256": "5e0f2a78d6fb1a9d41e2c6b5451c5b11c5b3c9f036fe5424162c181d8cfc69a2"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra125-postgres16.xml",
+      "sha256": "6d61172d39c02598e975d3df15ec18bcef1f1b7adf398e0eeaefd665541f5fea"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra125-postgres18.txt",
+      "sha256": "ea38d41582866f7ee37fa43923b364cc783a1227724a6ff9fc2d6259c9d6c264"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra125-postgres18.xml",
+      "sha256": "2cc45ed5d89782e6da2ca1ac5211560f7e7d99f89334bbbed4efdc9012a5f7e7"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra125-prototype16.txt",
+      "sha256": "7cc41699cb009ee96f056c66f992d53d51e20fc85c35b53918217dadea69a257"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra125-prototype16.xml",
+      "sha256": "7a4ba6efbca360c700cb9d1d9e4e0c21f4c2ffe6e80c20fe2b98b7de6442ba81"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra125-races-pg16.json",
+      "sha256": "859a6797ae83ebde6a716e110422951e33719100857bb4ef665846e6231fc1d6"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra125-races-pg18.json",
+      "sha256": "859a6797ae83ebde6a716e110422951e33719100857bb4ef665846e6231fc1d6"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra125-recovery-pg16.json",
+      "sha256": "3ee93f2920fd9e5079091654a0277d0a54c24fdc16632c0b529d69afa7a51080"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra125-recovery-pg18.json",
+      "sha256": "801912d833a8cec46e7ce32a55d8748faac0a2b3d2f75b92215070ad6041110e"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra125-regression-123-backup-pg16.json",
+      "sha256": "8541054b521f3056e35ee67f2131812047ade4679570783d002e09068a9f811d"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra125-regression-123-backup-pg18.json",
+      "sha256": "0227f9f6182fbdca778dbe792c353d92e5e5aa426ded4bdd027f97a340ebc445"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra125-regression-123-ordering-pg16.json",
+      "sha256": "560395818cf950f465809693e0c0689578033a73d301859f37d42d1b801c9d94"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra125-regression-123-ordering-pg18.json",
+      "sha256": "560395818cf950f465809693e0c0689578033a73d301859f37d42d1b801c9d94"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra125-regression-123-performance-pg16.json",
+      "sha256": "37bdeb4cc94f065d7c4f2db633f7e171b0edc5a588092786d2261fd89df443fe"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra125-regression-123-performance-pg18.json",
+      "sha256": "49f36c63b82d6611d3b8a174989fbe05f18bc8797ddb803a075f85262d099c80"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra125-regression-123-recovery-pg16.json",
+      "sha256": "b2e7d39bbf1158b683deeeb2085608043887933772bc0d02386e88fc10ad5109"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra125-regression-123-recovery-pg18.json",
+      "sha256": "34496ba192afb4c94b646814f997edf031b14e54a871fc492b784032c7023f59"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra125-regression-123-tcp-pg16.json",
+      "sha256": "c46b7844edc0b437db337d6dee546dffc9725b4fd0cb62b6cbee1362136eb720"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra125-regression-123-tcp-pg18.json",
+      "sha256": "41e8112f09bda8992c37cb512ea21b7191e964af4102c1b2e1c1231f966e7bc7"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra125-regression-124-performance-after-pg16.json",
+      "sha256": "943c965575896a6baad9c72b146101dfe45d7ae536402a460a462969a731a0b0"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra125-regression-124-performance-after-pg18.json",
+      "sha256": "e40180bb421f23c51caa85011202a8afdc1d115de6d29effd6db7f577e9b31be"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra125-regression-124-receipts-after-pg16.json",
+      "sha256": "0cd748c9c9ed86738c21dc3edc2108483fd92aa4122a70d4ca068666908f8c24"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra125-regression-124-receipts-after-pg18.json",
+      "sha256": "f41e6fb6cc175ff49d643cc46e845e4bba89f6a27868a92ab999d2c62b94760f"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra125-revisions-pg16.json",
+      "sha256": "24ce96ff818e4356be234004d729812fa640b2e880947580ac78ecab1fc5f184"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra125-revisions-pg18.json",
+      "sha256": "24ce96ff818e4356be234004d729812fa640b2e880947580ac78ecab1fc5f184"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra125-safety-initial-pg16.txt",
+      "sha256": "8ebff716c7c82d38bd79d3aa15d2b245e6c3320289646ec9f1149e5c549b8309"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra125-summary.json",
+      "sha256": "82a8b4acc23ed0eac8a080bb84bc6ff956a10852f8e9063098997070d2298e80"
+    },
+    {
+      "path": "docs/retomada/evidencias/pytest-final.txt",
+      "sha256": "ba70172114d961a1f35a13780c7fb77bdc799babb1c6206df605abc1f7e8171e"
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "docs/retomada/evidencias/infra127-baseline-collection.txt",
+      "bytes": 64767,
+      "sha256": "aff54cbdaf785f5046f797e474e8e62f7d9878e96027919a6d900d5a6e054b51"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra127-before-contract-pg18.json",
+      "bytes": 2775,
+      "sha256": "8c72a88f29361bef3d7f5b6773453993c26e133f089574408497ebccad7f0dd6"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra127-before18.txt",
+      "bytes": 1978,
+      "sha256": "2e64abc0e1528af4e8e1b39298c16abebdfa236c8e9e99cd51f29aed2ffa3255"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra127-before18.xml",
+      "bytes": 1912,
+      "sha256": "509ae060c88de9a4eff19137ec6d542926dd4651218a267acae57ea0c660e0d8"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra127-catalog-before-fix18.txt",
+      "bytes": 6502,
+      "sha256": "1781a98f47579090e3ee8438ca833445a350282e90e387f26b5f9a55cdf30eae"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra127-catalog-before-fix18.xml",
+      "bytes": 6285,
+      "sha256": "5f9595d0e1e1884df261c3ab584a4ec125100e8e97615d1bab4ac04465ca3c67"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra127-catalog-risks-before.json",
+      "bytes": 418,
+      "sha256": "baedd06bd8a3a3c555ce3f388c34dfc34dd9c53f8b89df90feeab25158e854ab"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra127-checks.json",
+      "bytes": 25324,
+      "sha256": "61e57af897d771c60642a8fb123885ad7812bdd9f70f38e4b2854c4b8e3338ce"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra127-converted-pg18.json",
+      "bytes": 3670,
+      "sha256": "2dfc0ad4b45eff92977ce297358286c7b831baa82bcd6a671b3cfb3efe62ad44"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra127-converted-pre-durable-guard-pg18.json",
+      "bytes": 3798,
+      "sha256": "d65110beccd8a549de02fd20102ac1f2058e46c58347605f949a48e46704a970"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra127-durable-final18.txt",
+      "bytes": 1903,
+      "sha256": "1e88d0cea78bfdbdb94ee6b8bca466abe356a5de3091289d459fc195929d4bad"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra127-durable-final18.xml",
+      "bytes": 5853,
+      "sha256": "78b5b88ae725ff4ef2d37ead7634e3ffbc1f29dd612faa3f3ea7dfe6e5100840"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra127-durable-focused18.txt",
+      "bytes": 4941,
+      "sha256": "d4b27f7ee69e515a9100e5c2858199540b4391d34a4b43aca60e6c526650b127"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra127-durable-focused18.xml",
+      "bytes": 7659,
+      "sha256": "ed22d542319e0567e142dd062a183ea9a103c1ed82c1fd7578a90164f8ef9451"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra127-final-collection.txt",
+      "bytes": 67234,
+      "sha256": "0a0553a20337b067851f0dda715b87d99d5f446acb9926bc86466f5058981a96"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra127-final-focused18.txt",
+      "bytes": 1903,
+      "sha256": "7b605c1c544c5644887c99ebd6321c3f0cf60938b0b7a1267ae026d0e01b48fc"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra127-final-focused18.xml",
+      "bytes": 5531,
+      "sha256": "61b7ceb108c22480da656ded22c5e5ed4da31e30b6a86ac575cc4f673ff31f23"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra127-final-full-converted-pg18.json",
+      "bytes": 3550,
+      "sha256": "841f633d2f7f54d4814064f7fd4b9485e5df183325f676e52c9bc34d0e376814"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra127-final-full-proof-pg18.json",
+      "bytes": 6664,
+      "sha256": "72530dc557d0499147cc09f1100734debfdb26d88db14b2871dac86a3c80a963"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra127-final-regression-123-backup-pg18.json",
+      "bytes": 5857,
+      "sha256": "30a3f59e6bd61fff8bcf671ae4ab9d1b56c89c7299685f9b087dc332dcdce21f"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra127-final-regression-123-performance-pg18.json",
+      "bytes": 5242,
+      "sha256": "46e7b117b22466a43567602999f0b18b1a36234186f56db0a28f4e4c945600cb"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra127-final-regression-123-recovery-pg18.json",
+      "bytes": 1035,
+      "sha256": "d6fb9a54622d709055f1f69d60fc18402fd2b62403d56c79a04e1e411e37eff3"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra127-final-regression-123-tcp-pg18.json",
+      "bytes": 3007,
+      "sha256": "ee9c248291dd63000bd60dbe89acfb29ccfa685f408497e722e71864724286b6"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra127-final-regression-124-performance-after-pg18.json",
+      "bytes": 37943,
+      "sha256": "49bf979a622e475ad88e1a8d2d269138b578b5184ee93a419c76c91facde7064"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra127-final-regression-124-receipts-after-pg18.json",
+      "bytes": 2495,
+      "sha256": "c3c25ed1db66af12843fd13d897b26fe9fbd616d69e10cb64c6859e18b8dce61"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra127-final-regression-125-backup-pg18.json",
+      "bytes": 2345,
+      "sha256": "94e72650aa1d40bd684b65d78f5764625175de8b9907b2f13e82e07ec16a11f9"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra127-final-regression-125-benchmark-pg18.json",
+      "bytes": 127057,
+      "sha256": "e3573362fa6b233652a7525cc9676d0d06da58085bd959bfa7e5df443d6a17d7"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra127-final-regression-125-blockers-pg18.json",
+      "bytes": 770,
+      "sha256": "54b99ec8337b7ceeaac7b207dfd4673afe0e7e62b236bda5a97628ce887306c2"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra127-final-regression-125-recovery-pg18.json",
+      "bytes": 1856,
+      "sha256": "00662c2024edbbda8e6287c57146b2ae757c04c49290d2840c878e08b4958d3c"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra127-focused18.txt",
+      "bytes": 1897,
+      "sha256": "6ab5fd4f33dabb8e6339e200a0a972a015adf79800417857609c4656c643bd70"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra127-focused18.xml",
+      "bytes": 4403,
+      "sha256": "b001c15a8eb2f9bacb77d5ac98792720334b2b0fedaa564df8fcb3ff26dd8145"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra127-focused2-18.txt",
+      "bytes": 4127,
+      "sha256": "27e2015b48123cb133854f65491a1859a756de2f82a9679fbb61695052516353"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra127-focused2-18.xml",
+      "bytes": 7631,
+      "sha256": "86fd1aaecd6255d2cf5530beea6d041ce2ea66d9d2a285178d78ad2298011033"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra127-format-normalization.json",
+      "bytes": 5048,
+      "sha256": "9e8d78c5256eb4bded6f9c68d1eeec67e38c521c74ec5bae0c721d5d4df44eb9"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra127-image16-resource-failure.txt",
+      "bytes": 1582,
+      "sha256": "6f1e6721aff7192b607613a9fd0081ff47a12a98e0f1f90a60025b81ee3876ed"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra127-local-image-cleanup.txt",
+      "bytes": 1100,
+      "sha256": "94cae27021da84b77f4199c1f27faa50f02852f14051559ef8edd240a5a4797b"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra127-namespace-before-fix18.txt",
+      "bytes": 3191,
+      "sha256": "f1310fc013a35ae0ca7e2011c12622da5f7f241dd1cf8d167b10068939253a3a"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra127-namespace-before-fix18.xml",
+      "bytes": 2760,
+      "sha256": "54fad5d2a3f1c4443c8f3b6dea79d0f41cd6f4483db78913a1e76eb15b8b3f58"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra127-normalization-before-fix18.txt",
+      "bytes": 3826,
+      "sha256": "1c729e4417f34f6b0db4faa225487fa8173f233f4c314e1c538b4f15f0e7adf5"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra127-normalization-before-fix18.xml",
+      "bytes": 4154,
+      "sha256": "bfdc026f6a0c05918d31f52873214033f45c5afef32e42772814d804996e5a0d"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra127-offline-complete.txt",
+      "bytes": 5053,
+      "sha256": "28a155e29b9074d83b1552d85116be9b5af1a6bacbf5ec3bdeba0f144804c8f2"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra127-offline-complete.xml",
+      "bytes": 137647,
+      "sha256": "0868e4cc2c9180c9a564f741ebd5d5eeae7488a0e00ace52ec88dd73577b8ce9"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra127-offline-final.txt",
+      "bytes": 5051,
+      "sha256": "693829b93bc4bfd7a7d2a8fa5fe36f6b25e7af8b057295a462934e3fa7f64e68"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra127-offline-final.xml",
+      "bytes": 136850,
+      "sha256": "06b3b26c7caf05b15d6fe49104fe907270e78b04cac905b9f926a776e3f7efb6"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra127-offline-release.txt",
+      "bytes": 5053,
+      "sha256": "71bd6288895534f93f42ce842a7a7cca2c3fb7aaabcf6ad5710515eab392a37b"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra127-offline-release.xml",
+      "bytes": 136850,
+      "sha256": "f460afb3c16748cd8c6fe41825e5c92c44140514a3f9246dc4b42f5008db29d6"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra127-offline.txt",
+      "bytes": 7918,
+      "sha256": "3b3ae8eccacf64033f8290583f478f869b6b67b3d36d4c2d30f1e7bf7a2c3e49"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra127-offline.xml",
+      "bytes": 136556,
+      "sha256": "ae2f5689f1327f3a92045891f8ec4a2ba496f00b747da640ecddd62c977eb5c8"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra127-pg16-unexecuted.json",
+      "bytes": 895,
+      "sha256": "69c61094538c5e7324a35bee2ad9f169a377abef4d81cc83512cde4a74dfb301"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra127-postgres18-release.txt",
+      "bytes": 7748,
+      "sha256": "db261adb53b7763d4ed7765c904aa11297a00fb49eaa5d4777b38b2b30a22ce1"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra127-postgres18-release.xml",
+      "bytes": 29327,
+      "sha256": "7d659cb937aac249467eb3ab9391f90bd1d11be98c8b499a06618ff42e2e268f"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra127-postgres18.txt",
+      "bytes": 2734,
+      "sha256": "36ed5ff3633a1159e68594b0a2b1606508858e3ef04bc8a6cbc1fb414b78403d"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra127-postgres18.xml",
+      "bytes": 24219,
+      "sha256": "fd60c6a2574dc7cd55d8506faa642c28b3d172afb2d61951f8f30d1ecebff1aa"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra127-preserved-evidence.json",
+      "bytes": 9697,
+      "sha256": "a80a676f59488b957311cbc8141e5740f377156e32ce4822f5155668bc2809c0"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra127-proof-pg18.json",
+      "bytes": 6782,
+      "sha256": "8d4b283cf729f5c444c651248bacd3eba6f67fa7d4b02d9444f77f14f949fcd8"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra127-proof-pre-catalog-fix-pg18.json",
+      "bytes": 4982,
+      "sha256": "c98d9b917b04bc5857c82e0e841be7b5fd116f3d44c6b92483900249c2df9d31"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra127-quarantine-crash18.txt",
+      "bytes": 2323,
+      "sha256": "e674f6e5b475eca5cf01cc345d4b23d91a4b81f330b9ef5e76ba28ddde2a688b"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra127-quarantine-crash18.xml",
+      "bytes": 370,
+      "sha256": "85bd2b87c44fc76388ec6d7636a6fbf10c425f2031a37e7301ea29a0d8cd5a3a"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra127-regression-123-backup-pg18.json",
+      "bytes": 5855,
+      "sha256": "ffb3b032beba8a6d972ac1c61b191fd7112e9a2214a421bdfa7f7491ceead361"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra127-regression-123-performance-pg18.json",
+      "bytes": 5237,
+      "sha256": "fde94ef0041ea18a61f52cd55383c7eb41c52023611945fdb77a4db97d6dbebd"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra127-regression-123-recovery-pg18.json",
+      "bytes": 1035,
+      "sha256": "b83d2cb270b256a86fc59fb7d7a53464683a36117f8b3b3720abc0f8411ea7c2"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra127-regression-123-tcp-pg18.json",
+      "bytes": 3007,
+      "sha256": "fc7c42eea93f9077720a8465e43a5b5b1cb0bab8054e7dc703e15c8baf345946"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra127-regression-124-performance-after-pg18.json",
+      "bytes": 37706,
+      "sha256": "32c9e6348dd9bdc04b1a57657ec0ed4a9336c863b5993d04218fe3424824a532"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra127-regression-124-receipts-after-pg18.json",
+      "bytes": 2497,
+      "sha256": "b0da762fb7a0349cae53d9eb53f628fad2782caecd67463fae53e6bbcdbfce6f"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra127-regression-125-backup-pg18.json",
+      "bytes": 2343,
+      "sha256": "94c6965c1d0d5ceee1e9d6ecc57033e456b0ed3101088d9a30ae1b1148e64e75"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra127-regression-125-benchmark-pg18.json",
+      "bytes": 126456,
+      "sha256": "8c805ee232f298ca930b65ea9438bb108864b29cb7b68e07db93cf67031d8ad3"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra127-regression-125-blockers-pg18.json",
+      "bytes": 771,
+      "sha256": "bd7ead659baa832df8d8990eb722b19fbc84338f97868f362fb32f45cb5b1e84"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra127-regression-125-recovery-pg18.json",
+      "bytes": 1856,
+      "sha256": "a9fd72f4d0197b4aa053e2489589c1ba6b9678ca2b7e54e1b814de392ad68c2c"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra127-regression-matrix.json",
+      "bytes": 7306,
+      "sha256": "f3b0718e8f77c988ab96bfc7822d8ce2a89a70b0ae65bdc8296f3277b1747996"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra127-safety-final18.txt",
+      "bytes": 2004,
+      "sha256": "2b25416982a5a0e55046aaca5cc53ff9b7a2bf9e9dc5f2a2466c71a7ed1035ea"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra127-safety-final18.xml",
+      "bytes": 7130,
+      "sha256": "62777f40e13e9da04c4dd037370b2bc57127e2f50355742bb37cd93ba8a84a30"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra127-safety-regression-124-receipts-after-pg18.json",
+      "bytes": 2499,
+      "sha256": "8485c2524626e7431ec1b8c73cfef9674fa5fc60814f7cb91d7fffd71ec7240f"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra127-source-audit.json",
+      "bytes": 2100,
+      "sha256": "5cde579919893d9f13c5369c8b9d08bdedb93aa79621df9cbafbbce88ca52b5e"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra127-summary.json",
+      "bytes": 14685,
+      "sha256": "8daf159ddb4b7dcdaecabc0b185ec1081e6b7c05b6e60608e9aef12f8364269f"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra127-ui-final.txt",
+      "bytes": 1568,
+      "sha256": "82c8860d47ecc529c8567683171a78ddd9b03a9091116fab9a3edf1a047fd89d"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra127-ui-final.xml",
+      "bytes": 8177,
+      "sha256": "699233c8d2138eab596304f96bc5abee8822404e57b3327809e28a57a05944e3"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra127-unanchored-before18.txt",
+      "bytes": 9839,
+      "sha256": "95a220f845b534f8c8e45e6a2a0a2bc2a0a962cf49ee10e08260f350d7958e85"
+    },
+    {
+      "path": "docs/retomada/evidencias/infra127-unanchored-before18.xml",
+      "bytes": 9660,
+      "sha256": "046b0d017fce039e03d42d63ef195c318213acdec559732fad7c7c1f51efb373"
+    }
+  ],
+  "artifact_count_excluding_manifest": 78,
+  "new_log_format_normalization_manifest": "infra127-format-normalization.json"
+}

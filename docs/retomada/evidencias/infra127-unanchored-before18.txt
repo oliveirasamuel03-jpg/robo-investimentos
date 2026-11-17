@@ -1,0 +1,143 @@
+{"server_version": "18.6", "image": ["postgres@sha256:9ba53c7d41ea093baf5c1ba635ba5434c4f979880527d49bb7d9237d3193085b"], "scope": "LOCAL_SYNTHETIC_ONLY", "broker_mode": "paper", "broker_provider": "paper", "listener": "127.0.0.1"}
+FFF                                                                      [100%]
+=================================== FAILURES ===================================
+___ test_valid_unreceipted_archive_preserves_objects_and_catalog_atomically ____
+
+pg = (<module 'core.persistence' from '/workspace/robo-investimentos-infra127/core/persistence.py'>, <psycopg.Connection [I...c0e43 host=127.0.0.1 port=59441', PosixPath('/tmp/pytest-of-agent/pytest-103/test_valid_unreceipted_archive0/storage'))
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7fa4703b6240>
+
+    def test_valid_unreceipted_archive_preserves_objects_and_catalog_atomically(pg, monkeypatch):
+        p, conn, _, root = pg
+        cfg = importlib.import_module('core.config')
+        retention = importlib.import_module('core.retention')
+        original = legacy_report()
+        store = importlib.import_module('core.state_store')
+        untouched_bot = deepcopy(store.DEFAULT_STATE)
+        untouched_bot.update(cash=cfg.LEGACY_VALIDATION_INITIAL_CAPITAL_BRL,
+                             wallet_value=cfg.LEGACY_VALIDATION_INITIAL_CAPITAL_BRL,
+                             positions=[], realized_pnl=0, last_run_at='')
+        untouched_bot['validation'].update(validation_started_at='', last_report={})
+        untouched_bot['trader']['max_open_positions'] = 3
+        p._ensure_db_schema()
+        conn.execute("INSERT INTO app_state(namespace,payload_json) VALUES ('bot_state',%s) ON CONFLICT(namespace) DO UPDATE SET payload_json=EXCLUDED.payload_json",
+                     (json.dumps(untouched_bot),))
+        p.replace_table(cfg.TRADER_REPORTS_FILE, [original])
+        result = retention.archive_old_trade_reports(60, now=datetime(2026, 4, 20, tzinfo=timezone.utc))
+        assert result['archived_rows'] == 1 and result['retained_rows'] == 0
+        archive = result['files_updated'][0]
+        assert p.load_json_rows(p._table_namespace(archive), root / 'unused.json') == [original]
+        assert p.load_json_rows(p._table_namespace(cfg.TRADER_REPORTS_FILE), root / 'unused.json') == []
+        persisted_bot = json.loads(conn.execute("SELECT payload_json FROM app_state WHERE namespace='bot_state'").fetchone()[0])
+        assert archive in persisted_bot['retention']['archive_catalog']['reports']
+        assert {k:v for k,v in persisted_bot.items() if k != 'retention'} == {k:v for k,v in untouched_bot.items() if k != 'retention'}
+        before = snapshot(conn)
+        again = retention.archive_old_trade_reports(60, now=datetime(2026, 4, 20, tzinfo=timezone.utc))
+        assert again['files_updated'] == [] and snapshot(conn) == before
+        # Incompatible SQL writer: introduce an archived-source conflict, then
+        # lose containment through both a failed write and an outer rollback.
+        conflicting = {**original, 'entry_price': original['entry_price'] + 1}
+        conn.execute('INSERT INTO app_rows(namespace,row_json) VALUES (%s,%s)',
+                     (p._table_namespace(cfg.TRADER_REPORTS_FILE), json.dumps(conflicting)))
+        before_conflict = snapshot(conn)[1]
+        q = importlib.import_module('core.commit_protocol')
+        save = p.save_json_state
+        with monkeypatch.context() as patch:
+            def unavailable(namespace, *args, **kwargs):
+                if namespace == q.QUARANTINE:
+                    raise OSError('PYTHON_INJECTION missing quarantine acknowledgment')
+                return save(namespace, *args, **kwargs)
+            patch.setattr(p, 'save_json_state', unavailable)
+            with pytest.raises(OSError, match='PYTHON_INJECTION'):
+                retention.archive_old_trade_reports(60, now=datetime(2026, 4, 20, tzinfo=timezone.utc))
+        with pytest.raises(ValueError, match='caller rollback'):
+            with p.persistence_transaction():
+                conflict = retention.archive_old_trade_reports(60, now=datetime(2026, 4, 20, tzinfo=timezone.utc))
+                assert conflict['blocked'] and conflict['reason'] == 'RETENTION_CONFLICT'
+                raise ValueError('caller rollback')
+        assert snapshot(conn)[1] == before_conflict and not q._quarantine()['active']
+>       assert q.gate_status()['blocked'], 'Persisted archive evidence must block even after containment rollback'
+E       AssertionError: Persisted archive evidence must block even after containment rollback
+E       assert False
+
+tests/test_infra127_postgres.py:159: AssertionError
+_ test_unanchored_runtime_conflict_cannot_reopen_after_failed_quarantine[quarantine_write] _
+
+pg = (<module 'core.persistence' from '/workspace/robo-investimentos-infra127/core/persistence.py'>, <psycopg.Connection [I...de283 host=127.0.0.1 port=59441', PosixPath('/tmp/pytest-of-agent/pytest-103/test_unanchored_runtime_confli0/storage'))
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7fa45e7b2720>
+failure = 'quarantine_write'
+
+    @pytest.mark.parametrize('failure', ['quarantine_write', 'outer_rollback'])
+    def test_unanchored_runtime_conflict_cannot_reopen_after_failed_quarantine(pg, monkeypatch, failure):
+        p, conn, _, _ = pg
+        cfg = importlib.import_module('core.config')
+        retention = importlib.import_module('core.retention')
+        q = importlib.import_module('core.commit_protocol')
+        first = legacy_report()
+        p.replace_table(cfg.TRADER_REPORTS_FILE, [first, {**first, 'entry_price': first['entry_price'] + 1}])
+        before = snapshot(conn)[1]
+        if failure == 'quarantine_write':
+            save = p.save_json_state
+            with monkeypatch.context() as patch:
+                def unavailable(namespace, *args, **kwargs):
+                    if namespace == q.QUARANTINE:
+                        raise OSError('PYTHON_INJECTION unavailable quarantine')
+                    return save(namespace, *args, **kwargs)
+                patch.setattr(p, 'save_json_state', unavailable)
+                with pytest.raises(OSError, match='PYTHON_INJECTION'):
+                    retention.archive_old_trade_reports(36500)
+        else:
+            with pytest.raises(ValueError, match='caller rollback'):
+                with p.persistence_transaction():
+                    result = retention.archive_old_trade_reports(36500)
+                    assert result['blocked'] and result['reason'] == 'RETENTION_CONFLICT'
+                    raise ValueError('caller rollback')
+        assert not q._quarantine()['active'] and snapshot(conn)[1] == before
+>       assert q.gate_status()['blocked'], 'Unanchored conflicting history must not be admitted'
+E       AssertionError: Unanchored conflicting history must not be admitted
+E       assert False
+
+tests/test_infra127_postgres.py:528: AssertionError
+_ test_unanchored_runtime_conflict_cannot_reopen_after_failed_quarantine[outer_rollback] _
+
+pg = (<module 'core.persistence' from '/workspace/robo-investimentos-infra127/core/persistence.py'>, <psycopg.Connection [I...51578 host=127.0.0.1 port=59441', PosixPath('/tmp/pytest-of-agent/pytest-103/test_unanchored_runtime_confli1/storage'))
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7fa45c9abdd0>
+failure = 'outer_rollback'
+
+    @pytest.mark.parametrize('failure', ['quarantine_write', 'outer_rollback'])
+    def test_unanchored_runtime_conflict_cannot_reopen_after_failed_quarantine(pg, monkeypatch, failure):
+        p, conn, _, _ = pg
+        cfg = importlib.import_module('core.config')
+        retention = importlib.import_module('core.retention')
+        q = importlib.import_module('core.commit_protocol')
+        first = legacy_report()
+        p.replace_table(cfg.TRADER_REPORTS_FILE, [first, {**first, 'entry_price': first['entry_price'] + 1}])
+        before = snapshot(conn)[1]
+        if failure == 'quarantine_write':
+            save = p.save_json_state
+            with monkeypatch.context() as patch:
+                def unavailable(namespace, *args, **kwargs):
+                    if namespace == q.QUARANTINE:
+                        raise OSError('PYTHON_INJECTION unavailable quarantine')
+                    return save(namespace, *args, **kwargs)
+                patch.setattr(p, 'save_json_state', unavailable)
+                with pytest.raises(OSError, match='PYTHON_INJECTION'):
+                    retention.archive_old_trade_reports(36500)
+        else:
+            with pytest.raises(ValueError, match='caller rollback'):
+                with p.persistence_transaction():
+                    result = retention.archive_old_trade_reports(36500)
+                    assert result['blocked'] and result['reason'] == 'RETENTION_CONFLICT'
+                    raise ValueError('caller rollback')
+        assert not q._quarantine()['active'] and snapshot(conn)[1] == before
+>       assert q.gate_status()['blocked'], 'Unanchored conflicting history must not be admitted'
+E       AssertionError: Unanchored conflicting history must not be admitted
+E       assert False
+
+tests/test_infra127_postgres.py:528: AssertionError
+- generated xml file: /workspace/robo-investimentos-infra127/docs/retomada/evidencias/infra127-unanchored-before18.xml -
+=========================== short test summary info ============================
+FAILED tests/test_infra127_postgres.py::test_valid_unreceipted_archive_preserves_objects_and_catalog_atomically
+FAILED tests/test_infra127_postgres.py::test_unanchored_runtime_conflict_cannot_reopen_after_failed_quarantine[quarantine_write]
+FAILED tests/test_infra127_postgres.py::test_unanchored_runtime_conflict_cannot_reopen_after_failed_quarantine[outer_rollback]
+3 failed in 3.81s
+Disposable local PostgreSQL container and own volumes removed.
