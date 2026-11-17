@@ -197,10 +197,17 @@ def render_commit_control(*, ui, allow_reconcile=False):
         ui.error(f"UNKNOWN_COMMIT: ciclo {status['cycle_id']}. Reconciliação necessária; "
                  'nenhum novo ciclo financeiro está autorizado. Isso não substitui STOP do operador.')
     if ui.button('Verificar reconciliação (sem operar)', disabled=not allow_reconcile):
-        result = reconcile(status['cycle_id'])
+        if status.get('quarantine_id'):
+            result = reconcile(status['cycle_id'], release_quarantine=True,
+                               expected_quarantine_id=status['quarantine_id'])
+        else:
+            result = reconcile(status['cycle_id'])
         if result.get('historical'):
             ui.info('Recibo histórico verificado anteriormente; não é uma reconciliação do estado atual. '
                     'A intenção atual e sua barreira não foram alteradas. Recarregue os dados.')
+        elif result['outcome'] == 'COMMITTED' and result.get('blocked'):
+            ui.warning('COMMITTED verificado; quarentena financeira continua ativa. '
+                       'A evidência de integridade não foi liberada. Não repita operações.')
         elif result['outcome'] == 'COMMITTED' and not result.get('resolution_recorded', False):
             ui.warning('COMMITTED verificado; registro/liberação da reconciliação não confirmado. '
                        'Não repita a operação. Recarregue o bloqueio e verifique a conexão.')
@@ -211,5 +218,6 @@ def render_commit_control(*, ui, allow_reconcile=False):
             ui.info('NOT_COMMITTED: ausência de commit comprovada sob barreira de escritores. '
                     'Nenhuma repetição financeira foi executada.')
         else:
-            ui.error('UNKNOWN_COMMIT: divergência ou evidência insuficiente. Bloqueio mantido; '
-                     'investigue os namespaces. Nenhum registro foi apagado.')
+            ui.error('UNKNOWN_COMMIT: divergência ou evidência insuficiente. Execução recusada; '
+                     f"persistência da barreira: {result.get('quarantine_persistence', 'UNCONFIRMED')}. "
+                     'Verifique a conexão e o estado persistido. Nenhum registro foi apagado.')

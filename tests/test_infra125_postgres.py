@@ -522,15 +522,16 @@ def test_actual_retention_rollback_and_archive_preserve_or_invalidate_proof(pg,m
     assert q.reconcile(cycle)['outcome']=='COMMITTED'
     proof=proto.prepare(cycle)
     maintenance=retention.run_retention_job(now=datetime(2027,5,1,tzinfo=timezone.utc))
-    assert maintenance['last_summary']['trade_reports_archived_rows']==1
-    assert proto.publish(proof)['outcome']=='UNKNOWN_COMMIT'
-    assert q.reconcile(cycle)['outcome']=='UNKNOWN_COMMIT'
-    assert proto.reconcile(cycle)['outcome']=='UNKNOWN_COMMIT'
+    assert maintenance['blocked'] and maintenance['last_error']=='FINANCIAL_ARCHIVE_REQUIRES_VERSIONED_RECEIPTS'
+    assert proto.publish(proof)['outcome']=='COMMITTED'
+    assert q.reconcile(cycle)['outcome']=='COMMITTED'
+    assert proto.reconcile(cycle)['outcome']=='COMMITTED'
     assert len(paper.read_paper_trades())==3
-    assert conn.execute("SELECT count(*) FROM app_rows WHERE namespace LIKE 'table:trade_reports_%%'").fetchone()[0]==1
-    evidence(conn,'blockers','retention',{'active_gate_rolled_back_maintenance':True,'history_preserved_in_archive':True,
-        'committed_archive_invalidated_old_proof':True,'current_verifier_also_unknown_after_archive':True,
-        'archive_compatibility':'NOT_PROVEN_FOR_OPERATIONAL_INTEGRATION'})
+    assert conn.execute("SELECT count(*) FROM app_rows WHERE namespace LIKE 'table:trade_reports_%%' AND namespace<>'table:trade_reports.csv'").fetchone()[0]==0
+    evidence(conn,'blockers','retention',{'active_gate_rolled_back_maintenance':True,
+        'receipted_archive_refused_without_rewrite':True,'manifest_and_receipt_preserved':True,
+        'archive_compatibility':'REQUIRES_FUTURE_VERSIONED_PROTOCOL'})
+
 
 
 @pytest.mark.parametrize('commit',[True,False])

@@ -22,9 +22,9 @@ from tests.test_infra123_postgres import _seed_full_synthetic_history
 
 def evidence(conn, name, values):
     major = str(conn.execute('SHOW server_version_num').fetchone()[0])[:2]
-    path = ROOT / f'docs/retomada/evidencias/infra126-contract-pg{major}.json'
+    path = ROOT / f'docs/retomada/evidencias/infra127-converted-pg{major}.json'
     data = json.loads(path.read_text()) if path.exists() else {
-        'scope': 'LOCAL_SYNTHETIC_STUDY_ONLY', 'runtime_changed': False, 'cases': {}}
+        'scope': 'LOCAL_SYNTHETIC_STUDY_ONLY', 'former_counterexamples_converted': True, 'cases': {}}
     data['cases'][name] = values
     path.write_text(json.dumps(data, indent=2, sort_keys=True) + '\n')
 
@@ -40,20 +40,14 @@ def test_noop_retention_changes_current_receipt_without_persisting_a_gate(pg, mo
     before_rows = rows(conn)
     result = retention.archive_old_trade_reports(retention_days=36500)
     assert result['archived_rows'] == 0 and result['retained_rows'] == 1
-    assert q.manifest() != before and rows(conn) != before_rows
+    assert q.manifest() == before and rows(conn) == before_rows
     reports = p.load_json_rows('table:trade_reports.csv', ROOT / 'unused.json')
-    assert len(reports) == 1 and 'cycle_id' not in reports[0]
+    assert len(reports) == 1 and reports[0]['cycle_id']
     answer = q.reconcile(cycle)
-    assert answer['outcome'] == 'UNKNOWN_COMMIT' and answer['blocked']
-    # Defect proof: returned blocking status is not persisted if gate was clear.
+    assert answer['outcome'] == 'COMMITTED' and not answer['blocked']
     assert not q.gate_status()['blocked']
-    q.assert_execution_allowed()  # NO subsequent financial operation is executed.
-    assert len(paper.read_paper_trades()) == 3
-    evidence(conn, 'noop_retention_and_unpersisted_block', {
-        'archived_rows': 0, 'manifest_changed': True, 'cycle_id_removed_from_report': True,
-        'reconcile_result': answer['outcome'], 'returned_blocked': True,
-        'persisted_gate_blocked': False, 'execution_guard_still_allows': True,
-        'classification': 'CRITICAL_OPEN_DEFECT_NOT_FIXED_IN_STUDY'})
+    evidence(conn, 'noop_retention_preserves_proof', {'manifest_equal': True,
+        'rows_equal': True, 'cycle_id_preserved': True, 'outcome': answer['outcome']})
 
 
 def test_retained_conflicting_reports_collapse_without_archive(pg, monkeypatch):
@@ -67,12 +61,14 @@ def test_retained_conflicting_reports_collapse_without_archive(pg, monkeypatch):
                  (json.dumps(changed),))
     result = retention.archive_old_trade_reports(retention_days=36500)
     after = p.load_json_rows('table:trade_reports.csv', ROOT / 'unused.json')
-    assert result['archived_rows'] == 0 and len(after) == 1
-    assert after[0]['entry_price'] == changed['entry_price']
-    assert conn.execute("SELECT count(*) FROM app_rows WHERE namespace LIKE 'table:trade_reports_%%' AND namespace <> 'table:trade_reports.csv'").fetchone()[0] == 0
-    evidence(conn, 'retained_conflicting_reports', {'synthetic_reports_before': 2,
-        'reports_after': 1, 'archived_rows': 0, 'different_payload_same_dedupe_key': True,
-        'classification': 'HIGH_LOSS_OF_EVIDENCE_NOT_FIXED'})
+    assert result['blocked'] and result['reason'] == 'RETENTION_CONFLICT'
+    assert result['archived_rows'] == 0 and len(after) == 2
+    assert after == [report, changed]
+    assert q.gate_status()['blocked'] and q._quarantine()['active']
+    with pytest.raises(q.ReconciliationRequired):
+        q.assert_execution_allowed()
+    evidence(conn, 'retained_conflicting_reports', {'reports_preserved': 2,
+        'conflict_quarantine_persisted': True, 'archived_rows': 0})
 
 
 def test_unknown_rolls_back_retention_and_catalog_unit(pg, monkeypatch):
@@ -101,7 +97,10 @@ def test_backup_of_retained_history_is_exact_but_does_not_repair_receipts(pg, mo
     with p.persistence_transaction():
         result = retention.run_retention_job(now=datetime(2027, 5, 1, tzinfo=timezone.utc))
         store.update_retention_status(result)
-    assert result['last_summary']['trade_reports_archived_rows'] == 1
+    assert result['blocked'] and result['last_error'] == 'FINANCIAL_ARCHIVE_REQUIRES_VERSIONED_RECEIPTS'
+    conn.execute('UPDATE app_state SET payload_json=%s WHERE namespace=%s', ('{',q.RECEIPT_PREFIX+cycle))
+    assert q.reconcile(cycle)['outcome'] == 'UNKNOWN_COMMIT'
+    assert q.gate_status()['blocked']
     before_rows = rows(conn)
     restored_dsn, report = dump_restore(pg[2], __import__('os').environ['ATLAS_INFRA12_CONTAINER'], tmp_path)
     with psycopg.connect(restored_dsn, autocommit=True) as restored:
@@ -109,12 +108,12 @@ def test_backup_of_retained_history_is_exact_but_does_not_repair_receipts(pg, mo
     with monkeypatch.context() as patch:
         patch.setenv('DATABASE_URL', restored_dsn)
         assert store.load_bot_state()['bot_status'] == 'STOPPED'
-        answer = q.reconcile(cycle)
-        assert answer['outcome'] == 'UNKNOWN_COMMIT'
+        assert q.reconcile(cycle)['outcome'] == 'UNKNOWN_COMMIT'
+        assert q.gate_status()['blocked']
         assert len(paper.read_paper_trades()) == 3
     evidence(conn, 'retention_backup_restore', {'all_rows_equal': True,
-        'archived_reports': 1, 'restored_stopped': True, 'receipt_still_unknown': True,
-        'backup_is_not_integrity_repair': True, 'financial_retry': False})
+        'unsafe_archival_refused': True, 'restored_stopped': True, 'bad_receipt_keeps_quarantine': True,
+        'backup': report, 'financial_retry': False})
 
 
 def test_table_namespaces_alias_different_directories(pg):

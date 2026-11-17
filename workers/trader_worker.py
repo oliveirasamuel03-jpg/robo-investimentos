@@ -1763,6 +1763,9 @@ def _run_daily_retention_maintenance() -> None:
                 archive_trader_orders=bool(retention_state.get("archive_trader_orders", False)),
             )
             update_retention_status(summary)
+            if summary.get('blocked'):
+                log_event('ERROR', f"Retencao bloqueada: {summary['last_error']}. Nenhuma liberacao financeira autorizada.")
+                return
             last_summary = summary.get("last_summary", {}) or {}
             log_event(
                 "INFO",

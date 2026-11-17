@@ -77,24 +77,13 @@ def test_archive_old_trade_reports_is_idempotent(isolated_storage):
         retention_days=60,
         now=retention._utc_now(retention.datetime.fromisoformat("2026-04-20T00:00:00+00:00")),
     )
-    runtime_after_first = state_store.read_storage_table(config.TRADER_REPORTS_FILE, columns=config.TRADER_REPORTS_COLUMNS)
-    archive_after_first = state_store.read_storage_table(first["files_updated"][0], columns=config.TRADER_REPORTS_COLUMNS)
-
-    assert first["archived_rows"] == 1
-    assert len(runtime_after_first) == 1
-    assert len(archive_after_first) == 1
-    assert archive_after_first.iloc[0]["trade_id"] == "old-trade"
-
+    assert first['blocked'] and first['reason'] == 'LOCAL_FINANCIAL_ARCHIVE_NOT_ATOMIC'
+    original = state_store.read_storage_table(config.TRADER_REPORTS_FILE, columns=config.TRADER_REPORTS_COLUMNS)
+    assert len(original) == 2 and first['archived_rows'] == 0 and first['files_updated'] == []
     second = retention.archive_old_trade_reports(
-        retention_days=60,
-        now=retention._utc_now(retention.datetime.fromisoformat("2026-04-20T00:00:00+00:00")),
-    )
-    runtime_after_second = state_store.read_storage_table(config.TRADER_REPORTS_FILE, columns=config.TRADER_REPORTS_COLUMNS)
-    archive_after_second = state_store.read_storage_table(first["files_updated"][0], columns=config.TRADER_REPORTS_COLUMNS)
-
-    assert second["archived_rows"] == 0
-    assert len(runtime_after_second) == 1
-    assert len(archive_after_second) == 1
+        retention_days=60, now=retention.datetime.fromisoformat('2026-04-20T00:00:00+00:00'))
+    assert second['blocked'] and second['files_updated'] == []
+    assert state_store.read_storage_table(config.TRADER_REPORTS_FILE, columns=config.TRADER_REPORTS_COLUMNS).equals(original)
 
 
 def test_run_retention_job_generates_weekly_validation_summary(isolated_storage):

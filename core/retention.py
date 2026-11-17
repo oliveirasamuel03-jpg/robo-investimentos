@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+import hashlib
+import json
 from pathlib import Path
 from typing import Any
 
@@ -26,6 +28,7 @@ from core.config import (
 from core.persistence import (
     load_json_state, read_table, replace_table, transactional_persistence, update_json_state,
 )
+import core.persistence as persistence
 from core.state_store import load_bot_state
 from core.trader_reports import (
     calculate_trade_report_metrics,
@@ -79,8 +82,12 @@ def _dedupe_rows(df: pd.DataFrame, *, key_columns: list[str], sort_column: str |
         sort_values = pd.to_datetime(working[sort_column], errors="coerce", utc=True)
         working = working.assign(_sort_value=sort_values).sort_values("_sort_value", kind="stable")
 
-    working = working.assign(_row_key=_row_key_series(working, key_columns))
-    working = working.drop_duplicates("_row_key", keep="last")
+    # A business key is not a content identity. Conflicting payloads must never
+    # disappear from a projection merely because one happened to be last.
+    fingerprints = [json.dumps(row, sort_keys=True, default=str, ensure_ascii=False)
+                    for row in _records(working, list(working.columns))]
+    working = working.assign(_row_key=fingerprints)
+    working = working.drop_duplicates("_row_key", keep="first")
     working = working.drop(columns=[c for c in ["_row_key", "_sort_value"] if c in working.columns])
     return working.reset_index(drop=True)
 
@@ -99,6 +106,19 @@ def _records(df: pd.DataFrame, columns: list[str]) -> list[dict[str, Any]]:
                 clean_row[key] = value
         records.append(clean_row)
     return records
+
+
+def _publish_archive_paths(prefix, paths):
+    """Same PostgreSQL unit as copy/removal, including direct API callers."""
+    if not paths:
+        return
+    from core.state_store import update_bot_state
+    kind = {'trade_reports': 'reports', 'trader_orders': 'orders', 'bot_log': 'logs'}[prefix]
+    def publish(state):
+        catalog = state.setdefault('retention', {}).setdefault('archive_catalog', {})
+        catalog[kind] = sorted(set(catalog.get(kind, [])) | set(paths))
+        return state
+    update_bot_state(publish)
 
 
 def _catalog_paths(kind: str) -> list[str]:
@@ -137,12 +157,25 @@ def _weekly_summary_namespace(week_key: str, *, archived: bool) -> str:
     return f"weekly_validation_summary:{location}:{week_key}"
 
 
-def _save_weekly_summary(summary: dict[str, Any], *, week_key: str, archived: bool) -> None:
+@transactional_persistence
+def _save_weekly_summary(summary: dict[str, Any], *, week_key: str, archived: bool) -> dict[str, Any]:
     path = _weekly_summary_path(week_key, archived=archived)
+    namespace = _weekly_summary_namespace(week_key, archived=archived)
+    if persistence.database_enabled():
+        with persistence._reader() as conn:
+            row = conn.execute('SELECT payload_json FROM app_state WHERE namespace=%s', (namespace,)).fetchone()
+        previous = persistence._decode_json(row[0], dict, 'weekly summary') if row else None
+    else:
+        previous = persistence._decode_json(path.read_text(), dict, 'weekly summary') if path.exists() else None
+    if previous is not None:
+        meaningful = lambda value: {key: item for key, item in value.items() if key != 'generated_at'}
+        if meaningful(previous) == meaningful(summary):
+            return previous
     update_json_state(
-        _weekly_summary_namespace(week_key, archived=archived), dict, path,
+        namespace, dict, path,
         lambda _current: summary,
     )
+    return summary
 
 
 def load_weekly_summary(report_entry: dict[str, Any]) -> dict[str, Any]:
@@ -173,8 +206,66 @@ def _archive_old_rows(
     key_columns: list[str],
     retention_days: int,
     now: datetime,
+    preflight_only: bool = False,
 ) -> dict[str, Any]:
-    current_df = _normalize_frame(read_table(runtime_path, columns=columns), columns)
+    namespace = persistence._table_namespace(runtime_path)
+    from core import commit_protocol as protocol
+    financial = namespace in protocol.FINANCIAL_ROWS
+    source = []
+    if financial:
+        # Read controls without using initializing loaders in a no-op path.
+        if persistence.database_enabled():
+            with persistence._reader() as conn:
+                controls = conn.execute('SELECT namespace FROM app_state WHERE namespace IN (%s,%s)',
+                                        (protocol.GATE, protocol.QUARANTINE)).fetchall()
+            if controls and protocol.gate_status()['blocked']:
+                raise protocol.ReconciliationRequired(reason='RETENTION_BLOCKED_BY_FINANCIAL_CONTROL')
+        elif protocol._GATE_PATH.exists() or protocol._QUARANTINE_PATH.exists():
+            if protocol.gate_status()['blocked']:
+                raise protocol.ReconciliationRequired(reason='RETENTION_BLOCKED_BY_FINANCIAL_CONTROL')
+        try:
+            if persistence.database_enabled():
+                with persistence._reader() as conn:
+                    raw = conn.execute('SELECT seq,row_json FROM app_rows WHERE namespace=%s ORDER BY seq',
+                                       (namespace,)).fetchall()
+                source = [(seq, persistence._decode_json(text, dict, 'retention financial source'))
+                          for seq, text in raw]
+                records = [row for _, row in source]
+                current_df = pd.DataFrame(records)
+            else:
+                current_df = read_table(runtime_path)
+                records = _records(current_df, list(current_df.columns))
+                source = list(enumerate(records))
+        except persistence.PersistenceDataError:
+            marked = protocol._quarantine_locked('RETENTION_CORRUPTION',
+                cycle_id=protocol._gate().get('active_cycle_id') or protocol._gate().get('last_cycle_id'),
+                evidence={'namespace': namespace, 'reason': 'STRICT_SOURCE_DECODING_FAILED'})
+            return {'blocked': True, 'reason': 'RETENTION_CORRUPTION', 'archived_rows': 0,
+                    'retained_rows': len(raw) if persistence.database_enabled() else None,
+                    'files_updated': [], 'oldest_runtime_at': '', **marked}
+        seen, conflicts, identical = {}, [], 0
+        for identity, record in source:
+            # Hash the complete original object, including cycle_id/extra fields.
+            content_hash = hashlib.sha256(persistence._encode(record).encode()).hexdigest()
+            key = tuple(str(record.get(field, '')).strip() for field in key_columns)
+            if key in seen:
+                previous_id, previous_hash = seen[key]
+                if previous_hash != content_hash:
+                    conflicts.append({'namespace': namespace, 'key': list(key),
+                        'origin_ids': [previous_id, identity], 'payload_sha256': [previous_hash, content_hash],
+                        'cycle_id': record.get('cycle_id'), 'reason': 'SAME_KEY_DIFFERENT_CONTENT'})
+                else:
+                    identical += 1
+            else:
+                seen[key] = (identity, content_hash)
+        if conflicts:
+            marked = protocol._quarantine_locked('RETENTION_CONFLICT',
+                cycle_id=protocol._gate().get('active_cycle_id') or protocol._gate().get('last_cycle_id'),
+                evidence={'namespace': namespace, 'conflicts': conflicts})
+            return {'blocked': True, 'reason': 'RETENTION_CONFLICT', 'archived_rows': 0,
+                    'retained_rows': len(source), 'files_updated': [], 'oldest_runtime_at': '', **marked}
+    else:
+        current_df = read_table(runtime_path)
     timestamp_series = _safe_dt_series(current_df, timestamp_column)
     cutoff = now - timedelta(days=retention_days)
 
@@ -185,20 +276,85 @@ def _archive_old_rows(
     files_updated: list[str] = []
     archived_rows = 0
 
+    oldest = timestamp_series.dropna().min().isoformat() if timestamp_series.notna().any() else ''
+    if archive_df.empty:
+        return {'archived_rows': 0, 'retained_rows': len(current_df), 'files_updated': [],
+                'oldest_runtime_at': oldest, 'identical_rows_preserved': identical if financial else 0}
+
+    if financial:
+        if persistence.database_enabled():
+            with persistence._reader() as conn:
+                receipted = conn.execute('SELECT EXISTS(SELECT 1 FROM app_state WHERE left(namespace,%s)=%s)',
+                                        (len(protocol.RECEIPT_PREFIX), protocol.RECEIPT_PREFIX)).fetchone()[0]
+        else:
+            receipted = any(protocol.RUNTIME_DIR.glob('paper_cycle_receipt_*.json'))
+        if receipted:
+            # Runtime namespace/seq/content are signed by v1 receipts. No safe
+            # relocation contract exists: refuse, do not rewrite or re-sign.
+            return {'blocked': True, 'reason': 'FINANCIAL_ARCHIVE_REQUIRES_VERSIONED_RECEIPTS',
+                    'archived_rows': 0, 'retained_rows': len(current_df), 'files_updated': [],
+                    'oldest_runtime_at': oldest}
+        if not persistence.database_enabled():
+            return {'blocked': True, 'reason': 'LOCAL_FINANCIAL_ARCHIVE_NOT_ATOMIC',
+                    'archived_rows': 0, 'retained_rows': len(current_df), 'files_updated': [],
+                    'oldest_runtime_at': oldest}
+        if any(row.get('cycle_id') for _, row in source):
+            marked = protocol._quarantine_locked('MISSING_FINANCIAL_RECEIPTS',
+                evidence={'namespace': namespace, 'reason': 'SOURCE_REFERENCES_ABSENT_CYCLE_RECEIPTS'})
+            return {'blocked': True, 'reason': 'MISSING_FINANCIAL_RECEIPTS', 'archived_rows': 0,
+                    'retained_rows': len(source), 'files_updated': [], 'oldest_runtime_at': oldest, **marked}
+        # Unreceipted synthetic/legacy rows can be moved losslessly in PG.
+        # Plan every destination before writing anything; preserve raw objects.
+        plans = []
+        for period_value in sorted(timestamp_series[archive_mask].dt.tz_localize(None).dt.to_period('M').unique()):
+            path = archive_dir / _archive_file_name(prefix, period_value)
+            existing = persistence.load_json_rows(persistence._table_namespace(path), path.with_suffix('.csv.json'))
+            selected = [row for (_, row), stamp in zip(source, timestamp_series)
+                        if pd.notna(stamp) and stamp < cutoff and stamp.tz_localize(None).to_period('M') == period_value]
+            by_key = {}
+            for record in existing + selected:
+                key = tuple(str(record.get(field, '')).strip() for field in key_columns)
+                fingerprint = hashlib.sha256(persistence._encode(record).encode()).hexdigest()
+                if key in by_key and by_key[key] != fingerprint:
+                    marked = protocol._quarantine_locked('RETENTION_CONFLICT',
+                        cycle_id=protocol._gate().get('active_cycle_id') or protocol._gate().get('last_cycle_id'),
+                        evidence={'namespace': namespace, 'archive_namespace': persistence._table_namespace(path),
+                                  'key': list(key), 'payload_sha256': [by_key[key], fingerprint],
+                                  'reason': 'ARCHIVE_KEY_DIFFERENT_CONTENT'})
+                    return {'blocked': True, 'reason': 'RETENTION_CONFLICT', 'archived_rows': 0,
+                            'retained_rows': len(source), 'files_updated': [], 'oldest_runtime_at': oldest, **marked}
+                by_key[key] = fingerprint
+            plans.append((path, existing + selected, len(selected)))
+        if preflight_only:
+            return {'blocked': False, 'archived_rows': 0, 'retained_rows': len(source),
+                    'files_updated': [], 'oldest_runtime_at': oldest}
+        for path, merged, count in plans:
+            persistence.replace_json_rows(persistence._table_namespace(path), merged, path.with_suffix('.csv.json'))
+            files_updated.append(str(path))
+            archived_rows += count
+        retained = [row for (_, row), keep in zip(source, ~archive_mask) if keep]
+        persistence.replace_json_rows(namespace, retained, runtime_path.with_suffix('.csv.json'))
+        _publish_archive_paths(prefix, files_updated)
+        return {'archived_rows': archived_rows, 'retained_rows': len(retained),
+                'files_updated': files_updated, 'oldest_runtime_at': oldest}
+
     if not archive_df.empty:
         month_series = _safe_dt_series(archive_df, timestamp_column).dt.tz_localize(None).dt.to_period("M")
         for period_value in sorted(month_series.dropna().unique()):
             month_chunk = archive_df.loc[month_series == period_value].copy()
             archive_path = archive_dir / _archive_file_name(prefix, period_value)
-            existing_df = _normalize_frame(read_table(archive_path, columns=columns), columns)
+            existing_df = read_table(archive_path)
             merged_df = pd.concat([existing_df, month_chunk], ignore_index=True)
             merged_df = _dedupe_rows(merged_df, key_columns=key_columns, sort_column=timestamp_column)
-            replace_table(archive_path, _records(merged_df, columns), columns=columns)
+            all_columns = list(merged_df.columns)
+            replace_table(archive_path, _records(merged_df, all_columns), columns=all_columns)
             files_updated.append(str(archive_path))
             archived_rows += int(len(month_chunk))
 
-    retained_df = _dedupe_rows(retained_df, key_columns=key_columns, sort_column=timestamp_column)
-    replace_table(runtime_path, _records(retained_df, columns), columns=columns)
+    # Retained source rows keep their order/content. No deduplication of originals.
+    all_columns = list(retained_df.columns)
+    replace_table(runtime_path, _records(retained_df, all_columns), columns=all_columns)
+    _publish_archive_paths(prefix, files_updated)
 
     oldest_runtime_at = None
     if not retained_df.empty:
@@ -214,7 +370,8 @@ def _archive_old_rows(
     }
 
 
-def archive_old_trade_reports(retention_days: int = RETENTION_DAYS, *, now: datetime | None = None) -> dict[str, Any]:
+def archive_old_trade_reports(retention_days: int = RETENTION_DAYS, *, now: datetime | None = None,
+                              _preflight_only: bool = False) -> dict[str, Any]:
     return _archive_old_rows(
         runtime_path=TRADER_REPORTS_FILE,
         archive_dir=ARCHIVE_REPORTS_DIR,
@@ -224,6 +381,7 @@ def archive_old_trade_reports(retention_days: int = RETENTION_DAYS, *, now: date
         key_columns=["trade_id", "closed_at", "asset", "exit_reason", "realized_pnl", "quantity"],
         retention_days=retention_days,
         now=_utc_now(now),
+        preflight_only=_preflight_only,
     )
 
 
@@ -240,7 +398,8 @@ def archive_old_bot_logs(retention_days: int = RETENTION_DAYS, *, now: datetime 
     )
 
 
-def archive_old_trader_orders(retention_days: int = RETENTION_DAYS, *, now: datetime | None = None) -> dict[str, Any]:
+def archive_old_trader_orders(retention_days: int = RETENTION_DAYS, *, now: datetime | None = None,
+                             _preflight_only: bool = False) -> dict[str, Any]:
     return _archive_old_rows(
         runtime_path=TRADER_ORDERS_FILE,
         archive_dir=ARCHIVE_REPORTS_DIR,
@@ -250,6 +409,7 @@ def archive_old_trader_orders(retention_days: int = RETENTION_DAYS, *, now: date
         key_columns=["timestamp", "asset", "side", "quantity", "price", "gross_value", "source"],
         retention_days=retention_days,
         now=_utc_now(now),
+        preflight_only=_preflight_only,
     )
 
 
@@ -492,7 +652,13 @@ def _build_weekly_reports(now: datetime, retention_days: int) -> dict[str, Any]:
         archived = weeks_old >= WEEKLY_REPORT_RUNTIME_WEEKS
         csv_path = _weekly_csv_path(week_key, archived=archived)
         summary_path = _weekly_summary_path(week_key, archived=archived)
-        replace_table(csv_path, _records(week_reports, TRADER_REPORTS_COLUMNS), columns=TRADER_REPORTS_COLUMNS)
+        desired_rows = _records(week_reports, TRADER_REPORTS_COLUMNS)
+        if persistence.database_enabled():
+            existing_rows = persistence.load_json_rows(persistence._table_namespace(csv_path), csv_path.with_suffix('.csv.json'))
+        else:
+            existing_rows = _records(read_table(csv_path), TRADER_REPORTS_COLUMNS) if csv_path.exists() else None
+        if existing_rows != desired_rows:
+            replace_table(csv_path, desired_rows, columns=TRADER_REPORTS_COLUMNS)
         summary = _build_weekly_summary(
             week_key=week_key,
             reports_df=normalize_trade_reports_frame(week_reports),
@@ -500,7 +666,7 @@ def _build_weekly_reports(now: datetime, retention_days: int) -> dict[str, Any]:
             now=now,
             archived=archived,
         )
-        _save_weekly_summary(summary, week_key=week_key, archived=archived)
+        summary = _save_weekly_summary(summary, week_key=week_key, archived=archived)
 
         entry = {
             "week_key": week_key,
@@ -558,6 +724,20 @@ def run_retention_job(
 ) -> dict[str, Any]:
     current_time = _utc_now(now)
 
+    trade_reports_preflight = archive_old_trade_reports(retention_days=retention_days, now=current_time,
+                                                       _preflight_only=True)
+    if trade_reports_preflight.get('blocked'):
+        return {'blocked': True, 'last_run_at': current_time.isoformat(),
+                'last_error': trade_reports_preflight['reason'], 'last_error_at': current_time.isoformat(),
+                'retention_result': trade_reports_preflight}
+    # Validate orders before moving logs or writing any derived weekly reports.
+    if archive_trader_orders:
+        orders_preflight = archive_old_trader_orders(retention_days=retention_days, now=current_time,
+                                                    _preflight_only=True)
+        if orders_preflight.get('blocked'):
+            return {'blocked': True, 'last_run_at': current_time.isoformat(),
+                    'last_error': orders_preflight['reason'], 'last_error_at': current_time.isoformat(),
+                    'retention_result': orders_preflight}
     trade_reports_summary = archive_old_trade_reports(retention_days=retention_days, now=current_time)
     bot_logs_summary = archive_old_bot_logs(retention_days=retention_days, now=current_time)
 
@@ -579,7 +759,7 @@ def run_retention_job(
         "reports": [],
         "logs": [],
         "orders": [],
-        "weekly_reports": sorted(set(weekly_payload["runtime_paths"] + weekly_payload["archive_paths"])),
+        "weekly_reports": sorted(set(_catalog_paths('weekly_reports') + weekly_payload["runtime_paths"] + weekly_payload["archive_paths"])),
     }
     archive_catalog["reports"] = sorted(
         {*(str(path) for path in _known_archive_paths("reports", ARCHIVE_REPORTS_DIR, "trade_reports_*.csv")), *trade_reports_summary["files_updated"]}
@@ -588,7 +768,9 @@ def run_retention_job(
         {*(str(path) for path in _known_archive_paths("logs", ARCHIVE_LOGS_DIR, "bot_log_*.csv")), *bot_logs_summary["files_updated"]}
     )
     if archive_trader_orders:
-        archive_catalog["orders"] = sorted(set(orders_summary["files_updated"]))
+        archive_catalog["orders"] = sorted(set(_catalog_paths('orders') + orders_summary["files_updated"]))
+    else:
+        archive_catalog['orders'] = _catalog_paths('orders')
 
     summary = {
         "enabled": True,
