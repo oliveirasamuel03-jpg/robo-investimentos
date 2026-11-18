@@ -1,0 +1,11 @@
+{
+  "scope": "Only trailing spaces/tabs in new TXT/XML; no line, failure, assertion, warning or result removed. All 216 previous evidence files are untouched.",
+  "files": [
+    {
+      "path": "docs/retomada/evidencias/infra1271/offline.txt",
+      "raw_sha256": "a959b7fbe95658ef84186d494fc2b6217dc910772c19ee659ad6decaccdccf70",
+      "formatted_sha256": "2910275f8b2a65a109dcdc8d4bf13350ae626f44578fc522dbc609f99722c731",
+      "trailing_space_bytes_removed": 12
+    }
+  ]
+}

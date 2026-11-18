@@ -1,0 +1,85 @@
+{
+  "checks": [
+    {
+      "command": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python",
+        "-m",
+        "compileall",
+        "-q",
+        "core",
+        "engines",
+        "workers",
+        "pages",
+        "scripts",
+        "tests",
+        "__init__.py",
+        "app.py",
+        "bot_engine.py",
+        "bot_runner.py",
+        "config.py",
+        "enginesquant_bridge.py",
+        "metrics.py",
+        "paper_trading_engine.py",
+        "quant_bridge.py",
+        "scheduler.py",
+        "trader_engine.py",
+        "trader_worker.py",
+        "ui.py"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python",
+        "-m",
+        "pip",
+        "check"
+      ],
+      "exit_code": 0,
+      "stdout": "No broken requirements found.\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "git",
+        "diff",
+        "8bdb4bd2fe099ddc59af158f8a32f190fd6b84ab",
+        "--check"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "git",
+        "diff",
+        "--cached",
+        "--check"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "git",
+        "diff",
+        "8bdb4bd2fe099ddc59af158f8a32f190fd6b84ab",
+        "--check"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    }
+  ],
+  "runtime_modified": false,
+  "previous_assertions_modified": false,
+  "custody_protocol_modified": false,
+  "production_sql_privileges_modified": false,
+  "runner_commit": "69d277def9966f7a20b76a8a352c39d5aadf47d9",
+  "all_changes_are_additions": true,
+  "existing_product_tests_and_evidence_unchanged": true
+}

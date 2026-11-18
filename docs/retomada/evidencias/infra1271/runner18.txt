@@ -1,0 +1,2 @@
+{"status": "RUNNING", "evidence": "/workspace/robo-investimentos-infra1271/docs/retomada/evidencias/infra1271/pg18-20261118T141016Z-7d8e6818", "expected_cases": 175}
+{"status": "PASSED", "evidence": "/workspace/robo-investimentos-infra1271/docs/retomada/evidencias/infra1271/pg18-20261118T141016Z-7d8e6818"}

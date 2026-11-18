@@ -1,0 +1,15 @@
+{
+  "branch": "atlas/infra-1-2-7-1-fechamento-regressao",
+  "broker_mode": "paper",
+  "broker_provider": "paper",
+  "expected_cases": 175,
+  "free_bytes_before": 2171805696,
+  "image": "postgres:16-alpine",
+  "min_free_bytes_unchanged": 268435456,
+  "reason": "Required local official image unavailable; no automatic pull or cleanup",
+  "requested_version": "16",
+  "scope": "LOCAL_SYNTHETIC_PAPER_ONLY",
+  "source_commit": "8bdb4bd2fe099ddc59af158f8a32f190fd6b84ab",
+  "started_utc": "2026-11-18T14:10:15.907327+00:00",
+  "status": "RESOURCE_BLOCKED"
+}

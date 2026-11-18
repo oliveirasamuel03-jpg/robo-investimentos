@@ -1,0 +1,27 @@
+{
+  "status": "RESOURCE_BLOCKED",
+  "tested_postgres16_cases": 0,
+  "not_executed_postgres16_cases": 175,
+  "docker_driver": "vfs",
+  "official_postgres16_image_local": false,
+  "host_postgres16_installation": false,
+  "disk_now": {
+    "total": 8417406976,
+    "used": 6519943168,
+    "free": 1451192320
+  },
+  "prior_observed_disk_bytes_after_pg16_image_only": 324292608,
+  "prior_preserved_container": "9fb2a800a365",
+  "prior_resource_evidence": "docs/retomada/evidencias/infra127-pg16-unexecuted.json",
+  "unchanged_test_min_free_bytes": 268435456,
+  "pull_attempted_in_this_phase": false,
+  "volume_removed_from_prior_phase": false,
+  "system_prune_executed": false,
+  "explanation": "Only PG18 image is installed. Prior PG16 VFS extraction left 309.3 MiB before a test container; another image/container/data cannot be added conservatively while retaining the old volume and the unchanged 256 MiB reserve. No automatic pull or destructive cleanup.",
+  "disk_after_pg18_cleanup": {
+    "total": 8417406976,
+    "used": 5822914560,
+    "free": 2148220928
+  },
+  "reassessment_after_pg18": "Image 16 remains unavailable; retained prior VFS constraints and disk reserve prevent a conservative new image/container/data allocation."
+}

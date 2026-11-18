@@ -1,0 +1,10 @@
+{
+  "status": "NOT_PROVIDED_OR_LOCATED",
+  "source_commit": "8bdb4bd2fe099ddc59af158f8a32f190fd6b84ab",
+  "repository_files_searched": "docs/retomada; audit/parecer filenames and auditoria independente text",
+  "github_issue_query": "repo:oliveirasamuel03-jpg/robo-investimentos \"auditoria\" \"1.2.7\"",
+  "github_issue_results": 0,
+  "user_reference_requested": true,
+  "independent_security_approval_claimed": false,
+  "source_author_report_is_not_independent_review": true
+}

@@ -1,0 +1,76 @@
+{
+  "cases": {
+    "growth": {
+      "elapsed_seconds": 26.336819230986293,
+      "financial_trades": 0,
+      "financial_units_attempted": 0,
+      "max_creation_window_seconds": 120,
+      "note": "Real protocol bookkeeping with no financial transaction; not 128 trading cycles nor proof of 72h growth.",
+      "real_prepared_intents_proven_not_committed": 128,
+      "receipt_cleanup_implemented": false,
+      "samples": [
+        {
+          "all_receipts_preserved": true,
+          "lookup_ms": {
+            "max": 21.586433009360917,
+            "median": 12.58440099627478,
+            "n": 10,
+            "p95": 21.586433009360917,
+            "p95_method": "nearest_rank; n=10 gives observed maximum"
+          },
+          "maintenance_ms": 130.7202300085919,
+          "payload_bytes": 955,
+          "receipts": 1,
+          "reconciliation_ms": {
+            "max": 43.436068008304574,
+            "median": 29.07975699781673,
+            "n": 10,
+            "p95": 43.436068008304574,
+            "p95_method": "nearest_rank; n=10 gives observed maximum"
+          }
+        },
+        {
+          "all_receipts_preserved": true,
+          "lookup_ms": {
+            "max": 13.509925993275829,
+            "median": 11.784012007410638,
+            "n": 10,
+            "p95": 13.509925993275829,
+            "p95_method": "nearest_rank; n=10 gives observed maximum"
+          },
+          "maintenance_ms": 105.45487901254091,
+          "payload_bytes": 30820,
+          "receipts": 32,
+          "reconciliation_ms": {
+            "max": 32.11825300240889,
+            "median": 26.822339990758337,
+            "n": 10,
+            "p95": 32.11825300240889,
+            "p95_method": "nearest_rank; n=10 gives observed maximum"
+          }
+        },
+        {
+          "all_receipts_preserved": true,
+          "lookup_ms": {
+            "max": 14.439662001677789,
+            "median": 11.752136502764188,
+            "n": 10,
+            "p95": 14.439662001677789,
+            "p95_method": "nearest_rank; n=10 gives observed maximum"
+          },
+          "maintenance_ms": 101.09999599808361,
+          "payload_bytes": 122760,
+          "receipts": 128,
+          "reconciliation_ms": {
+            "max": 33.254491005209275,
+            "median": 26.709543002652936,
+            "n": 10,
+            "p95": 33.254491005209275,
+            "p95_method": "nearest_rank; n=10 gives observed maximum"
+          }
+        }
+      ]
+    }
+  },
+  "scope": "LOCAL_SYNTHETIC_ONLY"
+}

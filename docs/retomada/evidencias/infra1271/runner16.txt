@@ -1,0 +1,1 @@
+{"status": "RESOURCE_BLOCKED", "evidence": "/workspace/robo-investimentos-infra1271/docs/retomada/evidencias/infra1271/pg16-20261118T141015Z-c5196095"}
